@@ -13,7 +13,7 @@ const coreDirectory = path.join(repository, 'services/rooms/internal/http/client
 const digest = (bytes) => new Bun.CryptoHasher('sha256').update(bytes).digest('hex');
 const compilers = new Map();
 async function compilerAssets(module = 'core') {
-  if (module !== 'core' && module !== 'office' && module !== 'mail') return null;
+  if (!['core', 'vault', 'office', 'mail', 'pdf'].includes(module)) return null;
   let compiler = compilers.get(module);
   if (!compiler) {
     compiler = (async () => {

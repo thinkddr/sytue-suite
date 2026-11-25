@@ -665,7 +665,7 @@ func (b *barraEstado) colocar(util float32) {
 	aa, ha := medidasDe(b.acciones)
 	ae, he := medidasDe(b.etapas)
 	b.posA, b.tamA = Envolver(aa, ha, HuecoAccionesEstado, HuecoAccionesEstado, util)
-	b.posE, b.tamE = Envolver(ae, he, HuecoEtapas, HuecoEtapas, util)
+	b.posE, b.tamE = EnvolverConRotulo(ae, he, HuecoEtapas, HuecoEtapas, util)
 	// Un grupo vacío no ocupa: `justify-between` con un hijo sin nada dentro sigue
 	// siendo un hijo, pero de ancho cero.
 	if b.tamA.Width+HuecoBarraEstado+b.tamE.Width <= util {

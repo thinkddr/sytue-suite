@@ -29,6 +29,8 @@ export type {
 // Primitivas y utilidades
 export { cx } from './lib/cx.js';
 export type { ClassValue } from './lib/cx.js';
+// «La app ya se puede usar»: la marca `sytue:app-ready` que se presupuesta.
+export { MARCA_APP_LISTA, cuandoAppLista, marcarAppLista } from './lib/appLista.js';
 
 export { saneaHtmlDeDocumento } from './lib/saneaHtml.js';
 // ¿Esta tecla es de la app o de quien está escribiendo? La comprobación estaba

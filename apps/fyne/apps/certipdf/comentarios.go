@@ -400,7 +400,7 @@ func respuesta(autor, texto string, ancho float32) fyne.CanvasObject {
 		abajo = tema.Espacio(0.5)
 	}
 	return container.New(ui.Margen{Izq: tema.Espacio(3), Abj: abajo}, container.New(conLineaIzquierda{sep: tema.Espacio(2)},
-		canvas.NewRectangle(tema.Color("border", v)), container.New(ui.Columna{}, partes...)))
+		ui.NuevoLiso("border"), container.New(ui.Columna{}, partes...)))
 }
 
 // conLineaIzquierda coloca [línea, contenido]: la línea de 1 px a la izquierda, a todo el
@@ -422,9 +422,8 @@ func (c conLineaIzquierda) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 // insigniaEstado es `text-2xs rounded px-1.5 py-0.5` con su fondo y su tinta. No se
 // pulsa: es una etiqueta.
 func insigniaEstado(texto, fondo, tinta string) fyne.CanvasObject {
-	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
-	f := canvas.NewRectangle(tema.Color(fondo, v))
-	f.CornerRadius = 0.25 * tema.Rem
+	f := ui.NuevoLiso(fondo)
+	f.Radio = 0.25 * tema.Rem
 	return container.NewStack(f, container.New(ui.Margen{Izq: tema.Espacio(1.5), Arr: tema.Espacio(0.5), Der: tema.Espacio(1.5), Abj: tema.Espacio(0.5)},
 		ui.NuevoRotulo(texto, tema.Texto2XS, ui.Normal, tinta)))
 }

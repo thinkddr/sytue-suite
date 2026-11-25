@@ -524,6 +524,8 @@ export const ga: AppCatalog<typeof en> = {
   'compose.templates': 'Teimpléid',
   'compose.templatesEmpty': 'Níl aon teimpléad agat fós. Cruthaigh iad i Socruithe Mail.',
   'compose.attachFailed': 'Níorbh fhéidir an ceangaltán a léamh',
+  'compose.openFailed':
+    'Níorbh fhéidir eagarthóir na teachtaireachta a oscailt. Bain triail eile as.',
   'compose.pastedImageDropped': 'Níor cuireadh an íomhá a greamaíodh san áireamh',
   'compose.pastedImagesDropped': 'Níor cuireadh na híomhánna a greamaíodh san áireamh',
   'compose.pastedImagesDroppedDescription': 'Chun íomhánna a sheoladh, ceangail iad mar chomhaid.',

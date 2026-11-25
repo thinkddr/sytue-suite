@@ -190,7 +190,8 @@ func TestElRelevoNoSeDejaInyectarPorElDestino(t *testing.T) {
 	}
 	guionesEnLaCSP(t, page, cspScriptHashes)
 
-	// Con la clave del puente de una app web: la confirmación y la salida tecleada.
+	// Con la clave del puente de una app web: la salida tecleada, y ninguna pregunta.
+	// La clave que este navegador ya tiene se entrega sin pedir un clic.
 	login := `/oauth2/authorize?client_id=a&prompt=login&x="><script>alert(2)</script>`
 	datos.Login = login
 	page, err = relevoPage("es", "https://x/cb?code=1&state=2", login, datos)
@@ -200,9 +201,14 @@ func TestElRelevoNoSeDejaInyectarPorElDestino(t *testing.T) {
 	if strings.Contains(page, "<script>alert") {
 		t.Fatal("la entrada tecleada cierra su atributo")
 	}
-	for _, id := range []string{`id="e2e-confirm" hidden`, `id="e2e-confirm-go"`, `id="e2e-app"`, `id="e2e-failed" hidden`, `id="e2e-retry"`} {
+	for _, id := range []string{`id="e2e-failed" hidden`, `id="e2e-retry"`} {
 		if !strings.Contains(page, id) {
 			t.Errorf("al relevo del puente le falta %s", id)
+		}
+	}
+	for _, id := range []string{`id="e2e-confirm"`, `id="e2e-confirm-go"`} {
+		if strings.Contains(page, id) {
+			t.Errorf("el relevo del puente no pregunta: le sobra %s", id)
 		}
 	}
 	guionesEnLaCSP(t, page, cspScriptHashes)

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 Daniel Delgado Ramos
+import '../client/html-estatico.js';
 import { GlobalRegistrator } from '@happy-dom/global-registrator';
 import { afterEach, expect, test } from 'bun:test';
 import { render } from 'preact';

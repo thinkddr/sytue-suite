@@ -47,6 +47,20 @@ func (p *Pantalla) imagenDe(url string) imagenRemota {
 	return imagenRemota{}
 }
 
+// repintarJuntos pide UN repintado para todo lo que llegue en la misma vuelta de la
+// rutina de la interfaz: un cuaderno con veinte imágenes repintaba veinte veces seguidas
+// al abrirse, una por imagen. El repintado va detrás de lo que ya está en cola.
+func (p *Pantalla) repintarJuntos() {
+	if p.repintePendiente {
+		return
+	}
+	p.repintePendiente = true
+	p.enHilo(func() {
+		p.repintePendiente = false
+		p.Repintar()
+	})
+}
+
 // cargarImagen la baja y, al tenerla, repinta.
 func (p *Pantalla) cargarImagen(url string) {
 	ctx, cancelar := p.ctx()
@@ -57,7 +71,7 @@ func (p *Pantalla) cargarImagen(url string) {
 			p.imagenes = map[string]imagenRemota{}
 		}
 		p.imagenes[url] = imagenRemota{img: img, err: err, lista: true}
-		p.Repintar()
+		p.repintarJuntos()
 	})
 }
 

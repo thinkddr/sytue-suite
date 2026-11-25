@@ -28,6 +28,8 @@ export function MobileFab({ label, icon, onClick, class: cls }: MobileFabProps):
       aria-label={label}
       title={label}
       onClick={onClick}
+      // Lo que flota en la misma esquina (el candado de reserva de la bóveda) se aparta.
+      data-sytue-fab=""
       class={cx(
         // Los mismos colores que Button primary: es LA acción primaria, en otro sitio.
         'bg-primary text-[var(--sytue-on-primary)] hover:bg-[var(--sytue-primary-hover)] active:bg-[var(--sytue-primary-active)]',

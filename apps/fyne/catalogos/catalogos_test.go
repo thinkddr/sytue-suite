@@ -313,6 +313,26 @@ var literalesQueNoSonClaves = map[string]bool{
 	"record.update": true,
 	"record.link":   true,
 	"record.delete": true,
+	// Los códigos cortos de por qué no abrió la bóveda (`cifrado/codigo_fallo.go`), los
+	// mismos que `vaultFailureCode` de la web: se enseñan tal cual en «Más información»
+	// y van al registro; no se traducen.
+	"drive.not_ready":        true,
+	"drive.conflict":         true,
+	"drive.source":           true,
+	"drive.closed":           true,
+	"drive.copy_in_progress": true,
+	"drive.vault_not_empty":  true,
+	"vault.signin":           true,
+	"vault.wrong":            true,
+	"vault.identity":         true,
+	"vault.closed":           true,
+	"vault.changed":          true,
+	"vault.copy":             true,
+	"auth.changed":           true,
+	"auth.login":             true,
+	"offline.paused":         true,
+	"offline.store":          true,
+	"matrix.recovery":        true,
 }
 
 // clavesDelArbol recorre `apps/fyne` y devuelve cada literal con forma de clave con el

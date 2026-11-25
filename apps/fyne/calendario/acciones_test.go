@@ -218,6 +218,49 @@ func TestLaVistaRapidaAbreSeAnclaYElimina(t *testing.T) {
 	}
 }
 
+// TestLaHojaRapidaDelTelefonoNoAbreConEliminarRojo: en el teléfono la vista rápida es
+// una hoja, y su pie pone sola a todo el ancho la primera de tres acciones. «Eliminar»
+// iba ahí, en el rojo macizo de Peligro: lo primero que se veía al tocar un evento
+// (auditoría del 2026-11-24). Ahora el pie es Duplicar | Editar y «Eliminar» es un
+// fantasma de peligro a su ancho al final del cuerpo, que sigue borrando.
+// VISTO EN ROJO con el pie de antes.
+func TestLaHojaRapidaDelTelefonoNoAbreConEliminarRojo(t *testing.T) {
+	s := &escrituras{}
+	a, w := appConVentana(t, s)
+	w.Resize(fyne.NewSize(390, 844))
+	o := ocurrenciaDe(t, a, "e1")
+	ancla := container.NewWithoutLayout()
+	a.raiz.Add(container.NewWithoutLayout(ancla))
+	a.abrirVistaRapida(o, ancla)
+	capas := w.Canvas().Overlays().List()
+	if len(capas) != 1 {
+		t.Fatalf("hay %d capas y tocaba la hoja", len(capas))
+	}
+	guardar(t, w.Canvas().Capture(), "calendario-hoja-rapida-telefono")
+	borrar := buscarBoton(capas[0], "Eliminar")
+	if borrar == nil {
+		t.Fatal("no está «Eliminar»")
+	}
+	if borrar.Variante != ui.Fantasma || !borrar.Destructivo {
+		t.Errorf("«Eliminar» es de la variante %v (destructivo %v) y tocaba el fantasma de peligro",
+			borrar.Variante, borrar.Destructivo)
+	}
+	if ancho := borrar.Size().Width; ancho > 390/2 {
+		t.Errorf("«Eliminar» mide %v de ancho: sigue a todo el ancho de la hoja", ancho)
+	}
+	editar := buscarBoton(capas[0], "Editar")
+	if editar == nil || editar.Variante != ui.Primario {
+		t.Fatal("falta «Editar» como acción principal")
+	}
+	if editar.Position().Y < 0 || borrar.Size().Height <= 0 {
+		t.Error("las acciones no se han colocado")
+	}
+	borrar.Tapped(nil)
+	if hechas, _ := s.apuntadas(); len(hechas) != 1 || hechas[0] != "DELETE /api/v1/events/e1" {
+		t.Errorf("eliminar hizo %v", hechas)
+	}
+}
+
 // TestElFormularioMovilDejaVerLasAccionesSinTeclado abre el modal de edición completo
 // en el tamaño de un iPhone SE. El cuerpo se desplaza; los campos y las tres acciones
 // quedan dentro del ancho, y el pie sigue a la vista con el teclado cerrado.

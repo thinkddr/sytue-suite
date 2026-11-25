@@ -487,6 +487,7 @@ export const lv: AppCatalog<typeof en> = {
   'compose.templates': 'Veidnes',
   'compose.templatesEmpty': 'Veidņu vēl nav. Izveidojiet tās Mail iestatījumos.',
   'compose.attachFailed': 'Pielikumu neizdevās nolasīt',
+  'compose.openFailed': 'Ziņojuma redaktoru neizdevās atvērt. Mēģiniet vēlreiz.',
   'compose.pastedImageDropped': 'Ielīmētais attēls netika iekļauts',
   'compose.pastedImagesDropped': 'Ielīmētie attēli netika iekļauti',
   'compose.pastedImagesDroppedDescription': 'Lai nosūtītu attēlus, pievienojiet tos kā failus.',

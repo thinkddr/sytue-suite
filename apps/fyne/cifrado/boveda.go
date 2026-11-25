@@ -70,6 +70,9 @@ type PuertaBovedaConfig struct {
 	// interfaz): Drive suelta ahí su fuente congelada, para que la bóveda nueva tenga
 	// de dónde importar. Si falla, no se vacía nada.
 	AntesDeVaciar func(context.Context) error
+	// SoloConBoton: no ir sola a Sytue ID sin clave (o con una que no abre); se
+	// enseña el botón desde el principio. Para las pruebas de los botones.
+	SoloConBoton bool
 	// abrir y vaciar se sustituyen en pruebas.
 	abrir, vaciar func(context.Context, pqvault.Config) (*pqvault.Vault, error)
 }
@@ -90,7 +93,14 @@ type PuertaBoveda struct {
 	// entrar se termina de vaciar en vez de abrir la bóveda de antes, que volvería a
 	// fallar. Nunca se pone si la bóveda ya se vació.
 	vaciarAlEntrar bool
-	vista          *vistaBoveda
+	// entroSola: la puerta ya fue sola a Sytue ID a por la clave (sin clave en el
+	// dispositivo o con una que no abre). Una vez por puerta: si a la vuelta sigue
+	// igual, se enseña el botón en vez de repetir sin fin.
+	entroSola bool
+	// fallo es el código corto del último fallo genérico (CodigoFallo), para
+	// enseñarlo debajo del aviso.
+	fallo string
+	vista *vistaBoveda
 }
 
 // NuevaPuertaBoveda crea la puerta; Iniciar la abre.
@@ -392,11 +402,24 @@ func (p *PuertaBoveda) terminar(life, ctx context.Context, vault *pqvault.Vault,
 	default:
 		p.estado = BovedaFallo
 	}
+	p.fallo = ""
+	if p.estado == BovedaFallo {
+		p.fallo = avisarFallo("la bóveda de "+p.cfg.Scope.Product, err)
+	}
 	estado := p.estado
+	// La clave es de la cuenta y vive en Sytue ID: sin ella aquí (o con una que no
+	// abre) se va a buscarla sin pedir a la persona que pulse nada, una vez.
+	sola := (estado == BovedaEntrar || estado == BovedaNoAbre) && !p.entroSola && p.cfg.Entrar != nil && !p.cfg.SoloConBoton
+	if sola {
+		p.entroSola = true
+	}
 	p.mu.Unlock()
 	p.vista.pintar()
 	if estado == BovedaLista {
 		p.cfg.Lista(ctx, vault)
+	}
+	if sola {
+		p.VolverAEntrar() //nolint:contextcheck // VolverAEntrar corre en p.life, como todo lo de la puerta: life es ese mismo contexto.
 	}
 }
 
@@ -406,6 +429,7 @@ type vistaBoveda struct {
 	p                          *PuertaBoveda
 	raiz                       *fyne.Container
 	mensaje                    *widget.Label
+	codigo                     *widget.Label
 	progreso                   *widget.ProgressBarInfinite
 	entrar, otraVez, reintenta *widget.Button
 	vaciar                     *widget.Button
@@ -420,6 +444,9 @@ func nuevaVistaBoveda(p *PuertaBoveda) *vistaBoveda {
 	titulo := widget.NewLabelWithStyle(t("matrix.title"), fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
 	v.mensaje = widget.NewLabel("")
 	v.mensaje.Wrapping = fyne.TextWrapWord
+	v.codigo = widget.NewLabelWithStyle("", fyne.TextAlignLeading, fyne.TextStyle{Monospace: true})
+	v.codigo.Importance = widget.LowImportance
+	v.codigo.Wrapping = fyne.TextWrapBreak
 	v.progreso = widget.NewProgressBarInfinite()
 	v.entrar = widget.NewButton(t("matrix.signIn"), p.VolverAEntrar)
 	v.entrar.Importance = widget.HighImportance
@@ -444,7 +471,7 @@ func nuevaVistaBoveda(p *PuertaBoveda) *vistaBoveda {
 		widget.NewLabelWithStyle(t("vault.emptyTitle"), fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
 		cuerpo, v.entiendo, container.NewHBox(v.cancelar, v.vaciarYa),
 	)
-	v.raiz = container.NewVBox(titulo, v.mensaje, v.progreso, container.NewHBox(v.entrar, v.otraVez, v.vaciar, v.reintenta), v.confirmar)
+	v.raiz = container.NewVBox(titulo, v.mensaje, v.codigo, v.progreso, container.NewHBox(v.entrar, v.otraVez, v.vaciar, v.reintenta), v.confirmar)
 	v.pintar()
 	return v
 }
@@ -452,7 +479,7 @@ func nuevaVistaBoveda(p *PuertaBoveda) *vistaBoveda {
 func (v *vistaBoveda) pintar() {
 	p, t := v.p, v.p.cfg.Translate
 	p.mu.Lock()
-	estado, confirmando := p.estado, p.confirmando
+	estado, confirmando, fallo := p.estado, p.confirmando, p.fallo
 	p.mu.Unlock()
 	mostrar := func(o fyne.CanvasObject, si bool) {
 		if si {
@@ -474,6 +501,8 @@ func (v *vistaBoveda) pintar() {
 		v.mensaje.SetText("")
 	}
 	salida := estado == BovedaNoAbre || estado == BovedaFallo
+	v.codigo.SetText(fallo)
+	mostrar(v.codigo, estado == BovedaFallo && fallo != "")
 	mostrar(v.progreso, estado == BovedaAbriendo)
 	mostrar(v.entrar, estado == BovedaEntrar)
 	mostrar(v.otraVez, salida)

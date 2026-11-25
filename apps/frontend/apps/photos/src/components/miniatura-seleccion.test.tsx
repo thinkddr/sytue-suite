@@ -100,3 +100,28 @@ test('mantener pulsada la tesela empieza a seleccionar sin abrir el visor', asyn
   expect(abiertas).toBe(1);
   expect(mantenidas).toBe(1);
 });
+
+// El corazón, con el dedo: solo el de las favoritas (relleno). El de las demás no se
+// pinta ni se puede pulsar (`pointer-coarse:hidden`): era ruido en cada tesela y le
+// robaba el toque a la foto. Igual en las apps nativas; se marca desde el visor o la
+// barra de selección. Con ratón se sigue viendo al pasar o enfocar.
+test('con el dedo solo se ve el corazón de las favoritas', () => {
+  const corazon = (favorite: boolean): HTMLButtonElement => {
+    montar(
+      <Miniatura foto={{ ...foto, favorite }} t={t} onOpen={() => {}} onFavorite={() => {}} />,
+    );
+    const b = host.querySelector<HTMLButtonElement>('button[aria-pressed]')!;
+    expect(b).not.toBeNull();
+    return b;
+  };
+  const hueco = corazon(false);
+  expect(hueco.className).toContain('pointer-coarse:hidden');
+  expect(hueco.className).not.toContain('pointer-coarse:opacity-100');
+  expect(hueco.className).toContain('group-hover:opacity-100');
+  render(null, host);
+  host.remove();
+  const lleno = corazon(true);
+  expect(lleno.className).not.toContain('pointer-coarse:hidden');
+  expect(lleno.className).not.toContain('opacity-0');
+  expect(lleno.querySelector('svg')?.getAttribute('fill')).toBe('currentColor');
+});

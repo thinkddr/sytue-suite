@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 /** Resumable native file.v1 publication. Cache is disposable; callers retain the original. */
-import { Attachment, initAsync } from '@matrix-org/matrix-sdk-crypto-wasm';
-import { createSHA256 } from 'hash-wasm';
+import { matrixAttachments } from './attachment-wasm.js';
+import { createSHA256 } from './sha256.js';
 import { decodeCipherBlobReceipt, maxCipherBlockBytes } from '@sytue/config/matrix';
 import type { EncryptedOfflineValues } from '../encrypted-storage.js';
 import { MatrixSecurityError, type MatrixReference, type MatrixStorageScope } from './types.js';
@@ -323,7 +323,7 @@ export class StorageFileUploads {
     signal: AbortSignal,
   ): Promise<void> {
     if (state.pending) return;
-    await initAsync();
+    const { Attachment } = await matrixAttachments();
     this.check(signal);
     const offset = state.next * maxCipherBlockBytes;
     const data = await source.read(offset, blockBytes(source.size, state.next), signal);

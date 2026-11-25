@@ -33,7 +33,7 @@ func firmante(t *testing.T, b byte) (*recoverywrap.PQVaultSigner, Registered) {
 	return s, Registered{Generation: 2, KeyID: keyID, Public: s.Public()}
 }
 
-func accion(t *testing.T, reg Registered, kind string) matrixproof.Action {
+func accionDePrueba(t *testing.T, reg Registered, kind string) matrixproof.Action {
 	t.Helper()
 	scope := storage.Scope{Tenant: "acme", Subject: "0f3c9a52-6d1e-4c1a-9b8e-2a7d5c4e1f00", Product: "mail"}
 	digest, err := matrixproof.RequestDigest(map[string]string{"recipient": "age1pq1…"})
@@ -50,7 +50,7 @@ func accion(t *testing.T, reg Registered, kind string) matrixproof.Action {
 
 func TestVaultproofFirmaYAutoriza(t *testing.T) {
 	s, reg := firmante(t, 1)
-	esperada := accion(t, reg, "key.enroll")
+	esperada := accionDePrueba(t, reg, "key.enroll")
 	prueba, err := Sign(s, esperada)
 	if err != nil {
 		t.Fatal(err)
@@ -78,7 +78,7 @@ func TestVaultproofFirmaYAutoriza(t *testing.T) {
 func TestVaultproofRechaza(t *testing.T) {
 	s, reg := firmante(t, 1)
 	otra, otraReg := firmante(t, 2)
-	esperada := accion(t, reg, "task.claim")
+	esperada := accionDePrueba(t, reg, "task.claim")
 	prueba, err := Sign(s, esperada)
 	if err != nil {
 		t.Fatal(err)

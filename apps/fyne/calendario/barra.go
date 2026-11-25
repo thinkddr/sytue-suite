@@ -20,8 +20,11 @@ import (
 // y `AllDayBar` de TimeGrid.tsx, que son la misma pieza en dos sitios:
 //
 //	absolute flex items-center px-1.5 rounded-[3px] hover:brightness-95
-//	height: 18px · background: el color del evento · color: barTextColor(relleno)
-//	<span class="text-2xs truncate leading-none font-medium">
+//	height: 24px · background: el color del evento · color: barTextColor(relleno)
+//	<span class="text-xs truncate leading-none font-medium">
+//
+// 24 y `text-xs` desde el 2026-11-25, como las píldoras: medía 18 con `text-2xs` y era
+// lo único de la celda por debajo del objetivo táctil de 24 (WCAG 2.5.8).
 //
 // En los cortes de semana el borde va recto y sin sangría, y el tramo que viene de una
 // semana anterior no lleva texto: el título se lee una vez, en el primer tramo.
@@ -122,7 +125,7 @@ func (b *barraEvento) CreateRenderer() fyne.WidgetRenderer {
 	r := &barraRenderer{
 		b:     b,
 		fondo: canvas.NewRectangle(b.t.Item.Color),
-		texto: ui.Texto(b.rotulo, tema.Texto2XS, ui.Medio, TintaSobre(b.t.Item.Color)),
+		texto: ui.Texto(b.rotulo, tema.TextoXS, ui.Medio, TintaSobre(b.t.Item.Color)),
 		aro:   ui.NuevoAro(RadioBarra, 0, v),
 	}
 	r.texto.Hidden = b.t.SigueIzq
@@ -149,13 +152,13 @@ func (r *barraRenderer) Destroy()                     {}
 // En el teléfono, `px-0.5` y el rótulo cortado sin «…», como la píldora compacta.
 func (r *barraRenderer) Layout(t fyne.Size) {
 	r.fondo.Resize(t)
-	caja := tema.Texto2XS.Tam // `leading-none`
+	caja := tema.TextoXS.Tam // `leading-none`
 	pad := espacio1p5
 	if estrecha(r.b) {
 		pad = espacio0p5
-		ui.Cortar(r.texto, r.b.rotulo, tema.Texto2XS, ui.Medio, max(t.Width-2*pad, 0))
+		ui.Cortar(r.texto, r.b.rotulo, tema.TextoXS, ui.Medio, max(t.Width-2*pad, 0))
 	} else {
-		ui.Truncar(r.texto, r.b.rotulo, tema.Texto2XS, ui.Medio, max(t.Width-2*pad, 0))
+		ui.Truncar(r.texto, r.b.rotulo, tema.TextoXS, ui.Medio, max(t.Width-2*pad, 0))
 	}
 	ui.ColocarTexto(r.texto, tema.Escalon{Tam: caja, Linea: caja}, pad, (t.Height-caja)/2)
 	r.aro.Colocar(t)

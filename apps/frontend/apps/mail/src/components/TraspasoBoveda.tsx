@@ -15,8 +15,13 @@ export function TraspasoBoveda({ locale, onConfirm }: { locale: Locale; onConfir
   const [entendido, setEntendido] = useState(false);
   return (
     <div class="mx-auto flex w-full max-w-xl flex-col px-6 pb-6">
+      {/* Los rótulos de estas pantallas son FRASES («Vorerst bei den bisherigen
+          E-Mails bleiben», «Can't open your mail? Empty it and move it to the
+          vault»): en un teléfono no caben en una línea, y sin `multilinea` se
+          salían de la pantalla (barrido móvil del 2026-11-24, 320 px). */}
       <Button
         variant="secondary"
+        multilinea
         onClick={() => {
           setEntendido(false);
           setAbierto(true);
@@ -38,6 +43,7 @@ export function TraspasoBoveda({ locale, onConfirm }: { locale: Locale; onConfir
           />
           <Button
             variant="danger"
+            multilinea
             disabled={!entendido}
             onClick={() => {
               if (!entendido) return;
@@ -97,6 +103,7 @@ export function PasarABoveda({
       <div class="flex flex-wrap gap-3">
         <Button
           variant="danger"
+          multilinea
           disabled={!entendido}
           onClick={() => {
             if (!entendido) return;
@@ -107,7 +114,7 @@ export function PasarABoveda({
           {t('privateMail.handoverConfirm')}
         </Button>
         {onKeep ? (
-          <Button variant="secondary" onClick={onKeep}>
+          <Button variant="secondary" multilinea onClick={onKeep}>
             {t('privateMail.vaultMoveKeep')}
           </Button>
         ) : null}

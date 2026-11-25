@@ -519,9 +519,13 @@ func NuevoRedactorDe(t *i18n.Translator, l i18n.Locale, b Borrador, rs []OpcionD
 	r.cc = direcciones(t.T("compose.ccPlaceholder", nil), b.Cc, func(s string) { r.B.Cc = s })
 	r.cco = direcciones(t.T("compose.bccPlaceholder", nil), b.Cco, func(s string) { r.B.Cco = s })
 
-	r.asunto = ui.NuevoEditorPlano(tema.TextoBase, nil)
+	// De una línea que corre el texto, como el `<input>` de la web y el campo de «Para»:
+	// el editor sin desplazamiento pintaba un asunto largo de la respuesta («Re: …») más
+	// allá de su fila, hasta el borde de la hoja del teléfono. Abre por el principio.
+	r.asunto = ui.NuevoEditorPlanoDesplazable(tema.TextoBase, nil)
 	r.asunto.PlaceHolder = t.T("compose.subjectPlaceholder", nil)
 	r.asunto.PonerTexto(b.Asunto)
+	r.asunto.PonerCursor(0)
 	r.asunto.AlCambiar(func(s string) { r.B.Asunto = s; cambio() })
 	r.asunto.Atajo = r.atajoEnviar
 

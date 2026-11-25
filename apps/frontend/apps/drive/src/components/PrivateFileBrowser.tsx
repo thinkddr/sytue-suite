@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
-import { Button, EmptyState, Input, Modal, Spinner, useToast } from '@sytue/ui';
+import { Button, EmptyState, Input, Modal, Spinner, marcarAppLista, useToast } from '@sytue/ui';
 import { useI18n } from '@sytue/i18n/preact';
 import type { DriveResource } from '@sytue/api-clients';
 import { MatrixSecurityError, PrivateDriveError } from '@sytue/offline/matrix';
@@ -100,6 +100,10 @@ function PrivateFilesContent({
   const [query, setQuery] = useState(''),
     [search, setSearch] = useState(''),
     [revision, setRevision] = useState(0);
+  // `sytue:app-ready`: la carpeta ya enseña sus archivos (o por qué no).
+  useEffect(() => {
+    if (items !== null || failed) marcarAppLista();
+  }, [items, failed]);
   const [preview, setPreview] = useState<DriveResource | null>(null),
     [moving, setMoving] = useState<DriveResource | null>(null);
   const [versions, setVersions] = useState<DriveResource | null>(null);

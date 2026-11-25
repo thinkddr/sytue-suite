@@ -260,6 +260,12 @@ type Boton struct {
 	// `text-muted`; con el puntero o apretado, en `text`. Solo cuenta en Fantasma. Como en
 	// la web el glifo es `currentColor`, aquí también se tiñe un `Glifo` puesto a mano.
 	Atenuado bool
+	// Destructivo es el fantasma de PELIGRO (`variant="ghost"` con `text-danger-text
+	// hover:bg-danger-bg`): rótulo y glifo en `danger-text`, sin caja en reposo y con el
+	// velo de peligro con el puntero o apretado. Solo cuenta en Fantasma. Es la acción
+	// destructiva que no debe ser lo primero que se ve —«Eliminar» en la hoja rápida de
+	// un evento—: el relleno rojo de Peligro se queda para la confirmación.
+	Destructivo bool
 	// Grupo es la opacidad del contenedor que lo envuelve (ver Grupo). Cero, ninguna.
 	Grupo Grupo
 	// Rotulo es el `aria-label`: el nombre accesible. Como en el navegador, MANDA sobre
@@ -382,62 +388,31 @@ func (b *Boton) Con(v Variante, t Talla) *Boton {
 // colores devuelve relleno, texto y borde de la variante según el estado del puntero.
 // Los tokens son los de Button.tsx, uno a uno.
 func (b *Boton) colores(v tema.Variante) (relleno, texto, borde color.NRGBA) {
-	elige := func(reposo, encima, activo string) color.NRGBA {
-		switch {
-		case b.pulsado:
-			return tema.Color(activo, v)
-		case b.encima:
-			return tema.Color(encima, v)
-		}
-		return tema.Color(reposo, v)
-	}
 	if b.inerte() { // `disabled:` congela el estado de reposo antes de bajar la opacidad
 		b.encima, b.pulsado = false, false
 	}
 	switch b.Variante {
 	case Secundario:
-		// El ROL primario y su rótulo, como el principal (Button.tsx: `bg-primary
-		// text-on-primary` con `border-border-strong`). Fue la escalera 600/700/800 fija
-		// con `on-primary` encima: en oscuro, casi negro sobre el 600, 4,1:1.
-		relleno = elige("primary", "primary-hover", "primary-active")
-		if b.SobreCromo {
-			// Dentro del carril el primario es el suyo, también para el secundario: la
-			// web reasigna `--color-primary` y su rótulo para todo lo que cuelga de él.
-			relleno = elige("sidebar-primary", "sidebar-primary-hover", "sidebar-primary-active")
-			return relleno, tema.Color("sidebar-on-primary", v), tokens.SobreSRGB(tokens.Crudo("border-strong", v), relleno)
-		}
-		return relleno, tema.Color("on-primary", v), tokens.SobreSRGB(tokens.Crudo("border-strong", v), relleno)
+		// CONTORNO (Button.tsx: `bg-surface text-text border border-border-strong
+		// hover:bg-bg-subtle active:bg-border`). Fue el relleno primario con borde desde
+		// los tres temas del 2026-10-04, y la auditoría del 2026-11-24 lo vio en todas
+		// partes: dos o tres botones del mismo verde azulado juntos (Cancelar/Guardar
+		// del contacto, Duplicar/Editar del evento, Ordenar/Nuevo/Subir de Drive), y la
+		// acción principal dejaba de distinguirse de las demás.
+		//
+		// Ni en el carril cambia: la web reasigna `--color-primary` bajo `bg-sidebar`,
+		// pero no `--color-surface` ni `--color-text`, así que el contorno es el mismo
+		// dentro y fuera del menú. Contraste: `text` sobre `surface` pasa de 13:1 en los
+		// dos temas, y `border-strong` es el contorno de control (≥3:1, WCAG 1.4.11).
+		// El borde va sobre el propio relleno, como lo pinta CSS.
+		relleno = b.elige(v, "surface", "bg-subtle", "border")
+		return relleno, tema.Color("text", v), tokens.SobreSRGB(tokens.Crudo("border-strong", v), relleno)
 	case Fantasma:
-		relleno = color.NRGBA{}
-		// SOBRE LA TINTA, EL FANTASMA CAMBIA DE VELOS. Es el aspa de un diálogo:
-		// `Modal.tsx` le pone `style={{color: header-fg}}` y `hover:bg-chrome-hover
-		// active:bg-chrome-active` ENCIMA del `variant="ghost"`, porque el `text-text`
-		// y el `hover:bg-bg-subtle` de la variante son los de una superficie clara y
-		// sobre la banda de tinta dejan el glifo a 1,1:1.
-		if b.SobreCromo {
-			if b.encima || b.pulsado {
-				relleno = elige("chrome-hover", "chrome-hover", "chrome-active")
-			}
-			return relleno, tema.Color("header-fg", v), color.NRGBA{}
-		}
-		tinta := "primary-text"
-		if b.encima || b.pulsado {
-			relleno = elige("selected", "selected", "selected")
-		}
-		if b.Atenuado {
-			if b.encima || b.pulsado {
-				relleno = elige("bg-subtle", "bg-subtle", "border")
-			}
-			tinta = "text-muted"
-			if b.encima || b.pulsado {
-				tinta = "text"
-			}
-		}
-		return relleno, tema.Color(tinta, v), color.NRGBA{}
+		return b.coloresFantasma(v)
 	case Peligro:
 		// Blanco (`text-white` en Button.tsx) y no `on-primary`: aquel es el rótulo del
 		// relleno primario y en oscuro es casi negro; sobre el rojo daría 3,7:1.
-		return elige("danger", "danger-hover", "danger-hover"), tema.Color("neutral-0", v), color.NRGBA{}
+		return b.elige(v, "danger", "danger-hover", "danger-hover"), tema.Color("neutral-0", v), color.NRGBA{}
 	case Primario:
 	}
 	// SOBRE EL CARRIL, EL BOTÓN PRINCIPAL ES BLANCO con el rótulo del color del carril:
@@ -448,11 +423,59 @@ func (b *Boton) colores(v tema.Variante) (relleno, texto, borde color.NRGBA) {
 	// cabecera y en los principales de su cuerpo): seis apps repitiendo la variante es
 	// como se pierde en la séptima.
 	if b.SobreCromo {
-		return elige("sidebar-primary", "sidebar-primary-hover", "sidebar-primary-active"),
+		return b.elige(v, "sidebar-primary", "sidebar-primary-hover", "sidebar-primary-active"),
 			tema.Color("sidebar-on-primary", v), color.NRGBA{}
 	}
 	// La acción principal sigue los tokens compartidos de la hoja canónica.
-	return elige("primary", "primary-hover", "primary-active"), tema.Color("on-primary", v), color.NRGBA{}
+	return b.elige(v, "primary", "primary-hover", "primary-active"), tema.Color("on-primary", v), color.NRGBA{}
+}
+
+// elige es el token del estado del puntero: pulsado, encima o en reposo.
+func (b *Boton) elige(v tema.Variante, reposo, encima, activo string) color.NRGBA {
+	switch {
+	case b.pulsado:
+		return tema.Color(activo, v)
+	case b.encima:
+		return tema.Color(encima, v)
+	}
+	return tema.Color(reposo, v)
+}
+
+// coloresFantasma son los de la variante fantasma: sin borde ni relleno en reposo, y
+// el velo y el rótulo según el puntero y si va sobre la tinta, atenuado o destructivo.
+func (b *Boton) coloresFantasma(v tema.Variante) (relleno, texto, borde color.NRGBA) {
+	relleno = color.NRGBA{}
+	// SOBRE LA TINTA, EL FANTASMA CAMBIA DE VELOS. Es el aspa de un diálogo:
+	// `Modal.tsx` le pone `style={{color: header-fg}}` y `hover:bg-chrome-hover
+	// active:bg-chrome-active` ENCIMA del `variant="ghost"`, porque el `text-text`
+	// y el `hover:bg-bg-subtle` de la variante son los de una superficie clara y
+	// sobre la banda de tinta dejan el glifo a 1,1:1.
+	if b.SobreCromo {
+		if b.encima || b.pulsado {
+			relleno = b.elige(v, "chrome-hover", "chrome-hover", "chrome-active")
+		}
+		return relleno, tema.Color("header-fg", v), color.NRGBA{}
+	}
+	tinta := "primary-text"
+	if b.encima || b.pulsado {
+		relleno = b.elige(v, "selected", "selected", "selected")
+	}
+	if b.Atenuado {
+		if b.encima || b.pulsado {
+			relleno = b.elige(v, "bg-subtle", "bg-subtle", "border")
+		}
+		tinta = "text-muted"
+		if b.encima || b.pulsado {
+			tinta = "text"
+		}
+	}
+	if b.Destructivo {
+		if b.encima || b.pulsado {
+			relleno = tema.Color("danger-bg", v)
+		}
+		tinta = "danger-text"
+	}
+	return relleno, tema.Color(tinta, v), color.NRGBA{}
 }
 
 // inerte junta `disabled` y `loading`: los dos sacan al botón de la interacción (el
@@ -547,7 +570,7 @@ func (b *Boton) CreateRenderer() fyne.WidgetRenderer {
 		// Sobre el relleno del primario o del de peligro el glifo es `currentColor`
 		// como el rótulo, y se apaga con él; en el secundario puede ir en su color.
 		deColor := b.Variante == Primario || b.Variante == Peligro
-		r.delante, r.tenirDelante = b.Glifo, b.Atenuado || deColor
+		r.delante, r.tenirDelante = b.Glifo, b.Atenuado || b.Destructivo || deColor
 		r.objetos = append(r.objetos, r.delante.Objeto())
 	case b.Icono != iconos.Ninguno:
 		r.delante, r.tenirDelante = iconos.TrazoConTinta(b.Icono, b.tamIcono(), tinta), true
@@ -559,7 +582,10 @@ func (b *Boton) CreateRenderer() fyne.WidgetRenderer {
 	//
 	// ponytail: se fija al montar, como el aro del fantasma; si la variante cambia
 	// después entre rellena y fantasma, el acento se queda como nació.
-	sobreRelleno := b.Variante != Fantasma
+	//
+	// El secundario ya no es de color: con `text-text` sobre la superficie, la web no le
+	// pone el relleno del glifo en `currentColor` y conserva el acento, como el fantasma.
+	sobreRelleno := b.Variante == Primario || b.Variante == Peligro
 	if r.delante != nil && sobreRelleno {
 		r.delante.AcentoTinta()
 	}

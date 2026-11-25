@@ -4,6 +4,7 @@ import preact from '@astrojs/preact';
 import sitemap from '@astrojs/sitemap';
 import tailwindcss from '@tailwindcss/vite';
 import { sytueHealthEndpoint } from '@sytue/config/astro-health';
+import { sytuePrecarga } from '@sytue/config/astro-precarga';
 
 /**
  * Sytue One — sitio publico. Estatico (output static / SSG): la landing no
@@ -128,6 +129,7 @@ export default defineConfig({
   },
 
   integrations: [
+    sytuePrecarga(),
     sytueHealthEndpoint(),
     preact({ compat: true }),
     // sitemap.xml + sitemap-index.xml automaticos. Excluye superficies que no

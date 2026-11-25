@@ -148,8 +148,8 @@ func NuevoBuscador(bs Buscable, t func(string, i18n.Vars) string) *Buscador {
 		b.b.ReemplazarTodo(b.reemplazo.Texto(), b.q(), b.mayus.Activa, b.palabra.Activa)
 		b.pintar()
 	})
-	filete := canvas.NewRectangle(tema.Color("border", tema.De(fyne.CurrentApp().Settings().ThemeVariant())))
-	filete.SetMinSize(fyne.NewSize(tema.Borde, tema.Espacio(5))) // `h-5 w-px`, y el `mx-0.5` lo pone el relleno
+	filete := ui.NuevoLiso("border")
+	filete.Minimo = fyne.NewSize(tema.Borde, tema.Espacio(5)) // `h-5 w-px`, y el `mx-0.5` lo pone el relleno
 	fila := container.New(filaContador{}, b.contador, b.mayus, b.palabra,
 		container.New(layout.NewCustomPaddedLayout(0, 0, tema.Espacio(0.5), tema.Espacio(0.5)), filete),
 		b.anterior, b.siguiente)

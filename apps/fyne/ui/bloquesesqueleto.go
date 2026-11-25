@@ -238,8 +238,11 @@ func (r *bloquesEsqueletoRenderer) Layout(t fyne.Size) {
 	}
 }
 
-func (r *bloquesEsqueletoRenderer) Objects() []fyne.CanvasObject { return r.objetos }
-func (r *bloquesEsqueletoRenderer) Destroy()                     { r.b.Parar() }
+func (r *bloquesEsqueletoRenderer) Objects() []fyne.CanvasObject {
+	r.b.pintada()
+	return r.objetos
+}
+func (r *bloquesEsqueletoRenderer) Destroy() { r.b.Parar() }
 
 // tenir pinta todos los bloques con el instante del latido.
 func (r *bloquesEsqueletoRenderer) tenir() {

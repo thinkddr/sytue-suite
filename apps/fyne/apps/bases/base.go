@@ -335,6 +335,10 @@ func (p *Pantalla) menuMas(rotulo string, elementos func() []fyne.CanvasObject) 
 		m.Rotulo = rotulo
 		m.Mostrar(b)
 	})
-	b.Lado = ui.LadoIconoLG
+	// A la altura de los botones de la barra y con el glifo entero de la rejilla (24): a
+	// 16, los tres puntos de «⋯» eran motas de 1,7 px que apenas se veían junto a
+	// «Compartir»; así son de 2,5 y en la tinta del texto, no en la del enlace.
+	b.Lado, b.TamIcono = ui.LadoIconoLG, iconos.TallaXL
+	b.Trazo, b.TrazoEncima = "text-muted", "text"
 	return b
 }

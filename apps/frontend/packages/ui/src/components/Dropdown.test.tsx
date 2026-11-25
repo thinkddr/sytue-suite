@@ -169,6 +169,42 @@ test('las opciones marcables (menuitemradio) también se recorren con las flecha
   host.remove();
 });
 
+// El «Más» del editor de Notes en 640×320: «Deshacer» cabe en la fila y la primera
+// opción del menú es «Rehacer», inerte. Con el foco en ella el menú no lo recibía, se
+// quedaba en el texto y el Escape del menú terminaba la edición.
+test('al abrir, el foco va a la primera opción viva aunque la primera sea inerte', async () => {
+  const host = document.body.appendChild(document.createElement('div'));
+  const texto = document.body.appendChild(document.createElement('div'));
+  texto.tabIndex = 0;
+  texto.focus();
+  render(
+    <Dropdown
+      label="Más"
+      trigger={(props) => (
+        <button type="button" {...props}>
+          Más
+        </button>
+      )}
+    >
+      <MenuItem disabled onClick={() => {}}>
+        Rehacer
+      </MenuItem>
+      <MenuItem onClick={() => {}}>Subrayado</MenuItem>
+    </Dropdown>,
+    host,
+  );
+  host.querySelector('button')?.click();
+  await tick();
+  expect(enFoco()).toBe('Subrayado');
+  tecla('Escape');
+  await tick();
+  expect(document.querySelector('[role="menu"]')).toBeNull();
+  expect(document.activeElement).toBe(host.querySelector('button'));
+  render(null, host);
+  host.remove();
+  texto.remove();
+});
+
 // El panel no tapa su disparador: se queda en el hueco de un lado y lo que no entra se
 // desplaza por dentro. Las medidas son las del menú de cuenta, que al ganar los
 // selectores de color y forma pasó a medir más que el hueco bajo la barra (2026-10-05).

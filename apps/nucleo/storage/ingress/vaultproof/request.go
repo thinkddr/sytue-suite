@@ -9,7 +9,7 @@ import (
 	"io"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/storage"
-	"git.sytue.eu/sytue/one/apps/nucleo/storage/ingress/matrixproof"
+	"git.sytue.eu/sytue/one/apps/nucleo/storage/ingress/accion"
 )
 
 // IntentWire es la intención tal como la manda el módulo de correo por el puerto
@@ -24,14 +24,14 @@ type IntentWire struct {
 }
 
 // Intent es la intención que se compara con la acción.
-func (w IntentWire) Intent() matrixproof.Intent {
-	return matrixproof.Intent{Generation: w.Generation, Scope: w.Scope, Epoch: w.Epoch, Kind: w.Kind, Target: w.Target, RequestSHA256: w.RequestSHA256}
+func (w IntentWire) Intent() accion.Intent {
+	return accion.Intent{Generation: w.Generation, Scope: w.Scope, Epoch: w.Epoch, Kind: w.Kind, Target: w.Target, RequestSHA256: w.RequestSHA256}
 }
 
 // SignRequest es el cuerpo entero de `ingress.action.sign`.
 type SignRequest struct {
-	Expected IntentWire         `json:"expected"`
-	Action   matrixproof.Action `json:"action"`
+	Expected IntentWire    `json:"expected"`
+	Action   accion.Action `json:"action"`
 }
 
 // DecodeSignRequest lee un SignRequest estricto: sin campos de más ni basura detrás.

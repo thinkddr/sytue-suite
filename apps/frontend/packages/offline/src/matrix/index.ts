@@ -1,15 +1,20 @@
 /* SPDX-License-Identifier: Apache-2.0 */
-export {
+// `SuiteMatrix` va solo como tipo: su valor arrastra matrix-js-sdk (~1 MB) y este
+// índice lo importan también las apps de la bóveda. Quien abre Matrix lo importa de
+// `@sytue/offline/matrix/client`, normalmente detrás de un `import()`.
+export type {
   SuiteMatrix,
+  MatrixRecoveryUI,
+  MatrixDevice,
+  MatrixSessionAdapter,
+  MailPrivatePorts,
+} from './client.js';
+export {
   safeAttachmentType,
   validCallContent,
-  type MatrixRecoveryUI,
-  type MatrixDevice,
-  type MatrixSessionAdapter,
-  type MailPrivatePorts,
   type MatrixCallEventType,
   type MatrixCallKeyContent,
-} from './client.js';
+} from './guards.js';
 export * from './types.js';
 export {
   MatrixCustodyError,

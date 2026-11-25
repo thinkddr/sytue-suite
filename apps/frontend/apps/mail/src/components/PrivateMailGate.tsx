@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: Apache-2.0 */
-import type { ComponentChildren } from 'preact';
+import type { ComponentChildren, JSX } from 'preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import type { Locale } from '@sytue/i18n';
 import { prefijoDeApp } from '@sytue/config/tokens';
@@ -10,7 +10,7 @@ import {
   MatrixSourceGate,
   type MatrixGateHost,
   type MatrixSourceGateHost,
-} from '@sytue/shell/matrix';
+} from '@sytue/shell/vault';
 import { PqVault, type PqVaultOpenOptions } from '@sytue/offline/vault';
 import { PrivateMailClient } from '../client/privateMail.js';
 import { createVaultMailGate } from '../client/privateMailVault.js';
@@ -33,6 +33,12 @@ interface GateProps {
   actor: string;
   tenant?: string | undefined;
   locale: Locale;
+  /**
+   * El armazón de Mail mientras se pregunta dónde está el correo y mientras la
+   * bóveda abre. Recibe la franja «Desbloqueando…» de la puerta cuando la hay. Nada
+   * de lo que pinte puede venir del correo: se ve antes de abrirlo.
+   */
+  skeleton?: ((franja?: JSX.Element) => ComponentChildren) | undefined;
   children: (client: PrivateMailClient) => ComponentChildren;
 }
 
@@ -119,7 +125,8 @@ export function PrivateMailGate(props: GateProps & { vault?: boolean | undefined
         }
       />
     );
-  return null;
+  // Preguntando a la autoridad: el armazón, no una página en blanco.
+  return <>{props.skeleton?.() ?? null}</>;
 }
 
 /**
@@ -132,6 +139,7 @@ function VaultMailGate({
   tenant,
   locale,
   children,
+  skeleton,
   traspaso,
 }: GateProps & { traspaso?: boolean | undefined }) {
   const gate = useMemo(() => {
@@ -166,6 +174,7 @@ function VaultMailGate({
       detach={gate.host.detach}
       close={gate.host.close}
       {...(nueva ? { openVault: nueva, resetVault: nueva } : {})}
+      {...(skeleton ? { skeleton: (franja: JSX.Element) => skeleton(franja) } : {})}
     >
       {(vault) => children(gate.current(vault))}
     </PqVaultGate>

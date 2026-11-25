@@ -157,6 +157,11 @@ type Historial struct {
 	cuerpo  fyne.CanvasObject
 	fondo   *canvas.Rectangle
 	pildora *PildoraCargando
+	// velo funde con el papel lo que se ha desplazado bajo la cabecera: sin él, con la
+	// lista algo más larga que la ventana, quedaba un retal de la ilustración del inicio
+	// del canal pegado a la cabecera, que en Carril es casi del color del papel
+	// (auditoría del 2026-11-24). Solo se ve si hay algo desplazado arriba.
+	velo *canvas.LinearGradient
 	// salto es el botón flotante «Saltar a no leído», con su `shadow-sm`.
 	salto       *ui.Boton
 	sombraSalto *ui.Sombra
@@ -217,6 +222,8 @@ func (h *Historial) CreateRenderer() fyne.WidgetRenderer {
 	h.bajar = ui.NuevoBoton("", h.IrAlFinal).Con(ui.Secundario, ui.TallaSM)
 	h.bajar.Glifo, h.bajar.TamIcono = dibujo(glifoAbajo, 14, "on-primary", v), 14
 	h.sombraBajar = ui.NuevaSombra(tema.SombraSM, tema.Forma("radius-control"))
+	h.velo = canvas.NewVerticalGradient(color.NRGBA{}, color.NRGBA{})
+	h.velo.Hide()
 	h.cuerpo = nil // lo construye Refresh, que así sabe que es la primera vez
 	r := &historialRenderer{h: h}
 	r.Refresh()
@@ -311,6 +318,27 @@ func (h *Historial) alDesplazar(sc *container.Scroll, p fyne.Position) {
 	if len(h.nuevosAbajo) > 0 && !h.colocando && alFondo(sc) {
 		h.olvidarNuevos()
 	}
+	h.ponerVelo(sc)
+}
+
+// AltoVeloHistorial es lo que mide el fundido de arriba del historial.
+var AltoVeloHistorial = tema.Espacio(6)
+
+// ponerVelo enseña el fundido de arriba solo con algo desplazado bajo la cabecera.
+func (h *Historial) ponerVelo(sc *container.Scroll) {
+	if h.velo == nil {
+		return
+	}
+	ver := sc != nil && sc.Offset.Y > 0.5
+	if ver == h.velo.Visible() {
+		return
+	}
+	if ver {
+		h.velo.Show()
+	} else {
+		h.velo.Hide()
+	}
+	h.velo.Refresh()
 }
 
 type historialRenderer struct{ h *Historial }
@@ -352,6 +380,8 @@ func (r *historialRenderer) Layout(t fyne.Size) {
 	} else {
 		cuerpo.Resize(tam)
 	}
+	r.h.velo.Move(fyne.NewPos(0, 0))
+	r.h.velo.Resize(fyne.NewSize(t.Width, AltoVeloHistorial))
 	// La píldora de «cargando anteriores»: `absolute inset-x-0 top-2 justify-center`,
 	// encima de la lista sin empujarla.
 	m := r.h.pildora.MinSize()
@@ -421,6 +451,8 @@ func (r *historialRenderer) Refresh() {
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	h.fondo.FillColor = tema.Color("surface", v)
 	h.fondo.Refresh()
+	papel := tema.Color("surface", v)
+	h.velo.StartColor, h.velo.EndColor = papel, color.NRGBA{R: papel.R, G: papel.G, B: papel.B}
 	pegado, antes := true, fyne.Position{}
 	altoAntes := h.altoAntes
 	if s, ok := h.cuerpo.(*container.Scroll); ok {
@@ -432,7 +464,7 @@ func (r *historialRenderer) Refresh() {
 	defer func() { h.colocando = false }()
 	h.guardarEdicion()
 	h.cuerpo = h.construir()
-	h.objetos = []fyne.CanvasObject{h.fondo, h.cuerpo}
+	h.objetos = []fyne.CanvasObject{h.fondo, h.cuerpo, h.velo}
 	if h.CargandoAnteriores {
 		h.objetos = append(h.objetos, h.pildora)
 	} else if h.VeSaltoNoLeidos() {
@@ -469,7 +501,11 @@ func (r *historialRenderer) Refresh() {
 			s.Refresh()
 		}
 		h.altoAntes = alto
+		h.ponerVelo(s)
+	} else {
+		h.ponerVelo(nil)
 	}
+	h.velo.Refresh()
 	h.primero = primero
 	h.devolverFocoEdicion()
 }

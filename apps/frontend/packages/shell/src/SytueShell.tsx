@@ -12,7 +12,7 @@
  * de memoria); para refresco transparente, pasar un getter.
  */
 import type { ComponentChildren, JSX } from 'preact';
-import { useCallback, useEffect, useMemo, useState } from 'preact/hooks';
+import { useCallback, useContext, useEffect, useMemo, useState } from 'preact/hooks';
 import {
   Avatar,
   BarraUnicaContext,
@@ -42,6 +42,12 @@ import { NotificationCenter } from './NotificationCenter.js';
 import { AccountMenu } from './AccountMenu.js';
 import { ProveedorDePaleta } from './PaletaDeLaSuite.js';
 import { HojaDeAtajosDeLaSuite } from './HojaDeAtajos.js';
+import {
+  VaultStatusButton,
+  VaultStatusContext,
+  VaultStatusSinkContext,
+  type VaultStatus,
+} from './matrix/vault-status.js';
 
 export interface SytueShellProps {
   /** App actual (resalta su icono en el app switcher). */
@@ -188,9 +194,12 @@ function OfflineStatus({
 function BarraDeLaSuite({
   showSearch,
   alDestinos,
+  boveda,
 }: {
   showSearch: boolean;
   alDestinos: (d: DestinosBarra | null) => void;
+  /** El estado de la bóveda de la puerta de la app (ADR 0086), si la hay. */
+  boveda: VaultStatus | null;
 }): JSX.Element {
   const { currentApp, user } = useShell();
   const t = useT();
@@ -214,6 +223,8 @@ function BarraDeLaSuite({
               el rótulo entero no cabe a 320 en la mitad de los idiomas. */}
           <OfflineStatus class="max-md:hidden" />
           <OfflineStatus compacto class="md:hidden" />
+          {/* El candado de la bóveda: antes flotaba abajo a la derecha y tapaba la app. */}
+          <VaultStatusButton status={boveda} />
           <NotificationCenter alCambiarSinLeer={setSinLeer} />
           <span class="bg-chrome-divider marco:invisible mx-1 h-6 w-px" aria-hidden="true" />
           <AccountMenu />
@@ -225,7 +236,12 @@ function BarraDeLaSuite({
         entrada: <Avatar name={user.name} src={user.picture} size="xs" class="sytue-aro-carril" />,
         selector: <AppSwitcher compacto />,
         ...(aviso ? { aviso } : {}),
-        estado: <OfflineStatus compacto />,
+        estado: (
+          <>
+            <OfflineStatus compacto />
+            <VaultStatusButton status={boveda} compacto />
+          </>
+        ),
         alDestinos,
       }}
     />
@@ -321,6 +337,11 @@ export function SytueShell({
   // topbar (nativo) no hay contexto, y cada app pinta su barra de siempre.
   const [destinos, setDestinos] = useState<DestinosBarra | null>(null);
   const barraUnica = useMemo(() => (nativo ? null : { destinos }), [nativo, destinos]);
+  // El estado de la bóveda (ADR 0086): de la puerta que envuelve a la shell o de la
+  // que va dentro. Sin barra (nativo) no se recoge: la puerta pinta su candado.
+  const bovedaDeFuera = useContext(VaultStatusContext);
+  const [bovedaDeDentro, setBovedaDeDentro] = useState<VaultStatus | null>(null);
+  const boveda = bovedaDeFuera ?? bovedaDeDentro;
 
   return (
     <I18nProvider locale={locale}>
@@ -340,12 +361,14 @@ export function SytueShell({
               {nativo ? (
                 <div class="sytue-native-safe-top sytue-topbar-carril" aria-hidden="true" />
               ) : (
-                <BarraDeLaSuite showSearch={showSearch} alDestinos={setDestinos} />
+                <BarraDeLaSuite showSearch={showSearch} alDestinos={setDestinos} boveda={boveda} />
               )}
               {/* ⌘K: la paleta de la suite, con las capas que registre la app. */}
               <ProveedorDePaleta hub={hub}>
                 <BarraUnicaContext.Provider value={barraUnica}>
-                  {children}
+                  <VaultStatusSinkContext.Provider value={nativo ? null : setBovedaDeDentro}>
+                    {children}
+                  </VaultStatusSinkContext.Provider>
                 </BarraUnicaContext.Provider>
               </ProveedorDePaleta>
               {/* «?» en todas las apps: la hoja con los atajos de la app y los de la suite. */}

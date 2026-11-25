@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //go:build js && wasm
 
-package main
+package kernelops
 
 import (
 	"encoding/json"
@@ -16,7 +16,7 @@ import (
 // el navegador pasa esos bytes tal cual, con la clave de firma de la bóveda, a
 // esta operación. El navegador no interpreta la acción ni firma nada.
 func init() {
-	domainOperations["vault.ingress.sign"] = vaultIngressSign
+	Operations["vault.ingress.sign"] = vaultIngressSign
 }
 
 const maxVaultIngressRequest = 16 << 10

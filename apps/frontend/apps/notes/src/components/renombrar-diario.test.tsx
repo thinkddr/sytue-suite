@@ -3,6 +3,7 @@
 //
 // En el diario, un texto sin título va en línea (sin cabecera). «Renombrar» del
 // menú tiene que sacar el campo igualmente, o esa nota no puede tener título nunca.
+import '../client/html-estatico.js';
 import { GlobalRegistrator } from '@happy-dom/global-registrator';
 import { expect, test } from 'bun:test';
 import { render } from 'preact';

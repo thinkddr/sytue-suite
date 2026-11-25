@@ -107,6 +107,12 @@ type Cabecera struct {
 	// menuYaVisible evita añadir una hamburguesa cuando sólo el canal es estrecho
 	// y el menú lateral sigue a la vista en una ventana ancha.
 	menuYaVisible bool
+	// Movil es la barra de la app del armazón. En una ventana estrecha la cabecera no se
+	// pinta (`VistaCanal.conCabecera`): el nombre del canal y sus acciones van en esa
+	// barra, que en el teléfono es la de la suite, y «Llamar» solo con su icono. Eran dos
+	// barras, con el nombre en «eq…» por el rótulo de «Llamar» (auditoría del
+	// 2026-11-24). nil: la cabecera de siempre a cualquier ancho.
+	Movil *ui.BarraMovil
 
 	// Los widgets se construyen una vez y el renderer los coloca.
 	marca                        fyne.CanvasObject
@@ -204,9 +210,14 @@ func (c *Cabecera) montar(v tema.Variante) {
 	c.llamar.Glifo = dibujo(glifoVideo, GlifoCabecera, "on-primary", v)
 	c.llamar.TamIcono = GlifoCabecera
 	c.llamar.Inerte = c.SinConexion
+	// Nace con o sin rótulo según la última medida: un botón montado en `iconOnly`
+	// esconde su rótulo y no lo vuelve a enseñar si después se le quita (ver
+	// colocarReducida), y «Llamar» se quedaba en una caja vacía al ensancharse.
+	c.llamar.SoloIcono = c.reducidaVisible
+	c.llamar.Rotulo = t.T("call.call", nil)
 
 	c.menu = nil
-	if c.Estrecha && !c.menuYaVisible && c.AlMenu != nil {
+	if c.Estrecha && !c.menuYaVisible && c.AlMenu != nil && c.Movil == nil {
 		c.menu = ui.NuevoBotonIcono(iconos.Menu, t.T("sidebar.openChannels", nil), c.AlMenu).SobreBanda()
 		c.menu.Lado, c.menu.TamIcono = ui.SueloTactil(LadoAccionCabecera), GlifoCabecera
 	}
@@ -233,6 +244,48 @@ func (c *Cabecera) montar(v tema.Variante) {
 	c.objetos = append(c.objetos, c.acciones...)
 	c.objetos = append(c.objetos, c.filete, c.llamar)
 	c.montarReducida()
+	c.ponerMovil()
+}
+
+// TituloBarra es el nombre del canal en la barra de la app: «#equipo», o el nombre de
+// la otra persona en un directo.
+func TituloBarra(c Canal) string {
+	if c.Clase == Directo || c.Nombre == "" {
+		return c.Nombre
+	}
+	return "#" + c.Nombre
+}
+
+// ponerMovil lleva el canal a la barra de la app: su nombre, y «Ponme al día», buscar,
+// llamar (solo el icono) y el menú del canal, que es donde están el resto de acciones de
+// la cabecera. Sin canal no hay nada que poner: la barra dice el nombre del producto.
+func (c *Cabecera) ponerMovil() {
+	b := c.Movil
+	if b == nil {
+		return
+	}
+	t := c.T
+	b.Titulo, b.Acciones = "", nil
+	if c.Canal.ID != "" {
+		b.Titulo = TituloBarra(c.Canal)
+		resumir := ui.NuevoBotonBarraMovil(iconos.Informacion, t.T("channel.summarize", nil), c.AlResumir)
+		resumir.Inerte = c.Resumiendo || c.SinConexion
+		buscar := ui.NuevoBotonBarraMovil(iconos.Buscar, t.T("channel.search", nil), func() {
+			if c.AlAbrirPanel != nil {
+				c.AlAbrirPanel(PanelBusqueda)
+			}
+		})
+		llamar := ui.NuevoBotonBarraMovil(iconos.Video, t.T("call.call", nil), c.AlLlamar)
+		llamar.Inerte = c.SinConexion
+		var menu *ui.BotonIcono
+		menu = ui.NuevoBotonBarraMovil(iconos.Puntos, t.T("channel.menuAria", i18n.Vars{"name": c.Canal.Nombre}), func() {
+			if c.AlAbrirMenu != nil {
+				c.AlAbrirMenu(menu)
+			}
+		})
+		b.Acciones = []fyne.CanvasObject{resumir, buscar, llamar, menu}
+	}
+	b.Refresh()
 }
 
 func (c *Cabecera) montarReducida() {
@@ -362,6 +415,13 @@ func (r *cabeceraRenderer) Destroy() {}
 // derecha. El texto se recorta con puntos suspensivos, que es el `truncate` de la web.
 func (r *cabeceraRenderer) Layout(t fyne.Size) {
 	c := r.c
+	if reducida := t.Width < c.anchoMinimo(); reducida != c.reducidaVisible || c.llamar.SoloIcono != reducida {
+		// Se rehace en vez de cambiarle `SoloIcono` a «Llamar»: el rótulo escondido al
+		// montarlo sin él no vuelve, y se quedaba una caja vacía (captura de 1280 tras la
+		// de 390, 2026-11-24).
+		c.reducidaVisible = reducida
+		c.montar(tema.De(fyne.CurrentApp().Settings().ThemeVariant()))
+	}
 	c.fondo.Resize(t)
 	if c.colocarReducida(t) {
 		return
@@ -444,10 +504,6 @@ func (r *cabeceraRenderer) Layout(t fyne.Size) {
 }
 
 func (c *Cabecera) colocarReducida(t fyne.Size) bool {
-	c.reducidaVisible = t.Width < c.anchoMinimo()
-	c.llamar.SoloIcono = c.reducidaVisible
-	c.llamar.Rotulo = c.T.T("call.call", nil)
-	c.llamar.Refresh()
 	if !c.reducidaVisible {
 		c.reducida.Hide()
 		return false

@@ -196,9 +196,65 @@ test('los botones RELLENOS llevan la tinta que pone el relleno del glifo en curr
     ).split(/\s+/);
   const sobreColor = (variant: Parameters<typeof clases>[0]): boolean =>
     clases(variant).some((c) => tintas.includes(c));
-  for (const rellena of ['primary', 'secondary', 'danger'] as const) {
+  for (const rellena of ['primary', 'danger'] as const) {
     expect(sobreColor(rellena)).toBe(true);
   }
-  // El fantasma no tiene relleno: su icono conserva el acento de marca.
+  // El fantasma no tiene relleno, y el secundario es de contorno: su icono conserva el
+  // acento de marca.
   expect(sobreColor('ghost')).toBe(false);
+  expect(sobreColor('secondary')).toBe(false);
+});
+
+test('el secundario es de CONTORNO y no del color del principal', () => {
+  // Auditoría del 2026-11-24: con `bg-primary`, «Cancelar» y «Guardar» salían del mismo
+  // verde azulado y la acción principal dejaba de distinguirse. Su espejo nativo
+  // (`ui.Secundario`) mira los mismos tokens en `controles_test.go`.
+  const cls = (
+    mount(<Button variant="secondary">Cancelar</Button>).querySelector('button')?.className ?? ''
+  ).split(/\s+/);
+  for (const c of ['bg-surface', 'text-text', 'border', 'border-border-strong']) {
+    expect(cls).toContain(c);
+  }
+  expect(cls).not.toContain('bg-primary');
+});
+
+test('multilinea: el rótulo salta de línea y el alto de la talla pasa a mínimo', () => {
+  // Sin `multilinea`, una línea y alto fijo: si no hay sitio, salta la fila.
+  const normal = (mount(<Button>Guardar</Button>).querySelector('button')?.className ?? '').split(
+    /\s+/,
+  );
+  expect(normal).toContain('whitespace-nowrap');
+  expect(normal).toContain('h-9');
+
+  // Con él, un rótulo que no cabe en la fila de un teléfono crece hacia abajo.
+  for (const [size, fijo, minimo] of [
+    ['xs', 'h-6', 'min-h-[24px]'],
+    ['sm', 'h-8', 'min-h-8'],
+    ['md', 'h-9', 'min-h-9'],
+    ['lg', 'h-11', 'min-h-11'],
+  ] as const) {
+    const clases = (
+      mount(
+        <Button size={size} multilinea>
+          Vorerst bei den bisherigen E-Mails bleiben
+        </Button>,
+      ).querySelector('button')?.className ?? ''
+    ).split(/\s+/);
+    expect(clases).toContain('whitespace-normal');
+    expect(clases).not.toContain('whitespace-nowrap');
+    expect(clases).toContain(minimo);
+    expect(clases).not.toContain(fijo);
+    // El resto de la talla no cambia: la reserva del dedo sigue ahí.
+    expect(clases).toContain('pointer-coarse:min-h-[max(44px,2.75rem)]');
+  }
+  // Un botón de solo icono es cuadrado: `multilinea` no lo toca.
+  const icono = (
+    mount(
+      <Button iconOnly multilinea aria-label="Cerrar">
+        ×
+      </Button>,
+    ).querySelector('button')?.className ?? ''
+  ).split(/\s+/);
+  expect(icono).toContain('h-9');
+  expect(icono).toContain('whitespace-nowrap');
 });

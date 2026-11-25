@@ -10,6 +10,7 @@ import (
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 
+	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
@@ -34,16 +35,23 @@ func (a *App) abrirVistaRapidaHoja(c fyne.Canvas, o Ocurrencia) {
 	}
 	solo := o.SoloLectura
 	var pie fyne.CanvasObject
+	var eliminar *ui.Boton
 	switch {
 	case solo:
 		pie = container.New(ui.PieAcciones{},
 			ui.NuevoBoton(p.t("popover.copyToMine", nil), cerrar(func() { a.duplicar(o) })).Con(ui.Secundario, ui.TallaMD))
 	default:
-		// «Eliminar» arriba y Duplicar | Editar debajo, con el principal abajo a la derecha.
-		pie = container.New(ui.PieAcciones{Izquierda: 1},
-			ui.NuevoBoton(p.t("common.delete", nil), cerrar(func() { a.eliminar(o) })).Con(ui.Peligro, ui.TallaMD),
+		// Duplicar | Editar en el pie, con el principal abajo a la derecha. «Eliminar» NO
+		// va en él: con tres acciones la primera sale sola a todo el ancho, y la hoja
+		// abría con un botón rojo macizo encima de todo (auditoría del 2026-11-24). Va al
+		// final del cuerpo, de fantasma de peligro y a su ancho: se encuentra, pero no
+		// es lo primero que se ve.
+		pie = container.New(ui.PieAcciones{},
 			ui.NuevoBoton(p.t("popover.duplicate", nil), cerrar(func() { a.duplicar(o) })).Con(ui.Secundario, ui.TallaMD),
 			ui.NuevoBoton(p.t("common.edit", nil), cerrar(func() { a.editar(o) })).Con(ui.Primario, ui.TallaMD))
+		eliminar = ui.NuevoBoton(p.t("common.delete", nil), cerrar(func() { a.eliminar(o) })).Con(ui.Fantasma, ui.TallaMD).
+			ConIcono(iconos.Papelera, 16)
+		eliminar.Destructivo = true
 	}
 	d = ui.NuevoDialogo(resumenDe(o, p.t("event.untitled", nil)), nil).Con(ui.DialogoSM, pie)
 	ancho := ui.AnchoCuerpoDialogo(d, c.Size())
@@ -107,6 +115,9 @@ func (a *App) abrirVistaRapidaHoja(c fyne.Canvas, o Ocurrencia) {
 	}
 	if solo {
 		hijos = append(hijos, ui.NuevoParrafo(p.t("popover.readOnly", nil), tema.TextoXS, ui.Normal, "text-subtle", v).A(ancho))
+	}
+	if eliminar != nil {
+		hijos = append(hijos, container.NewHBox(eliminar))
 	}
 	d.CambiarCuerpo(container.New(ui.Columna{Hueco: tema.Espacio(3)}, hijos...))
 	a.mostrarDialogo(d, c)

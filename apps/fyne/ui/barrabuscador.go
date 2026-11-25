@@ -836,8 +836,13 @@ func (r *panelBarraRenderer) Objects() []fyne.CanvasObject { return r.objetos }
 func (r *panelBarraRenderer) Destroy()                     {}
 
 func (r *panelBarraRenderer) Layout(t fyne.Size) {
-	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
-	r.sombra.Ajustar(fyne.NewPos(0, 0), t, v)
+	// Escondido no se ve, y su sombra es un `md` del ancho de la barra: ~4,5 ms al
+	// arrancar y en cada redimensión de TODAS las apps (medido el 2026-11-24). Al
+	// enseñarlo, Show pasa por Refresh, que vuelve aquí ya visible.
+	if r.p.Visible() {
+		v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
+		r.sombra.Ajustar(fyne.NewPos(0, 0), t, v)
+	}
 	// A sangre (teléfono): sin cantos, `max-md:rounded-none`.
 	if r.p.aSangre {
 		r.caja.CambiarRadio(0)

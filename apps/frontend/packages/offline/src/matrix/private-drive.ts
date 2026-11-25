@@ -62,6 +62,8 @@ import {
 export class PrivateDriveError extends Error {
   constructor(
     readonly reason: 'not_ready' | 'not_found' | 'conflict' | 'cycle' | 'closed' | 'immutable_root',
+    /** Qué comprobación lo dijo, si hace falta distinguirla (`roots`, `receipt`): código fijo. */
+    readonly check?: 'roots' | 'receipt',
   ) {
     super('drive_private_' + reason);
     this.name = 'PrivateDriveError';
@@ -103,6 +105,8 @@ export class PrivateDriveRepository {
   private closed = false;
   private state: LegacyMigrationState | undefined;
   private projection = empty();
+  /** Cuántos recibos idénticos de la época dejó la última carga (más de uno: dos importaciones). */
+  private receipts = 0;
   private tail: Promise<unknown> = Promise.resolve();
   constructor(private readonly repository: StorageRepository) {
     if (repository.scope.product !== 'drive') invalid();
@@ -134,6 +138,7 @@ export class PrivateDriveRepository {
     this.closed = true;
     await this.jobs.close();
     this.projection = empty();
+    this.receipts = 0;
     this.state = undefined;
   }
   private serialized<T>(action: () => Promise<T>): Promise<T> {
@@ -167,6 +172,9 @@ export class PrivateDriveRepository {
                       throw error;
                     }
                   },
+                  duplicated: () =>
+                    this.receipts > 1 ||
+                    [...this.projection.nodes.values()].some((nodes) => nodes.length > 1),
                   verifyBinary: async (item, pointer, signal) => {
                     await this.readBody(
                       pointer,
@@ -213,31 +221,47 @@ export class PrivateDriveRepository {
       next.heads.get('drive_migration_' + (await digest(new TextEncoder().encode(state.epoch)))) ??
       [];
     if (completion.length === 0) throw new PrivateDriveError('not_ready');
-    if (completion.length !== 1) conflict();
-    const receipt = completion[0]!,
-      raw = storageJSONBytes(receipt.commit.metadata, 8 << 10),
-      proof = json(raw);
-    if (
-      proof.kind !== driveMigrationKind ||
-      proof.epoch !== state.epoch ||
-      proof.rows !== state.rows ||
-      proof.blobs !== state.blobs ||
-      !hash(proof.inventory_sha256) ||
-      (inventory !== undefined && proof.inventory_sha256 !== inventory) ||
-      receipt.commit.state !== 'live'
-    )
-      invalid();
-    const pointer = receipt.commit.content;
-    if (!pointer || pointer.kind !== 'record') invalid();
-    const content = await this.repository.readRecord(
-      pointer.reference,
-      receipt.object_id,
-      'content',
-      signal,
+    // Dos importaciones de la misma fuente congelada que terminan a la vez dejan
+    // dos recibos. Valen si CADA uno es válido y todos dicen lo mismo (época,
+    // filas, ficheros e inventario): no hay nada que elegir. Distintos, conflicto.
+    if (completion.length > 16) throw new PrivateDriveError('conflict', 'receipt');
+    const proofs = completion.map((receipt) =>
+      json(storageJSONBytes(receipt.commit.metadata, 8 << 10)),
     );
-    if (content.revision_id !== pointer.revision_id || content.payload !== receipt.commit.metadata)
-      invalid();
-    let roots = 0;
+    const claims = new Set(
+      proofs.map((p) => JSON.stringify([p.kind, p.epoch, p.rows, p.blobs, p.inventory_sha256])),
+    );
+    if (claims.size !== 1) throw new PrivateDriveError('conflict', 'receipt');
+    for (const [i, receipt] of completion.entries()) {
+      const proof = proofs[i]!;
+      if (
+        proof.kind !== driveMigrationKind ||
+        proof.epoch !== state.epoch ||
+        proof.rows !== state.rows ||
+        proof.blobs !== state.blobs ||
+        !hash(proof.inventory_sha256) ||
+        (inventory !== undefined && proof.inventory_sha256 !== inventory) ||
+        receipt.commit.state !== 'live'
+      )
+        invalid();
+      const pointer = receipt.commit.content;
+      if (!pointer || pointer.kind !== 'record') invalid();
+      const content = await this.repository.readRecord(
+        pointer.reference,
+        receipt.object_id,
+        'content',
+        signal,
+      );
+      if (
+        content.revision_id !== pointer.revision_id ||
+        content.payload !== receipt.commit.metadata
+      )
+        invalid();
+    }
+    // Las raíces se cuentan por objeto: dos copias idénticas de la misma raíz (dos
+    // importaciones) son una raíz con dos cabezas, que la importación junta; dos
+    // carpetas distintas que dicen ser la raíz son un conflicto de verdad.
+    const roots = new Set<string>();
     for (const version of catalog) {
       const descriptor = json(storageJSONBytes(version.commit.metadata, 8 << 10));
       if (descriptor.kind !== driveItemKind) continue;
@@ -245,13 +269,15 @@ export class PrivateDriveRepository {
         list = next.nodes.get(version.object_id) ?? [];
       list.push({ item, version });
       next.nodes.set(version.object_id, list);
-      if (item.source_kind === 'folder' && item.is_root && version.commit.state === 'live') roots++;
+      if (item.source_kind === 'folder' && item.is_root && version.commit.state === 'live')
+        roots.add(version.object_id);
     }
-    if (roots > 1) conflict();
-    if (roots !== 1) invalid();
+    if (roots.size > 1) throw new PrivateDriveError('conflict', 'roots');
+    if (roots.size !== 1) invalid();
     this.check(false);
     signal.throwIfAborted();
     this.projection = next;
+    this.receipts = completion.length;
     this.state = { ...state, scope: { ...state.scope } };
   }
   private async node(projection: Projection, kind: DriveSourceKind, id: string): Promise<Node> {

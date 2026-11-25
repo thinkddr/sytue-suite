@@ -77,6 +77,8 @@ export const en = {
   'vault.emptyUnderstood': 'I understand that the data encrypted with the lost key will be deleted',
   'vault.failed':
     'The encrypted data could not be opened. Try again or sign in to Sytue ID again. If the key is lost, you can empty this app’s encrypted data.',
+  'vault.moreInfo': 'More information',
+  'vault.attention': 'Your encrypted data needs attention',
   'matrix.incoming': 'Verify this device',
   'matrix.match': 'They match',
   'matrix.mismatch': 'They don’t match',

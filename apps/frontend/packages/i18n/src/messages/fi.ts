@@ -73,6 +73,8 @@ export const fi: Catalog = {
   'vault.emptyUnderstood': 'Ymmärrän, että kadonneella avaimella salatut tiedot poistetaan',
   'vault.failed':
     'Salattuja tietoja ei voitu avata. Yritä uudelleen tai kirjaudu uudelleen Sytue ID:hen. Jos avain on kadonnut, voit tyhjentää sovelluksen salatut tiedot.',
+  'vault.moreInfo': 'Lisätietoja',
+  'vault.attention': 'Salatut tietosi vaativat huomiota',
   'matrix.incoming': 'Vahvista tämä laite',
   'matrix.match': 'Ne täsmäävät',
   'matrix.mismatch': 'Ne eivät täsmää',

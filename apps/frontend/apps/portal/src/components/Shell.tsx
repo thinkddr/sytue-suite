@@ -7,7 +7,7 @@
 import type { ComponentChildren } from 'preact';
 import { useRef } from 'preact/hooks';
 import { SytueShell } from '@sytue/shell';
-import { MatrixStorageGate } from '@sytue/shell/matrix';
+import { MatrixStorageGate } from '@sytue/shell/vault';
 import { IndicadorRefrescoTactil, usePullToRefresh } from '@sytue/ui';
 import type { SytueUser } from '@sytue/auth';
 import type { Locale } from '@sytue/i18n';

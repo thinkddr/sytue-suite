@@ -6,6 +6,7 @@ package drive
 import (
 	"image"
 	"image/color"
+	"strconv"
 	"strings"
 
 	"fyne.io/fyne/v2"
@@ -128,6 +129,9 @@ type Explorador struct {
 	filasLineas  int
 	desplazable  *container.Scroll
 	anchoRejilla float32
+	// rejillaViva es la cuadrícula del último pintado: la que hace las tarjetas que
+	// entran al desplazar (ver rejillaVirtual).
+	rejillaViva *rejillaVirtual
 	// deLista es lo que enseña la LISTA en este pintado: todo, o lo que no se ha ido a
 	// la franja de carpetas (ver Partes). franjaScroll es el desplazable de la franja,
 	// el mismo de un pintado a otro, y anchoFranja el último ancho de su rejilla.
@@ -137,6 +141,8 @@ type Explorador struct {
 	// listaFranja desplaza juntas las carpetas y la lista en una ventana baja.
 	// La lista conserva su propia virtualización y su instancia al repintar.
 	listaFranja *container.Scroll
+	// reservaFilas es la fila vacía del final de `filas` para el botón flotante.
+	reservaFilas *ui.ReservaEnLista
 	// vista es la única raíz que puede colocar las piezas conservadas. Al
 	// repintar se retira antes de prestarlas a la vista nueva.
 	vista *fyne.Container
@@ -157,6 +163,10 @@ type Explorador struct {
 	// arriba pide volver al principio en el próximo pintado: una carpeta NUEVA
 	// empieza arriba, y la misma recargada o ampliada se queda donde estaba.
 	arriba bool
+	// franjas son las piezas de la vista montada que no dependen de la selección, y
+	// cabLista la cabecera de columnas de la lista: ActualizarSeleccion las conserva.
+	franjas  struct{ cab, subida, cuerpo fyne.CanvasObject }
+	cabLista *ui.CabeceraDrive
 }
 
 // FilasAntesDelFinal es a cuántas filas del final se pide la página siguiente: los
@@ -290,23 +300,60 @@ func (e *Explorador) Objeto(v tema.Variante) fyne.CanvasObject {
 		e.vista = nil
 	}
 	e.marcados = e.Marcados()
-	cab := e.cabecera(v)
-	franjas := []fyne.CanvasObject{cab}
-	elastico := 1
-	if n := e.Marcados(); n > 0 && !e.SinRed() {
-		franjas = append(franjas, e.barraSeleccion(v, n))
-		elastico++
-	}
+	e.franjas.cab, e.franjas.subida, e.cabLista = e.cabecera(v), nil, nil
 	if e.Subida != nil {
-		franjas = append(franjas, e.barraSubida(v))
-		elastico++
+		e.franjas.subida = e.barraSubida(v)
 	}
-	franjas = append(franjas, e.conVeloSoltar(e.cuerpo(v), v))
+	e.franjas.cuerpo = e.conVeloSoltar(e.cuerpo(v), v)
 	// Pila mide AltoCon con el ancho actual antes de colocar la cabecera.
 	// No se encola su Refresh: un repintado retira esta pila pero conserva
 	// listaFranja, y una notificación antigua redimensionaría el scroll vivo.
-	e.vista = container.New(Pila{Elastico: elastico}, franjas...)
+	pila, franjas := e.apilarFranjas(v)
+	e.vista = container.New(pila, franjas...)
 	return e.vista
+}
+
+// apilarFranjas son la cabecera, la franja de lote si hay algo marcado, la de la subida
+// y el cuerpo, en ese orden, en la pila que las coloca: el cuerpo es el que crece.
+func (e *Explorador) apilarFranjas(v tema.Variante) (Pila, []fyne.CanvasObject) {
+	franjas := []fyne.CanvasObject{e.franjas.cab}
+	if n := e.marcados; n > 0 && !e.SinRed() {
+		franjas = append(franjas, e.barraSeleccion(v, n))
+	}
+	if e.franjas.subida != nil {
+		franjas = append(franjas, e.franjas.subida)
+	}
+	return Pila{Elastico: len(franjas)}, append(franjas, e.franjas.cuerpo)
+}
+
+// ActualizarSeleccion pone la selección de ahora en lo que ya está montado: la casilla
+// de cada tarjeta y fila, la de «seleccionar todo» y la franja de lote, que es lo único
+// que se rehace. Marcar un fichero rehacía la pantalla entera (~1 ms con la rejilla
+// virtual, y el árbol viejo retenido un minuto). Devuelve false si no hay vista
+// montada en la que ponerla: entonces toca repintar.
+func (e *Explorador) ActualizarSeleccion(v tema.Variante) bool {
+	if e.vista == nil || e.Fase != Exito || e.franjas.cab == nil || e.franjas.cuerpo == nil {
+		return false
+	}
+	e.marcados = e.Marcados()
+	// Las tarjetas montadas: las de la rejilla (virtual: las que no están se hacen ya
+	// con la selección de ahora) o las de la franja de carpetas de la lista.
+	for _, tp := range e.tarjetas {
+		tp.t.Seleccionada, tp.t.SeleccionActiva = e.Seleccion[tp.el.ID], e.marcados > 0
+		tp.t.Refresh()
+	}
+	if !e.Rejilla && e.filas != nil {
+		if e.cabLista != nil {
+			e.cabLista.Todas, e.cabLista.Algunas = e.TodoMarcado(), e.AlgoMarcado()
+			e.cabLista.Refresh()
+		}
+		e.filas.Refresh() // cada fila vuelve a leer la selección al rellenarse
+	}
+	viejas := e.vista.Objects
+	e.vista.Layout, e.vista.Objects = e.apilarFranjas(v)
+	e.vista.Refresh()
+	soltarArboles(viejas, e.vista) // la franja de lote de antes
+	return true
 }
 
 // ---- La cabecera ----
@@ -465,6 +512,22 @@ func conGlifo(b *ui.Boton, cuerpo string, v tema.Variante) *ui.Boton {
 // ponytail: sin el `title` de la web («Se combinan en el orden en que aparecen en la
 // lista»): `ui.BarraDeLote` recibe botones sueltos y no los envuelve en una `ui.Pista`.
 func (e *Explorador) barraSeleccion(v tema.Variante, n int) fyne.CanvasObject {
+	acciones := e.accionesLote(v, false)
+	if ui.EsTactil() && e.Ventana > 0 && !accionesLoteCaben(acciones, n, e.Ventana) {
+		// En el teléfono las acciones van en una tira deslizable entre el número y el
+		// aspa, y con su rótulo no caben: «Papelera», la última, se quedaba en «Papeler»
+		// contra el borde. Entonces van solo con su glifo, como la barra contextual de un
+		// teléfono; el rótulo sigue siendo su nombre accesible. Son botones nuevos: el
+		// botón decide al montarse si pinta el rótulo, y medir ya los ha montado.
+		acciones = e.accionesLote(v, true)
+	}
+	recuento := e.t("files.selection.count", i18n.Vars{"count": n})
+	return ui.NuevaBarraDeLote(recuento, e.t("ui.bulk.region"), e.t("files.selection.clear"),
+		acciones, e.limpiarSeleccion).Con(CanalonCabecera(e.Ventana)).ConNumero(n)
+}
+
+// accionesLote son los botones de la barra de lote, con su rótulo o solo con su glifo.
+func (e *Explorador) accionesLote(v tema.Variante, soloIcono bool) []*ui.Boton {
 	var acciones []*ui.Boton
 	if e.PuedeCombinar() {
 		b := ui.NuevoBoton(e.t("pdf.combine"), e.AlCombinarPDF).Con(ui.Secundario, ui.TallaSM)
@@ -477,9 +540,29 @@ func (e *Explorador) barraSeleccion(v tema.Variante, n int) fyne.CanvasObject {
 		conGlifo(ui.NuevoBoton(e.t("files.selection.download"), e.AlDescargarLote).Con(ui.Secundario, ui.TallaSM), glifoDescargar, v),
 		conGlifo(ui.NuevoBoton(e.t("files.selection.trash"), e.AlPapeleraLote).Con(ui.Peligro, ui.TallaSM), glifoPapelera, v),
 	)
-	recuento := e.t("files.selection.count", i18n.Vars{"count": n})
-	return ui.NuevaBarraDeLote(recuento, e.t("ui.bulk.region"), e.t("files.selection.clear"),
-		acciones, e.limpiarSeleccion).Con(CanalonCabecera(e.Ventana)).ConNumero(n)
+	if soloIcono {
+		for _, b := range acciones {
+			b.Rotulo, b.SoloIcono = b.Texto, true
+		}
+	}
+	return acciones
+}
+
+// accionesLoteCaben dice si las acciones con su rótulo caben enteras en la barra de lote
+// táctil de una ventana de ese ancho: el canalón a cada lado, el número (`text-base
+// font-semibold` con su `mr-1`), el aspa de 44 y los `gap-1.5` entre todo.
+func accionesLoteCaben(acciones []*ui.Boton, n int, ventana float32) bool {
+	hueco := tema.Espacio(1.5)
+	libre := ventana - 2*CanalonCabecera(ventana) -
+		ui.Medir(strconv.Itoa(n), tema.TextoBase, ui.SemiNegrita).Width - tema.Espacio(1) -
+		ui.SueloTactil(ui.MedidaBoton("", ui.TallaSM, 0).Height) - 2*hueco
+	for i, b := range acciones {
+		if i > 0 {
+			libre -= hueco
+		}
+		libre -= b.MinSize().Width
+	}
+	return libre >= 0
 }
 
 func (e *Explorador) limpiarSeleccion() {
@@ -740,16 +823,7 @@ func (e *Explorador) llevarAVista() {
 
 // lista es la cabecera de columnas más el listado virtualizado.
 func (e *Explorador) lista(v tema.Variante) fyne.CanvasObject {
-	cab := ui.NuevaCabeceraDrive(e.t("files.col.name"), e.t("files.col.size"), e.t("files.col.modified"))
-	cab.ConCasilla = !e.SinRed()
-	cab.RotuloCasilla = e.t("files.selectAll")
-	cab.Todas, cab.Algunas = e.TodoMarcado(), e.AlgoMarcado()
-	cab.Ventana = e.Ventana
-	cab.AlMarcarTodas = e.AlSeleccionarTodo
-	if e.ordenable() {
-		cab.OrdenCampo, cab.OrdenDesc = string(e.Orden.Campo), e.Orden.Desc
-		cab.AlOrdenar = func(campo string) { e.AlOrdenar(CampoOrden(campo)) }
-	}
+	cab := e.cabeceraLista()
 	var carpetas []Elemento
 	carpetas, e.deLista = e.Partes()
 
@@ -764,67 +838,10 @@ func (e *Explorador) lista(v tema.Variante) fyne.CanvasObject {
 	// sin el hueco desplaza el nombre, la tesela y las dos columnas. Anotado en el
 	// informe como hueco de `ui.Eleccion`, que no tiene opacidad.
 	conCasilla := !e.SinRed()
-	lineas := 0
-	if e.EnBusqueda {
-		lineas++
-	}
-	if e.Ventana > 0 && e.Ventana < ui.CorteSM {
-		lineas++
-	}
-	if e.filas == nil || e.filasCasilla != conCasilla || e.filasLineas != lineas {
-		e.filas = nuevaListaFilas(
-			e.abrirFila,
-			func() int { return len(e.filasDeLista()) },
-			func() fyne.CanvasObject {
-				// Con ratón la fila se arrastra a una carpeta; con el dedo, no: una fila
-				// que se queda el arrastre no deja desplazar la lista.
-				var o fyne.CanvasObject
-				var f *ui.FilaDrive
-				switch {
-				case punteroGrueso() && e.AlMoverA != nil:
-					a := e.nuevaFilaTactil()
-					f, o = a.fila, a
-				case e.AlMoverA == nil:
-					f = ui.NuevaFilaDrive("", "")
-					o = f
-				default:
-					a := &filaArrastrable{e: e}
-					a.ExtendBaseWidget(a)
-					f, o = &a.FilaDrive, a
-				}
-				f.ConCasilla = conCasilla
-				f.Ventana = e.Ventana
-				if e.EnBusqueda {
-					f.Ubicacion = " " // la plantilla solo necesita saber que hay línea
-				}
-				// El glifo va al CREAR la fila: el renderer lo monta una vez y la
-				// fila se recicla. Se tiñe en cada Refresh con su estado.
-				f.GlifoMas = glifoCon(glifoMas, iconos.TallaSM, tema.Color("text-muted", v))
-				f.SiempreMenu = punteroGrueso()
-				return o
-			},
-			e.rellenarFila,
-		)
-		e.filas.HideSeparators = true
-		// El `widget.List` separa sus filas con el relleno del TEMA —7 px con el de la
-		// suite, y también con HideSeparators—: 35.000 px de desvío en 5.000 filas.
-		// Con esto van pegadas, que es lo que hace la web.
-		e.filasObj = ui.RefrescarAlTirar(container.NewThemeOverride(e.filas, SinRelleno{}), &e.Refresco)
-		e.filasCasilla, e.filasLineas = conCasilla, lineas
-	} else {
-		e.filas.Refresh()
-	}
+	lineas := e.lineasDeFila()
+	e.prepararFilas(conCasilla, lineas, v)
 	conFranja := len(carpetas) > 0 && ui.EsTactil()
-	e.Refresco.Arriba = func() bool {
-		return e.filas.GetScrollOffset() <= 0.5 && (!conFranja || e.listaFranja == nil || e.listaFranja.Offset.Y <= 0.5)
-	}
-	if e.arriba {
-		e.filas.ScrollToTop()
-		if e.listaFranja != nil {
-			e.listaFranja.ScrollToTop()
-		}
-		e.arriba = false
-	}
+	e.ajustarDesplazamiento(conFranja)
 	e.llevarAVista()
 
 	fondo := canvas.NewRectangle(tema.Color(ui.FondoHoja(), v))
@@ -840,6 +857,114 @@ func (e *Explorador) lista(v tema.Variante) fyne.CanvasObject {
 		hijos = append(hijos, col.pie)
 	}
 	return e.montarLista(col, hijos, lineas)
+}
+
+// cabeceraLista monta la cabecera de columnas (con su casilla de «todas» y el orden,
+// si la vista se deja ordenar) y la recuerda en `cabLista`.
+func (e *Explorador) cabeceraLista() *ui.CabeceraDrive {
+	cab := ui.NuevaCabeceraDrive(e.t("files.col.name"), e.t("files.col.size"), e.t("files.col.modified"))
+	e.cabLista = cab
+	cab.ConCasilla = !e.SinRed()
+	cab.RotuloCasilla = e.t("files.selectAll")
+	cab.Todas, cab.Algunas = e.TodoMarcado(), e.AlgoMarcado()
+	cab.Ventana = e.Ventana
+	cab.AlMarcarTodas = e.AlSeleccionarTodo
+	if e.ordenable() {
+		cab.OrdenCampo, cab.OrdenDesc = string(e.Orden.Campo), e.Orden.Desc
+		cab.AlOrdenar = func(campo string) { e.AlOrdenar(CampoOrden(campo)) }
+	}
+	return cab
+}
+
+// lineasDeFila cuenta las líneas de `sytue-meta` que cada fila lleva bajo el nombre:
+// la ubicación en una búsqueda y, cuando la ventana estrecha esconde sus columnas,
+// la del tamaño y la fecha (como `ui.FilaDrive.Lineas`).
+func (e *Explorador) lineasDeFila() int {
+	lineas := 0
+	if e.EnBusqueda {
+		lineas++
+	}
+	if e.Ventana > 0 && e.Ventana < ui.CorteSM {
+		lineas++
+	}
+	return lineas
+}
+
+// prepararFilas crea el listado virtualizado cuando cambia la forma de sus filas
+// (casilla o líneas) y, si no, lo refresca tal cual.
+func (e *Explorador) prepararFilas(conCasilla bool, lineas int, v tema.Variante) {
+	if e.filas != nil && e.filasCasilla == conCasilla && e.filasLineas == lineas {
+		e.filas.Refresh()
+		return
+	}
+	e.filas = nuevaListaFilas(
+		e.abrirFila,
+		func() int { return len(e.filasDeLista()) },
+		e.plantillaFila(conCasilla, v),
+		e.rellenarFila,
+	)
+	e.filas.HideSeparators = true
+	// Una fila vacía al final en el teléfono: el «Subir» flotante tapaba la última.
+	e.reservaFilas = ui.ReservarEnLista(&e.filas.List)
+	// El `widget.List` separa sus filas con el relleno del TEMA —7 px con el de la
+	// suite, y también con HideSeparators—: 35.000 px de desvío en 5.000 filas.
+	// Con esto van pegadas, que es lo que hace la web.
+	e.filasObj = ui.RefrescarAlTirar(container.NewThemeOverride(e.filas, SinRelleno{}), &e.Refresco)
+	e.filasCasilla, e.filasLineas = conCasilla, lineas
+}
+
+// plantillaFila crea cada fila reciclable del listado.
+func (e *Explorador) plantillaFila(conCasilla bool, v tema.Variante) func() fyne.CanvasObject {
+	return func() fyne.CanvasObject {
+		// Con ratón la fila se arrastra a una carpeta; con el dedo, no: una fila
+		// que se queda el arrastre no deja desplazar la lista.
+		var o fyne.CanvasObject
+		var f *ui.FilaDrive
+		switch {
+		case punteroGrueso() && e.AlMoverA != nil:
+			a := e.nuevaFilaTactil()
+			f, o = a.fila, a
+		case e.AlMoverA == nil:
+			f = ui.NuevaFilaDrive("", "")
+			o = f
+		default:
+			a := &filaArrastrable{e: e}
+			a.ExtendBaseWidget(a)
+			f, o = &a.FilaDrive, a
+		}
+		f.ConCasilla = conCasilla
+		f.Ventana = e.Ventana
+		if e.EnBusqueda {
+			f.Ubicacion = " " // la plantilla solo necesita saber que hay línea
+		}
+		// El glifo va al CREAR la fila: el renderer lo monta una vez y la
+		// fila se recicla. Se tiñe en cada Refresh con su estado.
+		f.GlifoMas = glifoCon(glifoMas, iconos.TallaSM, tema.Color("text-muted", v))
+		f.SiempreMenu = punteroGrueso()
+		return o
+	}
+}
+
+// ajustarDesplazamiento pone la reserva del «Subir» flotante, el «arriba del todo»
+// del tirar para refrescar y, si se pidió, vuelve el listado al principio.
+func (e *Explorador) ajustarDesplazamiento(conFranja bool) {
+	if conFranja {
+		// ponytail: con la franja de carpetas la lista va dentro de otro desplazamiento
+		// y su final no es el de la pantalla; ahí no se reserva (`ui.Estrecho` la apaga).
+		e.reservaFilas.Ajustar(ui.Estrecho)
+	} else {
+		e.reservaFilas.Ajustar(e.Ventana)
+	}
+	e.Refresco.Arriba = func() bool {
+		return e.filas.GetScrollOffset() <= 0.5 && (!conFranja || e.listaFranja == nil || e.listaFranja.Offset.Y <= 0.5)
+	}
+	if e.arriba {
+		e.filas.ScrollToTop()
+		if e.listaFranja != nil {
+			e.listaFranja.ScrollToTop()
+		}
+		e.arriba = false
+	}
 }
 
 func (e *Explorador) montarLista(col *columnaLista, hijos []fyne.CanvasObject, lineas int) fyne.CanvasObject {
@@ -1008,11 +1133,12 @@ func (c *columnaLista) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 		objs[0].Move(fyne.NewPos(0, 0))
 		objs[0].Resize(t)
 	}
-	// La franja de carpetas, arriba: lo que pida, hasta el 45 % del alto (`max-h-[45%]`);
-	// con más carpetas desplaza por dentro y la lista conserva más de la mitad.
+	// La franja de carpetas, arriba: lo que pida, hasta el 45 % del alto (`max-h-[45%]`)
+	// recortado a filas enteras; con más carpetas desplaza por dentro y la lista conserva
+	// más de la mitad.
 	arriba := float32(0)
 	if c.franja != nil {
-		arriba = min(c.altoFranja(t.Width), TopeFranja*t.Height)
+		arriba = min(c.altoFranja(t.Width), franjaEnFilas(TopeFranja*t.Height))
 		if c.compacta {
 			arriba = c.altoFranja(t.Width)
 		}
@@ -1118,6 +1244,19 @@ func (e *Explorador) franja(carpetas []Elemento) (fyne.CanvasObject, func(ancho 
 	}
 }
 
+// franjaEnFilas es el alto de la franja con `tope` recortado a filas ENTERAS de teselas:
+// al 45 % a secas la última fila visible quedaba partida bajo la cabecera «NOMBRE» (en el
+// teléfono, en Marco, media tarjeta con el nombre tapado). Las demás filas se alcanzan
+// desplazando la franja. Si no cabe ni una, el tope tal cual: en el táctil esa franja ya
+// va entera dentro del desplazamiento del cuerpo (`viewportListaCarpetas`).
+func franjaEnFilas(tope float32) float32 {
+	filas := int((tope - RellenoFranja - RellenoFranjaAbajo + HuecoFranja) / (AltoTeselaFranja + HuecoFranja))
+	if filas < 1 {
+		return tope
+	}
+	return RellenoFranja + float32(filas)*AltoTeselaFranja + float32(filas-1)*HuecoFranja + RellenoFranjaAbajo
+}
+
 // marcoFranja es el relleno de la franja: `px-6 pt-4 pb-1`.
 type marcoFranja struct{}
 
@@ -1190,22 +1329,18 @@ func (esqueletoLista) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 
 // rejilla es la vista de tarjetas: `grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4
 // xl:grid-cols-5` dentro de un `px-6 py-4`.
+//
+// Es VIRTUAL, como el `GridWrap` de Fyne: solo existen las tarjetas de las filas que se
+// ven y una por encima y por debajo (`rejillaVirtual`), y al desplazar se hacen las que
+// entran. Con 2.000 elementos se rehacían 2.000 tarjetas en cada repintado.
 func (e *Explorador) rejilla(v tema.Variante) fyne.CanvasObject {
-	tarjetas := make([]fyne.CanvasObject, 0, len(e.Elementos))
 	e.tarjetas = e.tarjetas[:0]
-	tonos := ui.TonosTarjeta()
-	for i, el := range e.Elementos {
-		t, o := e.nuevaTarjeta(el)
-		// Una carpeta es una tarjeta de recurso, con el tono por turno
-		// (`CARD_TONES[index % CARD_TONES.length]`): solo pinta en la forma Marco.
-		if el.Carpeta {
-			t.Tono = tonos[i%len(tonos)]
-		}
-		e.tarjetas = append(e.tarjetas, tarjetaPintada{el: el, objeto: o, t: t})
-		tarjetas = append(tarjetas, o)
+	rej := &rejillaVirtual{
+		rejillaDrive: rejillaDrive{rej: ui.RejillaTarjetas(e.Ventana, HuecoRejilla, CortesRejillaDrive), ancho: &e.anchoRejilla},
+		e:            e, elementos: e.Elementos, hechas: map[int]tarjetaPintada{}, desde: -1,
 	}
-	rej := &rejillaDrive{rej: ui.RejillaTarjetas(e.Ventana, HuecoRejilla, CortesRejillaDrive), ancho: &e.anchoRejilla}
-	var interior fyne.CanvasObject = container.New(rej, tarjetas...)
+	rej.c = container.New(rej)
+	var interior fyne.CanvasObject = rej.c
 	if e.HayMas {
 		// La rejilla no pagina sola: `flex justify-center pt-5` con «Cargar más».
 		mas := ui.NuevoBoton(e.t("files.loadMore"), e.AlCargarMas).Con(ui.Secundario, ui.TallaSM)
@@ -1214,16 +1349,24 @@ func (e *Explorador) rejilla(v tema.Variante) fyne.CanvasObject {
 	}
 	// El desplazable es el MISMO de un pintado a otro: con uno nuevo, cada repintado
 	// devolvía la rejilla arriba.
+	interior = ui.ConReservaFlotante(interior) // el hueco del «Subir» flotante
 	if e.desplazable == nil {
 		e.desplazable = container.NewVScroll(interior)
 	} else {
 		e.desplazable.Content = interior
-		e.desplazable.Refresh()
 	}
 	if e.arriba {
 		e.desplazable.ScrollToTop()
 		e.arriba = false
 	}
+	e.rejillaViva = rej
+	e.desplazable.OnScrolled = func(fyne.Position) {
+		if e.rejillaViva == rej {
+			rej.alDesplazar()
+		}
+	}
+	rej.ponerVentana()
+	e.desplazable.Refresh()
 	// ponytail: en la rejilla el marcado se ve pero no se desplaza hasta él (la rejilla
 	// no sabe en qué fila cae cada tesela hasta medirla); se consume para que no salte
 	// al volver a la lista.
@@ -1232,7 +1375,7 @@ func (e *Explorador) rejilla(v tema.Variante) fyne.CanvasObject {
 	refresco := e.Refresco
 	refresco.Arriba = func() bool { return e.desplazable.Offset.Y <= 0.5 }
 	cuerpo := ui.RefrescarAlTirar(e.desplazable, &refresco)
-	return container.New(&marcoRejilla{hijo: cuerpo}, fondo, cuerpo)
+	return container.New(&marcoRejilla{hijo: cuerpo, alColocar: rej.alDesplazar}, fondo, cuerpo)
 }
 
 // nuevaTarjeta crea la tarjeta de un elemento con sus datos puestos, y lo que va al
@@ -1302,6 +1445,194 @@ func (r *rejillaDrive) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 		o.Move(fyne.NewPos(r.rej.X(t.Width, i%cols), float32(i/cols)*(alto+r.rej.Hueco)))
 		o.Resize(fyne.NewSize(col, alto))
 	}
+}
+
+// rejillaVirtual es la cuadrícula de `rejilla` con solo las tarjetas que se ven: las
+// filas que caen en el desplazable y FilasDeMas por encima y por debajo, para que las
+// flechas y el tabulador tengan adónde ir. Todas miden lo mismo (la medida de la
+// tarjeta al ancho de columna), así que la cuenta de qué fila cae dónde es exacta, y
+// el mínimo es el de la cuadrícula entera.
+type rejillaVirtual struct {
+	rejillaDrive
+	e         *Explorador
+	elementos []Elemento
+	c         *fyne.Container
+	// hechas son las tarjetas montadas, por índice; [desde, hasta) es lo que se ve.
+	hechas       map[int]tarjetaPintada
+	desde, hasta int
+}
+
+// FilasDeMas son las filas que se montan fuera de la vista por cada lado.
+const FilasDeMas = 1
+
+func (r *rejillaVirtual) MinSize([]fyne.CanvasObject) fyne.Size {
+	n := len(r.elementos)
+	ancho := *r.ancho
+	if ancho <= 0 || n == 0 {
+		// Antes del primer Layout, el de la rejilla con todas: las tarjetas miden
+		// todas lo mismo, así que vale con una repetida.
+		if n == 0 || len(r.c.Objects) == 0 {
+			return r.rej.MinSize(nil)
+		}
+		todas := make([]fyne.CanvasObject, n)
+		for i := range todas {
+			todas[i] = r.c.Objects[0]
+		}
+		return r.rej.MinSize(todas)
+	}
+	cols := r.rej.Columnas(ancho)
+	filas := (n + cols - 1) / cols
+	alto := r.altoTarjeta(r.rej.AnchoColumna(ancho))
+	return fyne.NewSize(ancho, float32(filas)*alto+float32(filas-1)*r.rej.Hueco)
+}
+
+func (r *rejillaVirtual) Layout(_ []fyne.CanvasObject, t fyne.Size) {
+	*r.ancho = t.Width
+	r.ponerVentana()
+	r.colocar()
+}
+
+// colocar pone cada tarjeta montada en su celda.
+func (r *rejillaVirtual) colocar() {
+	ancho := *r.ancho
+	if ancho <= 0 {
+		return
+	}
+	cols := r.rej.Columnas(ancho)
+	col := r.rej.AnchoColumna(ancho)
+	alto := r.altoTarjeta(col)
+	for i := r.desde; i < r.hasta; i++ {
+		o := r.hechas[i].objeto
+		o.Move(fyne.NewPos(r.rej.X(ancho, i%cols), float32(i/cols)*(alto+r.rej.Hueco)))
+		o.Resize(fyne.NewSize(col, alto))
+	}
+}
+
+// ventana es [desde, hasta): las tarjetas de las filas que se ven, y FilasDeMas.
+func (r *rejillaVirtual) ventana() (int, int) {
+	n := len(r.elementos)
+	ancho := *r.ancho
+	s := r.e.desplazable
+	if n == 0 {
+		return 0, 0
+	}
+	cols, paso := 1, float32(0)
+	if ancho > 0 {
+		cols = r.rej.Columnas(ancho)
+		paso = r.altoTarjeta(r.rej.AnchoColumna(ancho)) + r.rej.Hueco
+	}
+	arriba, visible := float32(0), float32(0)
+	if s != nil {
+		arriba, visible = s.Offset.Y, s.Size().Height
+	}
+	if visible <= 0 {
+		visible = ventanaDe(r.c).Height
+	}
+	if paso <= 0 {
+		// Sin medir todavía: lo que quepa en la ventana con la tarjeta de reserva.
+		paso = MedidaTarjetaDrive(0).Height + r.rej.Hueco
+	}
+	primera := max(int(arriba/paso)-FilasDeMas, 0)
+	ultima := int((arriba+visible)/paso) + 1 + FilasDeMas
+	return min(primera*cols, n), min(ultima*cols, n)
+}
+
+// ponerVentana monta las tarjetas que entran en la vista y suelta las que salen.
+func (r *rejillaVirtual) ponerVentana() bool {
+	desde, hasta := r.ventana()
+	if desde == r.desde && hasta == r.hasta {
+		return false
+	}
+	r.desde, r.hasta = desde, hasta
+	tonos := ui.TonosTarjeta()
+	for i := range r.hechas {
+		if i < desde || i >= hasta {
+			delete(r.hechas, i)
+		}
+	}
+	objs := make([]fyne.CanvasObject, 0, hasta-desde)
+	pintadas := make([]tarjetaPintada, 0, hasta-desde)
+	for i := desde; i < hasta; i++ {
+		tp, ok := r.hechas[i]
+		if !ok {
+			el := r.elementos[i]
+			t, o := r.e.nuevaTarjeta(el)
+			// Una carpeta es una tarjeta de recurso, con el tono por turno
+			// (`CARD_TONES[index % CARD_TONES.length]`): solo pinta en la forma Marco.
+			if el.Carpeta {
+				t.Tono = tonos[i%len(tonos)]
+			}
+			tp = tarjetaPintada{el: el, objeto: o, t: t, i: i}
+			r.hechas[i] = tp
+		}
+		objs = append(objs, tp.objeto)
+		pintadas = append(pintadas, tp)
+	}
+	r.c.Objects = objs
+	if r.e.rejillaViva == r {
+		r.e.tarjetas = pintadas
+	}
+	return true
+}
+
+// alDesplazar monta lo que entra en la vista al desplazar.
+func (r *rejillaVirtual) alDesplazar() {
+	if r.ponerVentana() {
+		r.colocar()
+		r.c.Refresh()
+	}
+}
+
+// irA monta la tarjeta i (desplazando hasta su fila si no se ve) y la devuelve.
+func (r *rejillaVirtual) irA(i int) (tarjetaPintada, bool) {
+	if i < 0 || i >= len(r.elementos) {
+		return tarjetaPintada{}, false
+	}
+	if tp, ok := r.hechas[i]; ok {
+		return tp, true
+	}
+	if s := r.e.desplazable; s != nil && *r.ancho > 0 {
+		cols := r.rej.Columnas(*r.ancho)
+		paso := r.altoTarjeta(r.rej.AnchoColumna(*r.ancho)) + r.rej.Hueco
+		s.ScrollToOffset(fyne.NewPos(s.Offset.X, float32(i/cols)*paso))
+	}
+	r.alDesplazar()
+	tp, ok := r.hechas[i]
+	return tp, ok
+}
+
+// vecino es a qué tarjeta lleva una tecla desde la i en la cuadrícula ENTERA: es lo que
+// `ui.VecinoEnRejilla` mide sobre las cajas, contado, porque las filas que no se ven no
+// tienen tarjeta. Las columnas son iguales y van alineadas, así que la más cercana de
+// la fila de debajo es la misma columna, o la última de una fila incompleta.
+func (r *rejillaVirtual) vecino(i int, tecla fyne.KeyName) int {
+	n := len(r.elementos)
+	cols := 1
+	if *r.ancho > 0 {
+		cols = r.rej.Columnas(*r.ancho)
+	}
+	if tecla == fyne.KeyDown {
+		if (i/cols+1)*cols >= n {
+			return -1
+		}
+		return min(i+cols, n-1)
+	}
+	if tecla == fyne.KeyUp {
+		if i < cols {
+			return -1
+		}
+		return i - cols
+	}
+	// ← → Inicio y Fin van en orden de lectura: solo cuenta el total.
+	return ui.VecinoEnRejilla(make([]ui.CajaRejilla, n), i, tecla)
+}
+
+// ventanaDe es el tamaño del lienzo en el que está, o el del escritorio de referencia.
+func ventanaDe(o fyne.CanvasObject) fyne.Size {
+	if c := fyne.CurrentApp().Driver().CanvasForObject(o); c != nil {
+		return c.Size()
+	}
+	return fyne.NewSize(1280, 800)
 }
 
 // SeparaCargarMas es el `pt-5` sobre el botón «Cargar más» de la rejilla.
@@ -1378,8 +1709,22 @@ func (e *Explorador) flechaEnTarjetas(t *TarjetaDrive, tecla fyne.KeyName) bool 
 		return false
 	}
 	s := e.franjaScroll
-	if e.Rejilla {
-		s = e.desplazable
+	if r := e.rejillaViva; e.Rejilla && r != nil {
+		// La cuadrícula es virtual: el destino se cuenta sobre todos los elementos y
+		// se monta si no se ve.
+		destino, ok := r.irA(r.vecino(e.tarjetas[actual].i, tecla))
+		if !ok {
+			return false
+		}
+		f, es := destino.objeto.(fyne.Focusable)
+		c := fyne.CurrentApp().Driver().CanvasForObject(r.c)
+		if !es || c == nil {
+			return false
+		}
+		c.Focus(f)
+		ui.MostrarFoco(e.desplazable, c, 0)
+		r.alDesplazar() // desplazar por código no avisa a OnScrolled
+		return true
 	}
 	return ui.MoverFocoEnRejilla(objs, actual, tecla, s)
 }
@@ -1513,7 +1858,12 @@ func (e *Explorador) metaFila(el Elemento) string {
 }
 
 // marcoRejilla aplica el `px-6 py-4` de la zona de tarjetas.
-type marcoRejilla struct{ hijo fyne.CanvasObject }
+type marcoRejilla struct {
+	hijo fyne.CanvasObject
+	// alColocar avisa de que el desplazable ha cambiado de tamaño: con una ventana más
+	// alta, la cuadrícula virtual tiene que montar las filas que ahora se ven.
+	alColocar func()
+}
 
 var _ fyne.Layout = (*marcoRejilla)(nil)
 
@@ -1526,6 +1876,9 @@ func (m *marcoRejilla) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 	}
 	m.hijo.Move(fyne.NewPos(CanalonRejilla, RellenoRejilla))
 	m.hijo.Resize(fyne.NewSize(max(t.Width-2*CanalonRejilla, 0), max(t.Height-2*RellenoRejilla, 0)))
+	if m.alColocar != nil {
+		m.alColocar()
+	}
 }
 
 // filaArrastrable es la fila del explorador que además se arrastra: `draggable` con
@@ -1570,6 +1923,8 @@ type tarjetaPintada struct {
 	el     Elemento
 	objeto fyne.CanvasObject
 	t      *TarjetaDrive
+	// i es su índice en la cuadrícula (solo en la rejilla, que es virtual).
+	i int
 }
 
 // arrastrar empieza o sigue un arrastre desde `el` con el puntero en `abs`: si `el` forma
@@ -1585,6 +1940,9 @@ func (e *Explorador) seguirScrollArrastre(el Elemento, abs fyne.Position) {
 	if e.Rejilla && e.desplazable != nil {
 		e.autoArrastre.Actualizar(e.desplazable, abs, func(_, dy float32) {
 			e.desplazable.ScrollToOffset(fyne.NewPos(0, e.desplazable.Offset.Y+dy))
+			if r := e.rejillaViva; r != nil {
+				r.alDesplazar() // desplazar por código no avisa a OnScrolled
+			}
 			e.marcarCarpetaArrastre(el, abs)
 		})
 	} else if e.filas != nil {

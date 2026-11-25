@@ -3,6 +3,7 @@ import { ownedTransfers, eraseOwnedBytes } from './owned-bytes.js';
 import {
   isClientCoreModule,
   clientCoreModuleBounds,
+  vaultCoreModule,
   type ClientCoreModule,
 } from '@sytue/config/client-core';
 import { hostMethodBounds, type HostCall, type HostMethod, type HostScope } from './host-port.js';
@@ -84,60 +85,144 @@ host.sytueCoreHostCall = (request) =>
     }
   });
 
-let initialize: ((value: { url: URL; module: ClientCoreModule }) => void) | null = null;
-const assets = new Promise<{ url: URL; module: ClientCoreModule }>((resolve) => {
-  initialize = resolve;
-});
+interface Digests {
+  wasm: string;
+  runtime: string;
+}
+const hex64 = /^[0-9a-f]{64}$/;
+
+let initialize:
+  ((value: { url: URL; module: ClientCoreModule; digests: Digests | null }) => void) | null = null;
+const assets = new Promise<{ url: URL; module: ClientCoreModule; digests: Digests | null }>(
+  (resolve) => {
+    initialize = resolve;
+  },
+);
+
+/** Que el documento sepa que la descarga avanza: su plazo es de silencio, no total. */
+let lastProgress = 0;
+function progress(): void {
+  const now = Date.now();
+  if (now - lastProgress < 1000) return;
+  lastProgress = now;
+  host.postMessage({ type: 'progress' });
+}
+
+/**
+ * Baja el wasm, con su tope de tamaño, y comprueba su sha256 antes de devolver un
+ * solo byte: lo que se instancia es exactamente lo que el compilador publicó.
+ * `same-origin` y no `omit`: es como pide la página su `<link rel=preload
+ * crossorigin>`, y con otro modo de credenciales la caché no los junta (la ruta del
+ * BFF no lee la sesión: `clientCoreProxy`).
+ */
+async function verifiedWasm(url: URL, digest: string, maximum: number): Promise<ArrayBuffer> {
+  const response = await fetch(url, { credentials: 'same-origin', redirect: 'error' });
+  if (!response.ok || !response.body) throw new Error('crypto_runtime_unavailable');
+  const declared = Number(response.headers.get('content-length'));
+  if (Number.isFinite(declared) && declared > maximum)
+    throw new Error('crypto_runtime_unavailable');
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > maximum) {
+      await reader.cancel().catch(() => {});
+      throw new Error('crypto_runtime_unavailable');
+    }
+    chunks.push(value);
+    progress();
+  }
+  const binary = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    binary.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  const hash = new Uint8Array(await crypto.subtle.digest('SHA-256', binary));
+  const actual = Array.from(hash, (byte) => byte.toString(16).padStart(2, '0')).join('');
+  if (actual !== digest) throw new Error('crypto_runtime_unavailable');
+  return binary.buffer;
+}
 
 const ready = (async (): Promise<CryptoCore> => {
   // The compiler emits both assets from the same pinned Go toolchain. The
   // browser loads a maintained runtime, not a second crypto implementation.
-  const { url: assetBase, module } = await assets;
+  const { url: assetBase, module: requested, digests } = await assets;
+  let module: ClientCoreModule = requested;
   const artifact = (name: string, digest?: string): URL => {
     const url = new URL(name, assetBase);
     if (module !== 'core') url.searchParams.set('module', module);
     if (digest) url.searchParams.set('sha256', digest);
     return url;
   };
-  const manifestResponse = await fetch(artifact('manifest.json'), {
-    credentials: 'omit',
-    redirect: 'error',
-    cache: 'no-cache',
-  });
-  if (!manifestResponse.ok) throw new Error('crypto_runtime_unavailable');
-  const manifest = (await manifestResponse.json()) as {
-    version?: unknown;
-    module_id?: unknown;
-    wasm_sha256?: unknown;
-    runtime_sha256?: unknown;
+  const fromManifest = async (): Promise<Digests> => {
+    const fetchManifest = (): Promise<Response> =>
+      fetch(artifact('manifest.json'), {
+        credentials: 'omit',
+        redirect: 'error',
+        cache: 'no-cache',
+      });
+    let manifestResponse = await fetchManifest();
+    // Un Rooms anterior al núcleo de la bóveda contesta 400 a `vault`. El núcleo
+    // completo lleva las mismas operaciones de la bóveda (es su superconjunto, con la
+    // misma huella comprobada), así que se carga ese en vez de dejar la app sin bóveda.
+    if (manifestResponse.status === 400 && module === vaultCoreModule) {
+      module = 'core';
+      manifestResponse = await fetchManifest();
+    }
+    if (!manifestResponse.ok) throw new Error('crypto_runtime_unavailable');
+    const manifest = (await manifestResponse.json()) as {
+      version?: unknown;
+      module_id?: unknown;
+      wasm_sha256?: unknown;
+      runtime_sha256?: unknown;
+    };
+    if (
+      manifest.version !== 1 ||
+      (manifest.module_id !== module && !(module === 'core' && manifest.module_id === undefined)) ||
+      typeof manifest.wasm_sha256 !== 'string' ||
+      !hex64.test(manifest.wasm_sha256) ||
+      typeof manifest.runtime_sha256 !== 'string' ||
+      !hex64.test(manifest.runtime_sha256)
+    )
+      throw new Error('crypto_runtime_unavailable');
+    return { wasm: manifest.wasm_sha256, runtime: manifest.runtime_sha256 };
   };
-  if (
-    manifest.version !== 1 ||
-    (manifest.module_id !== module && !(module === 'core' && manifest.module_id === undefined)) ||
-    typeof manifest.wasm_sha256 !== 'string' ||
-    !/^[0-9a-f]{64}$/.test(manifest.wasm_sha256) ||
-    typeof manifest.runtime_sha256 !== 'string' ||
-    !/^[0-9a-f]{64}$/.test(manifest.runtime_sha256)
-  )
-    throw new Error('crypto_runtime_unavailable');
-  const goRuntimeURL = artifact('wasm_exec.js', manifest.runtime_sha256).href;
-  await import(/* @vite-ignore */ goRuntimeURL);
+  // Las dos descargas A LA VEZ (antes: manifiesto, luego `wasm_exec.js`, luego el
+  // wasm, tres viajes en serie). El servidor solo sirve un `sha256` que sea el suyo.
+  const load = async (pinned: Digests): Promise<ArrayBuffer> => {
+    const runtime = import(/* @vite-ignore */ artifact('wasm_exec.js', pinned.runtime).href);
+    const binary = verifiedWasm(
+      artifact('core.wasm', pinned.wasm),
+      pinned.wasm,
+      clientCoreModuleBounds[module],
+    );
+    // Que el rechazo del que no se espere no quede sin atender.
+    runtime.catch(() => {});
+    binary.catch(() => {});
+    await runtime;
+    return binary;
+  };
+  let binary: ArrayBuffer;
+  if (digests) {
+    try {
+      binary = await load(digests);
+    } catch {
+      // Los resúmenes de la página ya no son los del servidor (se desplegó otro
+      // núcleo desde que se pintó): se le preguntan, una vez.
+      const fresh = await fromManifest();
+      if (fresh.wasm === digests.wasm && fresh.runtime === digests.runtime)
+        throw new Error('crypto_runtime_unavailable');
+      binary = await load(fresh);
+    }
+  } else {
+    binary = await load(await fromManifest());
+  }
   const go = new host.Go();
   go.env = { ...go.env, GOMAXPROCS: '1' };
-  const response = await fetch(artifact('core.wasm', manifest.wasm_sha256), {
-    credentials: 'omit',
-    redirect: 'error',
-  });
-  if (!response.ok) throw new Error('crypto_runtime_unavailable');
-  const declared = Number(response.headers.get('content-length'));
-  if (Number.isFinite(declared) && declared > clientCoreModuleBounds[module])
-    throw new Error('crypto_runtime_unavailable');
-  const binary = await response.arrayBuffer();
-  if (binary.byteLength > clientCoreModuleBounds[module])
-    throw new Error('crypto_runtime_unavailable');
-  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', binary));
-  const actual = Array.from(digest, (byte) => byte.toString(16).padStart(2, '0')).join('');
-  if (actual !== manifest.wasm_sha256) throw new Error('crypto_runtime_unavailable');
   const { instance } = await WebAssembly.instantiate(binary, go.importObject);
   void go.run(instance).catch(() => host.postMessage({ type: 'failed' }));
   await Promise.resolve();
@@ -217,6 +302,7 @@ host.onmessage = (event): void => {
     type?: unknown;
     assetBaseURL?: unknown;
     module?: unknown;
+    digests?: unknown;
   } | null;
   if (bootstrap?.type === 'initialize') {
     try {
@@ -234,7 +320,21 @@ host.onmessage = (event): void => {
         url.hash
       )
         throw new Error();
-      initialize({ url, module: bootstrap.module });
+      const pinned = bootstrap.digests as {
+        wasm_sha256?: unknown;
+        runtime_sha256?: unknown;
+      } | null;
+      const digests =
+        bootstrap.module === 'core' &&
+        pinned &&
+        typeof pinned === 'object' &&
+        typeof pinned.wasm_sha256 === 'string' &&
+        hex64.test(pinned.wasm_sha256) &&
+        typeof pinned.runtime_sha256 === 'string' &&
+        hex64.test(pinned.runtime_sha256)
+          ? { wasm: pinned.wasm_sha256, runtime: pinned.runtime_sha256 }
+          : null;
+      initialize({ url, module: bootstrap.module, digests });
       initialize = null;
     } catch {
       host.postMessage({ type: 'failed' });

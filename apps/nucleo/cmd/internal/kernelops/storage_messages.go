@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //go:build js && wasm
 
-package main
+package kernelops
 
 import (
 	"syscall/js"
@@ -11,9 +11,9 @@ import (
 )
 
 func init() {
-	domainOperations["storage.message.encode"] = encodeStorageMessage
-	domainOperations["storage.message.fits"] = storageMessageFits
-	domainOperations["storage.message.decode"] = decodeStorageMessage
+	Operations["storage.message.encode"] = encodeStorageMessage
+	Operations["storage.message.fits"] = storageMessageFits
+	Operations["storage.message.decode"] = decodeStorageMessage
 }
 
 func encodeStorageMessage(req js.Value) (any, error) {

@@ -88,10 +88,16 @@ type pedido struct {
 // todos al arrancar costaba 50 ms en cada una de las catorce apps (medido el 2026-10-05,
 // seis juegos), y que todos se dejan leer lo vigila TestTodosLosJuegosDeLaHojaSeLeen.
 // `paletas` son las de la casa.
+//
+// Y ni siquiera esos se leen al arrancar: el de la casa y el del cromo «papel» —el que
+// eligen diez de las catorce apps en su `main`— van ya resueltos en
+// paletas_generadas.go (`go generate`), que leer la hoja con expresiones regulares eran
+// 8–13 ms del `init` y otros 6–14 de `ElegirCromo`. Lo generado lleva la huella de las
+// hojas de las que salió: si no es la de las embebidas, se leen como siempre
+// (leerHoja), y TestLasPaletasGeneradasSonLasDeLaHoja se pone en rojo.
 var (
-	coloresDeLaHoja = coloresDeclarados(coloresCSS)
-	juegos          = mustJuegos(coloresCSS, aparienciaCSS)
-	paletas         = juegos[pedido{}].paletas
+	coloresDeLaHoja, juegos = leerHoja()
+	paletas                 = juegos[pedido{}].paletas
 	// enVigor es el juego con el que se pinta. Atómico: lo cambia el vigilante de los
 	// ajustes compartidos (otra app de la suite puede cambiar el color o la forma) y lo
 	// leen los renderers.
@@ -283,29 +289,38 @@ func Names() []string {
 	return out
 }
 
+// Las expresiones de leer la hoja se compilan al usarlas por primera vez (`perezosa`):
+// con las paletas y las formas generadas, el arranque no lee ninguna hoja, y compilarlas
+// todas en el `init` eran ~0,2 ms y 600 asignaciones de cada app.
 var (
-	reSelectorTema = regexp.MustCompile(`\[data-(theme|color|app|forma|cromo)=["']([a-z]+)["']\]`)
-	reComentario   = regexp.MustCompile(`(?s)/\*.*?\*/`)
-	reDecl         = regexp.MustCompile(`(?s)--sytue-([a-z0-9-]+)\s*:\s*(.*?);`)
-	reVar          = regexp.MustCompile(`var\(--sytue-([a-z0-9-]+)\)`)
-	reEspacios     = regexp.MustCompile(`\s+`)
+	reSelectorTema = perezosa(`\[data-(theme|color|app|forma|cromo)=["']([a-z]+)["']\]`)
+	reComentario   = perezosa(`(?s)/\*.*?\*/`)
+	reDecl         = perezosa(`(?s)--sytue-([a-z0-9-]+)\s*:\s*(.*?);`)
+	reVar          = perezosa(`var\(--sytue-([a-z0-9-]+)\)`)
+	reEspacios     = perezosa(`\s+`)
 	// El alfa es opcional: `rgb(22, 163, 74)` es lo que un navegador escribe en el
 	// contenido de la gente (un `<span style="color: …">` de un documento pegado), y
 	// `rgba(…)` lo que usa nuestra hoja de tokens. Las dos formas, un solo lector.
-	reRGBA   = regexp.MustCompile(`^rgba?\((\d+), ?(\d+), ?(\d+)(?:, ?([0-9.]+))?\)$`)
-	reMezcla = regexp.MustCompile(`^color-mix\(in srgb, ?(.+) ([0-9.]+)%, ?transparent ?\)$`)
+	reRGBA   = perezosa(`^rgba?\((\d+), ?(\d+), ?(\d+)(?:, ?([0-9.]+))?\)$`)
+	reMezcla = perezosa(`^color-mix\(in srgb, ?(.+) ([0-9.]+)%, ?transparent ?\)$`)
 	// Lo que la hoja declara y NO es un color: la tinta como terna suelta
 	// (`--sytue-ink-rgb: 26, 53, 65`) y la intensidad de la selección (`10%`).
-	reNoColor = regexp.MustCompile(`^\d`)
+	reNoColor = perezosa(`^\d`)
 )
 
 // reColorSuite reconoce los colores de la suite que declara la hoja, por sus bloques.
-var reColorSuite = regexp.MustCompile(`\[data-color='([a-z]+)'\]`)
+var reColorSuite = perezosa(`\[data-color='([a-z]+)'\]`)
+
+// perezosa es una expresión que se compila la primera vez que se pide. Una mal escrita
+// entra en pánico ahí, y la prueban los guardianes que leen la hoja.
+func perezosa(expr string) func() *regexp.Regexp {
+	return sync.OnceValue(func() *regexp.Regexp { return regexp.MustCompile(expr) })
+}
 
 // coloresDeclarados son los colores de la suite que declara la hoja, sin el de la casa.
 func coloresDeclarados(css string) map[string]bool {
 	out := map[string]bool{}
-	for _, m := range reColorSuite.FindAllStringSubmatch(normalizar(css), -1) {
+	for _, m := range reColorSuite().FindAllStringSubmatch(normalizar(css), -1) {
 		out[m[1]] = true // cada color sale en varios bloques, uno por modo
 	}
 	return out
@@ -322,9 +337,7 @@ func mustJuego(p pedido, hojas ...string) *juego {
 	if err != nil {
 		panic(fmt.Sprintf("tokens: colors.css y appearance.css (%+v): %v", p, err))
 	}
-	j := &juego{crudas: crudas, paletas: aplanar(crudas)}
-	j.bordes = indiceDeBordes(j)
-	return j
+	return juegoDe(crudas)
 }
 
 // parsePaletas son las paletas que devuelve `Color`: las de la hoja con los bordes ya
@@ -368,8 +381,33 @@ func parseCrudasCon(apertura string, hojas ...string) ([variantes]map[string]col
 // normalizar deja la hoja sin comentarios y con los selectores de atributo en una sola
 // forma de comillas.
 func normalizar(css string) string {
-	css = reComentario.ReplaceAllString(css, "")
-	return reSelectorTema.ReplaceAllString(css, "[data-$1='$2']")
+	css = reComentario().ReplaceAllString(css, "")
+	return reSelectorTema().ReplaceAllString(css, "[data-$1='$2']")
+}
+
+// limpiasEmbebidas guarda normalizadas las dos hojas embebidas: cada color, forma o
+// producto que se pide por primera vez las necesita, y normalizarlas eran 2,7 ms.
+var limpiasEmbebidas struct {
+	sync.Mutex
+	hojas map[string]string
+}
+
+// normalizada es normalizar, recordando el resultado para las hojas embebidas.
+func normalizada(css string) string {
+	if css != coloresCSS && css != aparienciaCSS {
+		return normalizar(css)
+	}
+	limpiasEmbebidas.Lock()
+	defer limpiasEmbebidas.Unlock()
+	if l, ok := limpiasEmbebidas.hojas[css]; ok {
+		return l
+	}
+	if limpiasEmbebidas.hojas == nil {
+		limpiasEmbebidas.hojas = map[string]string{}
+	}
+	l := normalizar(css)
+	limpiasEmbebidas.hojas[css] = l
+	return l
 }
 
 // parseCrudasDe lee las tres paletas de un pedido (el cero es el color y la forma de la
@@ -400,7 +438,7 @@ func parseCrudasDe(apertura string, p pedido, hojas ...string) ([variantes]map[s
 	var out [variantes]map[string]color.NRGBA
 	limpias := make([]string, len(hojas))
 	for n, css := range hojas {
-		limpias[n] = normalizar(css)
+		limpias[n] = normalizada(css)
 	}
 	delColor, delApp := "", ""
 	if p.color != "" {
@@ -544,7 +582,7 @@ func resolver(decl map[string]string) (map[string]color.NRGBA, error) {
 		if err != nil {
 			return nil, fmt.Errorf("--sytue-%s: %w", nombre, err)
 		}
-		if reNoColor.MatchString(valor) {
+		if reNoColor().MatchString(valor) {
 			continue
 		}
 		c, err := parseColor(valor)
@@ -689,10 +727,10 @@ func declaraciones(css, apertura string) (map[string]string, error) {
 		return nil, fmt.Errorf("el bloque %q no cierra", apertura)
 	}
 	decl := map[string]string{}
-	for _, m := range reDecl.FindAllStringSubmatch(cuerpo[:j], -1) {
+	for _, m := range reDecl().FindAllStringSubmatch(cuerpo[:j], -1) {
 		// La última declaración gana, como en CSS: `--sytue-primary` aparece dos
 		// veces en :root (azul primero, tinta después) y la que vale es la tinta.
-		decl[m[1]] = strings.TrimSpace(reEspacios.ReplaceAllString(m[2], " "))
+		decl[m[1]] = strings.TrimSpace(reEspacios().ReplaceAllString(m[2], " "))
 	}
 	return decl, nil
 }
@@ -704,8 +742,8 @@ func expandir(decl map[string]string, valor string, prof int) (string, error) {
 		return "", fmt.Errorf("var() en ciclo")
 	}
 	var fallo error
-	out := reVar.ReplaceAllStringFunc(valor, func(m string) string {
-		nombre := reVar.FindStringSubmatch(m)[1]
+	out := reVar().ReplaceAllStringFunc(valor, func(m string) string {
+		nombre := reVar().FindStringSubmatch(m)[1]
 		crudo, ok := decl[nombre]
 		if !ok {
 			fallo = fmt.Errorf("var(--sytue-%s) sin definir", nombre)
@@ -742,8 +780,14 @@ func ParseColor(s string) (color.NRGBA, bool) {
 	return c, err == nil
 }
 
+// juntarParentesis quita el espacio de dentro de los paréntesis. Es de paquete porque
+// parseColor corre por cada color de la hoja y por cada color de cada documento que se
+// pinta (ParseColor), y crear el Replacer en cada llamada era casi todo lo que costaba
+// leer un color: lo vio el perfil del repintado de Notes el 2026-11-24.
+var juntarParentesis = strings.NewReplacer("( ", "(", " )", ")")
+
 func parseColor(s string) (color.NRGBA, error) {
-	s = strings.NewReplacer("( ", "(", " )", ")").Replace(s)
+	s = juntarParentesis.Replace(s)
 	switch {
 	case s == "transparent":
 		return color.NRGBA{}, nil
@@ -754,7 +798,7 @@ func parseColor(s string) (color.NRGBA, error) {
 		}
 		return color.NRGBA{R: b[0], G: b[1], B: b[2], A: 0xff}, nil
 	}
-	if m := reRGBA.FindStringSubmatch(s); m != nil {
+	if m := reRGBA().FindStringSubmatch(s); m != nil {
 		var canal [3]uint8
 		for i := range canal {
 			n, err := strconv.ParseUint(m[i+1], 10, 8)
@@ -774,7 +818,7 @@ func parseColor(s string) (color.NRGBA, error) {
 	}
 	// Mezclar con `transparent` en sRGB deja el color como está y le escala el alfa:
 	// es lo único para lo que la hoja usa color-mix (el tinte de selección).
-	if m := reMezcla.FindStringSubmatch(s); m != nil {
+	if m := reMezcla().FindStringSubmatch(s); m != nil {
 		c, err := parseColor(m[1])
 		if err != nil {
 			return color.NRGBA{}, err

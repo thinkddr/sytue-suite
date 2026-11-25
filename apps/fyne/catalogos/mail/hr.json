@@ -115,6 +115,7 @@
   "compose.noAttachmentSend": "Ipak pošalji",
   "compose.noAttachmentTitle": "Slanje bez privitaka",
   "compose.noDraftsFolder": "Mapa Skice nije pronađena",
+  "compose.openFailed": "Uređivač poruke nije se mogao otvoriti. Pokušajte ponovno.",
   "compose.pastedImageDropped": "Zalijepljena slika nije uključena",
   "compose.pastedImagesDropped": "Zalijepljene slike nisu uključene",
   "compose.pastedImagesDroppedDescription": "Da biste poslali slike, priložite ih kao datoteke.",

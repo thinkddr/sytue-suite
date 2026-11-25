@@ -28,10 +28,10 @@ import type { EditorCommand, EditorContext } from '../types';
 import { RibbonButton, RibbonGroup, usePopover, POPOVER_SHELL } from './primitives';
 import { EditorIcon } from '../icons';
 import { exec } from '../canvas/exec';
-import { dispatchSheetCommand } from '../sheets/SheetCanvas';
-import type { SheetCommand } from '../sheets/SheetCanvas';
-import { dispatchSlidesCommand } from '../slides/SlidesCanvas';
-import type { SlidesCommand } from '../slides/SlidesCanvas';
+import { dispatchSheetCommand } from '../sheets/mando';
+import type { SheetCommand } from '../sheets/mando';
+import { dispatchSlidesCommand } from '../slides/mando';
+import type { SlidesCommand } from '../slides/mando';
 import {
   MAX_MACROS,
   MAX_NOMBRE,

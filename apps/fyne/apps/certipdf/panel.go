@@ -11,7 +11,6 @@ import (
 	"strconv"
 
 	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
 
@@ -283,12 +282,9 @@ func (p *PanelLateral) Objeto() fyne.CanvasObject {
 		p.raiz = container.New(ui.Pila{Elastico: 1})
 		p.raiz.Objects = p.componer()
 	}
-	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	// El panel se superpone al PDF en estrecho: sus opciones conservan un papel
 	// opaco también en traslúcido. El borde va por dentro del ancho del panel.
-	fondo := canvas.NewRectangle(tema.Color("menu-surface", v))
-	linea := canvas.NewRectangle(tema.Color("border", v))
-	return container.New(bordeDerecho{}, fondo, linea, p.raiz)
+	return container.New(bordeDerecho{}, ui.NuevoLiso("menu-surface"), ui.NuevoLiso("border"), p.raiz)
 }
 
 func (p *PanelLateral) componer() []fyne.CanvasObject {
@@ -300,12 +296,11 @@ func (p *PanelLateral) componer() []fyne.CanvasObject {
 		id := x.id
 		pestanas = append(pestanas, nuevaPestanaPanel(p.t(x.clave, nil), x.n, x.id == p.on, func() { p.Abrir(id) }))
 	}
-	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	// SE DESLIZA, no se reparte: los nueve rótulos no caben en los 252 del panel y
 	// cortarlos deja rótulos ilegibles de cuatro letras. La web enmascara la tira con su
 	// `border-b`, sobre el papel opaco del panel.
 	deslizante, s := deslizableCon(container.New(ui.Fila{}, pestanas...))
-	tira := conMascara(container.New(conLineaAbajo{}, canvas.NewRectangle(tema.Color("border", v)), deslizante), s, "menu-surface")
+	tira := conMascara(container.New(conLineaAbajo{}, ui.NuevoLiso("border"), deslizante), s, "menu-surface")
 	cuerpo := container.New(ui.Margen{Izq: rellenoPanel, Arr: rellenoPanel, Der: rellenoPanel, Abj: rellenoPanel},
 		p.panel())
 	p.desplazador = container.NewVScroll(cuerpo)

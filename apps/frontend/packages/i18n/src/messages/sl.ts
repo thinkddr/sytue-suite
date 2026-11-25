@@ -73,6 +73,8 @@ export const sl: Catalog = {
   'vault.emptyUnderstood': 'Razumem, da bodo podatki, šifrirani z izgubljenim ključem, izbrisani',
   'vault.failed':
     'Šifriranih podatkov ni bilo mogoče odpreti. Poskusite znova ali se znova prijavite v Sytue ID. Če je ključ izgubljen, lahko šifrirane podatke te aplikacije izpraznite.',
+  'vault.moreInfo': 'Več informacij',
+  'vault.attention': 'Tvoji šifrirani podatki potrebujejo pozornost',
   'matrix.incoming': 'Preveri to napravo',
   'matrix.match': 'Ujemajo se',
   'matrix.mismatch': 'Ne ujemajo se',

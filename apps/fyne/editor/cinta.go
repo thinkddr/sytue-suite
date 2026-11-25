@@ -394,6 +394,59 @@ func (r *cintaRenderer) Layout(t fyne.Size) {
 	}
 	c.banda.Move(fyne.NewPos(0, tira))
 	c.banda.Resize(fyne.NewSize(max(ancho, 0), alto-tema.Borde))
+	if c.mas.Visible() {
+		// Con «Más», la banda acaba tras el último control que cabe ENTERO: cortada en
+		// `ancho`, la galería de estilos de Docus dejaba un retal de su cuarta ficha
+		// pegado a «Más» (auditoría del 2026-11-24).
+		if corte := c.corteEntero(ancho); corte > 0 && corte < ancho {
+			c.banda.Resize(fyne.NewSize(corte, alto-tema.Borde))
+		}
+	}
+}
+
+// corteEntero es dónde acaba, en la banda, el último control que cabe entero antes de
+// `hasta`; 0 si no se sabe. Justo ahí: con el `px-2` detrás asomaba el siguiente. Recorre lo mismo que seguirFoco con las
+// posiciones relativas, que ya están puestas: preguntar la absoluta de cada control
+// recorrería la ventana entera por cada uno.
+func (c *Cinta) corteEntero(hasta float32) float32 {
+	contenido := c.banda.Contenido
+	if contenido == nil {
+		return 0
+	}
+	limite := hasta - contenido.Position().X
+	corte := float32(0)
+	var ir func(o fyne.CanvasObject, x float32)
+	ir = func(o fyne.CanvasObject, x float32) {
+		if o == nil || !o.Visible() {
+			return
+		}
+		x += o.Position().X
+		switch h := o.(type) {
+		case *fyne.Container:
+			for _, n := range h.Objects {
+				ir(n, x)
+			}
+			return
+		case *Grupo:
+			for _, n := range h.Controles {
+				ir(n, x)
+			}
+			return
+		}
+		if _, pulsable := o.(fyne.Tappable); !pulsable {
+			return
+		}
+		if fin := x + o.Size().Width; fin <= limite && fin > corte {
+			corte = fin
+		}
+	}
+	for _, o := range objetosDeBanda(contenido) {
+		ir(o, 0)
+	}
+	if corte == 0 {
+		return 0
+	}
+	return corte + contenido.Position().X
 }
 
 // activaTira es la pestaña activa, si hay.

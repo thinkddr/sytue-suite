@@ -503,6 +503,7 @@ export const lt: AppCatalog<typeof en> = {
   'compose.templates': 'Šablonai',
   'compose.templatesEmpty': 'Šablonų dar nėra. Sukurkite juos Mail nustatymuose.',
   'compose.attachFailed': 'Nepavyko nuskaityti priedo',
+  'compose.openFailed': 'Nepavyko atidaryti laiško rengyklės. Bandykite dar kartą.',
   'compose.pastedImageDropped': 'Įklijuotas paveikslėlis neįtrauktas',
   'compose.pastedImagesDropped': 'Įklijuoti paveikslėliai neįtraukti',
   'compose.pastedImagesDroppedDescription':

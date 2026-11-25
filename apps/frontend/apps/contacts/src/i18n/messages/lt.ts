@@ -53,6 +53,8 @@ export const lt: AppCatalog<typeof en> = {
   'list.unstar': 'Pašalinti {name} iš pažymėtų žvaigždute',
   'list.starredTitle': 'Su žvaigždute',
   'list.reviewDuplicates': 'Peržiūrėti dublikatus ({count})',
+  'list.selectMode': 'Pasirinkti',
+  'list.moreActions': 'Daugiau veiksmų',
   'list.count': {
     one: '{count} kontaktas',
     few: '{count} kontaktai',

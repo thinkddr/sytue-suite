@@ -118,8 +118,22 @@ func TeclaSuperficie(texto string) *Tecla {
 // `Fondo` por el token de lo que tiene debajo, y solo ese.
 func TeclaCromo(texto string) *Tecla {
 	t := teclaDeAtajo(texto)
-	t.Fondo, t.Tinta, t.Borde = TokenCarril(), "on-chrome-muted", "chrome-border"
+	t.Fondo, t.Tinta, t.Borde = FondoCarrilVivo, "on-chrome-muted", "chrome-border"
 	return t
+}
+
+// FondoCarrilVivo es el Fondo de TeclaCromo: el token del carril de la forma EN VIGOR
+// (TokenCarril), que se resuelve al pintar. Con el de la forma en que nació, una tecla
+// creada en Marco pedía `frame-from` al pasar a Carril, que no lo tiene, y la app caía al
+// repintar (visto el 2026-11-24 con el «Ctrl+G» del carril de Rooms).
+const FondoCarrilVivo = "@carril"
+
+// tokenTecla es el token que se pinta: el del carril en vigor para FondoCarrilVivo.
+func tokenTecla(n string) string {
+	if n == FondoCarrilVivo {
+		return TokenCarril()
+	}
+	return n
 }
 
 // MedidaTecla es lo que ocupa: el texto con su relleno y el borde por dentro, nunca
@@ -144,9 +158,9 @@ func (t *Tecla) MinSize() fyne.Size {
 // colores resuelve los tokens de la pastilla: relleno y filete, transparentes si no hay.
 func (t *Tecla) colores(v tema.Variante) (relleno, borde color.NRGBA) {
 	if t.Fondo != "" {
-		relleno = tema.Color(t.Fondo, v)
+		relleno = tema.Color(tokenTecla(t.Fondo), v)
 		if t.Debajo != "" {
-			relleno = tokens.SobreSRGB(relleno, tema.Color(t.Debajo, v))
+			relleno = tokens.SobreSRGB(relleno, tema.Color(tokenTecla(t.Debajo), v))
 		}
 	}
 	if t.Borde != "" {

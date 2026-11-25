@@ -461,6 +461,7 @@ export const nl: AppCatalog<typeof en> = {
   'compose.templates': 'Sjablonen',
   'compose.templatesEmpty': 'Nog geen sjablonen. Maak ze aan in de Mail-instellingen.',
   'compose.attachFailed': 'De bijlage kon niet worden gelezen',
+  'compose.openFailed': 'De berichteditor kon niet worden geopend. Probeer het opnieuw.',
   'compose.pastedImageDropped': 'De geplakte afbeelding is niet opgenomen',
   'compose.pastedImagesDropped': 'De geplakte afbeeldingen zijn niet opgenomen',
   'compose.pastedImagesDroppedDescription':

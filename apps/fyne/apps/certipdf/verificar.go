@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
@@ -306,7 +305,7 @@ func (f *panelFirmas) pie(texto string) fyne.CanvasObject {
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	nota := ui.NuevoParrafo(texto, tema.Texto2XS, ui.Normal, "text-subtle", v).A(anchoUtil())
 	return container.New(ui.Margen{Arr: tema.Espacio(1)},
-		container.New(conLineaArriba{sep: tema.Espacio(2)}, canvas.NewRectangle(tema.Color("border", v)), nota))
+		container.New(conLineaArriba{sep: tema.Espacio(2)}, ui.NuevoLiso("border"), nota))
 }
 
 // vistaDeLoDeclarado es lo que la firma DECLARA —quién, por qué, cuándo y si cubre el

@@ -112,6 +112,7 @@
   "compose.noAttachmentSend": "Lähetä silti",
   "compose.noAttachmentTitle": "Lähetä ilman liitteitä",
   "compose.noDraftsFolder": "Luonnokset-kansiota ei löytynyt",
+  "compose.openFailed": "Viestieditoria ei voitu avata. Yritä uudelleen.",
   "compose.pastedImageDropped": "Liitettyä kuvaa ei otettu mukaan",
   "compose.pastedImagesDropped": "Liitettyjä kuvia ei otettu mukaan",
   "compose.pastedImagesDroppedDescription": "Lähetä kuvat liittämällä ne tiedostoina.",

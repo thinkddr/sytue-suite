@@ -7,12 +7,16 @@
 # MISMA toolchain que lo compiló (un runtime de otra versión de Go no arranca ese
 # wasm, y el manifiesto publica los dos hashes juntos).
 #
-#   <directorio>/                core   ← apps/nucleo/cmd/pqc-wasm  (cifrado E2E)
+#   <directorio>/                core   ← apps/nucleo/cmd/pqc-wasm  (núcleo completo: Matrix, Rooms)
+#   <directorio>/vault/          vault  ← apps/nucleo/cmd/vault-wasm (núcleo de bóveda, ADR 0086)
 #   <directorio>/office/         office ← apps/nucleo/cmd/office-wasm
 #   <directorio>/mail/           mail   ← apps/nucleo/cmd/mail-wasm
 #   <directorio>/pdf/            pdf    ← apps/nucleo/cmd/pdf-wasm  (PDF de la bóveda, ADR 0086)
 #
-# cada uno con core.wasm, wasm_exec.js y GO-LICENSE.
+# cada uno con core.wasm, wasm_exec.js y GO-LICENSE, y core.wasm y wasm_exec.js
+# también PRECOMPRIMIDOS: `.br` (brotli 11) y `.gz` (gzip 9) al lado, que Rooms sirve
+# según el Accept-Encoding (tools/precomprimir). Brotli 11 de ~90 MB de wasm tarda un
+# par de minutos en paralelo; se paga aquí una vez y no en cada descarga en Traefik.
 #
 # UNA SOLA RECETA, Y POR QUÉ. Esto vivía como un RUN en la etapa de compilación de
 # services/rooms/Dockerfile, y la release NO construye los servicios con su
@@ -44,7 +48,8 @@ destino="$(cd "$destino" && pwd)"
 cd "$raiz/apps/nucleo"
 goroot="$(go env GOROOT)"
 
-for par in core:pqc-wasm office:office-wasm mail:mail-wasm pdf:pdf-wasm; do
+declare -a comprimir=()
+for par in core:pqc-wasm vault:vault-wasm office:office-wasm mail:mail-wasm pdf:pdf-wasm; do
   modulo="${par%%:*}"
   dir="$destino"
   [ "$modulo" = core ] || dir="$destino/$modulo"
@@ -56,5 +61,13 @@ for par in core:pqc-wasm office:office-wasm mail:mail-wasm pdf:pdf-wasm; do
     -o "$dir/core.wasm" "./cmd/${par#*:}"
   cp "$goroot/lib/wasm/wasm_exec.js" "$dir/wasm_exec.js"
   cp "$goroot/LICENSE" "$dir/GO-LICENSE"
+  # Una variante de una generación anterior junto a un wasm nuevo no casaría con su
+  # huella: se borran antes de regenerarlas (Rooms además descarta la que no case).
+  rm -f "$dir"/core.wasm.br "$dir"/core.wasm.gz "$dir"/wasm_exec.js.br "$dir"/wasm_exec.js.gz
+  comprimir+=("$dir/core.wasm" "$dir/wasm_exec.js")
   echo "client core $modulo: $(wc -c <"$dir/core.wasm" | tr -d ' ') bytes en $dir"
 done
+
+# Desde la raíz: la herramienta es del módulo raíz, que es el que tiene brotli.
+cd "$raiz"
+go run ./tools/precomprimir "${comprimir[@]}"

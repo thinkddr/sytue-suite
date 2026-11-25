@@ -13,6 +13,7 @@ import { expect, test } from 'bun:test';
 import { ERR } from '@sytue/formula';
 import type { CellValue } from '@sytue/formula';
 import {
+  alineacionPintada,
   applyNumFmt,
   compileCondRules,
   condFill,
@@ -317,4 +318,16 @@ test('selectionStats: cuenta lo ocupado, suma y promedia solo los números', () 
   expect(selectionStats([1, 1, 0])?.avg).toBe(0.666667);
   // Números enormes: se dejan sin redondear en vez de salirse del entero seguro.
   expect(selectionStats([1e12, 1e12])?.avg).toBe(1e12);
+});
+
+// «General»: sin alineación propia, los números van a la derecha y lo demás a la
+// izquierda; la alineación de la celda manda. Gemelo de TestLosNumerosVanALaDerecha
+// (apps/fyne/calcus).
+test('alineacionPintada: los números a la derecha salvo alineación propia', () => {
+  expect(alineacionPintada('1200', 1200)).toBe('right');
+  expect(alineacionPintada('=SUM(B2:D2)', 3600)).toBe('right');
+  expect(alineacionPintada('Alquiler', 'Alquiler')).toBe('');
+  expect(alineacionPintada('', null)).toBe('');
+  expect(alineacionPintada('<div style="text-align: center;">12</div>', 12)).toBe('center');
+  expect(alineacionPintada('<b>Total</b>', 'Total')).toBe('');
 });

@@ -52,9 +52,9 @@ export function ResumenSeleccion(p: ResumenSeleccionProps): JSX.Element {
             size="sm"
             role="menuitemcheckbox"
             aria-checked={marcada}
-            // La última que queda no se puede quitar: un resumen vacío no se podría
-            // pulsar para volver a elegir.
-            disabled={marcada && p.medidas.length === 1}
+            // La última que queda no se puede quitar (un resumen vacío no se podría pulsar
+            // para volver a elegir): pulsarla no hace nada (`alternarMedida`), pero no se
+            // apaga. Con `disabled` la ÚNICA elegida salía en gris, a ~2,5:1.
             class="tabular-nums"
             icon={
               <span class="text-text inline-flex w-3.5 justify-center" aria-hidden="true">

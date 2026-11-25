@@ -12,6 +12,7 @@
  */
 import type { Note, NoteInput, Notebook } from '@sytue/api-clients';
 import { admiteEnlacesEnEnvio } from './notesApi.js';
+import { cargarHtml } from './html.js';
 import {
   deleteOfflineValue,
   listOfflineValues,
@@ -136,16 +137,26 @@ export function guardarCuadernos(owner: string, lista: Notebook[]): Promise<void
   return writeOfflineValue(owner, CUADERNOS, 'lista', lista);
 }
 
-export function leerCuadernos(owner: string): Promise<Notebook[] | null> {
-  return readOfflineValue<Notebook[]>(owner, CUADERNOS, 'lista');
+// Lo guardado también espera al parser de HTML: ninguna nota llega a la interfaz antes
+// que él (`html.ts`).
+export async function leerCuadernos(owner: string): Promise<Notebook[] | null> {
+  const [lista] = await Promise.all([
+    readOfflineValue<Notebook[]>(owner, CUADERNOS, 'lista'),
+    cargarHtml(),
+  ]);
+  return lista;
 }
 
 export function guardarNotas(owner: string, notebookId: string, notas: Note[]): Promise<void> {
   return writeOfflineValue(owner, NOTAS, notebookId, notas);
 }
 
-export function leerNotas(owner: string, notebookId: string): Promise<Note[] | null> {
-  return readOfflineValue<Note[]>(owner, NOTAS, notebookId);
+export async function leerNotas(owner: string, notebookId: string): Promise<Note[] | null> {
+  const [notas] = await Promise.all([
+    readOfflineValue<Note[]>(owner, NOTAS, notebookId),
+    cargarHtml(),
+  ]);
+  return notas;
 }
 
 /**

@@ -74,6 +74,11 @@ type Barra struct {
 	// Estrecha hace que el filtro abierto ocupe su propia fila. «Nueva nota» conserva
 	// su texto, también en el teléfono; las herramientas secundarias van en «…».
 	Estrecha bool
+	// RepiteLaBarra es que el nombre del cuaderno ya lo dice la barra de la app: por
+	// debajo de 768 la barra móvil —en el teléfono, la barra única— lleva el título, y
+	// la franja dejaba «Mudanza» bajo «Mudanza». Entonces la franja no pinta el nombre
+	// ni su emoji y quedan las acciones, como el `RepiteLaBarra` de `ui.CabeceraApp`.
+	RepiteLaBarra bool
 
 	AlFiltrar      func(string)
 	AlOrdenar      func(Orden)
@@ -126,14 +131,15 @@ func (b *Barra) Objeto(v tema.Variante) fyne.CanvasObject {
 	t := b.tr.T
 	piezas := []fyne.CanvasObject{}
 
-	if b.Cuaderno.Emoji != "" {
+	if b.Cuaderno.Emoji != "" && !b.RepiteLaBarra {
 		piezas = append(piezas, ui.Texto(b.Cuaderno.Emoji, tema.TextoLG, ui.SemiNegrita,
 			tema.Color("text", v)))
 	}
 	// El nombre CEDE (`min-w-0 truncate`): una caja de línea que recorta con elipsis.
 	// En un diario el título es el día y ya lo escribe la página (`sr-only` en la web).
+	// Vacío, la caja sigue empujando las acciones a la derecha (`mr-auto`).
 	nombre := b.Cuaderno.Titulo
-	if b.Cuaderno.Crudo.DailyDate != "" {
+	if b.Cuaderno.Crudo.DailyDate != "" || b.RepiteLaBarra {
 		nombre = ""
 	}
 	piezas = append(piezas, lineaTok(nombre, tema.TextoLG, ui.SemiNegrita, "text", v))

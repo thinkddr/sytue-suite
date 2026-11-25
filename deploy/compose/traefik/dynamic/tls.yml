@@ -34,5 +34,7 @@ http:
         contentTypeNosniff: true
         referrerPolicy: "strict-origin-when-cross-origin"
         stsSeconds: 0              # sin HSTS en dev (.localhost)
+    # Lo que ya trae Content-Encoding (los wasm precomprimidos del núcleo de
+    # cliente) pasa sin recomprimir; ver deploy/helm/sytue-one/templates/edge-security.yaml.
     sytue-compress:
       compress: {}

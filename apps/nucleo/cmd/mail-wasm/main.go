@@ -24,6 +24,14 @@ var (
 	}
 )
 
+// `mail.capabilities` también aquí, y no solo en el núcleo completo: el correo de la
+// bóveda tiene este módulo abierto y no necesita arrancar un `core` para preguntarla.
+func init() {
+	asyncDomainOperations["mail.capabilities"] = func(ctx context.Context, req js.Value) (any, error) {
+		return webport.MailCapabilitiesJS(ctx, req, coreSources, corePolicies)
+	}
+}
+
 func main() {
 	webport.Serve(webport.Module{ID: "mail", Version: 1, Execute: func(string, js.Value) (any, error) { return nil, webport.ErrRejected }, Async: asyncDomainOperations, RevokePort: corePortRevocations.Revoke})
 }

@@ -74,6 +74,8 @@ export const da: Catalog = {
   'vault.emptyUnderstood': 'Jeg forstår, at data krypteret med den mistede nøgle bliver slettet',
   'vault.failed':
     'De krypterede data kunne ikke åbnes. Prøv igen, eller log ind på Sytue ID igen. Hvis nøglen er mistet, kan du tømme denne apps krypterede data.',
+  'vault.moreInfo': 'Flere oplysninger',
+  'vault.attention': 'Dine krypterede data kræver opmærksomhed',
   'matrix.incoming': 'Bekræft denne enhed',
   'matrix.match': 'De er ens',
   'matrix.mismatch': 'De er forskellige',

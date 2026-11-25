@@ -15,6 +15,7 @@ import (
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/test"
 
+	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
@@ -671,10 +672,10 @@ func TestElGalonDeUnAreaVaALaDerecha(t *testing.T) {
 	}
 }
 
-// TestA360HayUnaSolaHamburguesa: por debajo de 768 el cajón del ERP se abre con su
-// botón de `main` (`#erp-cajon-boton`), «el único mando de navegación» de la web. El
-// armazón ponía además su barra móvil con otra hamburguesa (visto en una ventana real
-// el 2026-09-27). VISTO EN ROJO sin `SinBarraMovil`.
+// TestA360HayUnaSolaHamburguesa: por debajo de 768 el cajón del ERP se abre con el «☰»
+// de la barra móvil del armazón, y es el único. Hasta el 2026-11-24 era un botón propio
+// en una caja sobre la vista (`#erp-cajon-boton`), con la barra móvil apagada: en el
+// teléfono eran dos barras, la de la suite y otra solo con el «☰».
 func TestA360HayUnaSolaHamburguesa(t *testing.T) {
 	p := pantallaDePrueba(t)
 	p.Ventana = fyne.NewSize(360, 740)
@@ -682,16 +683,45 @@ func TestA360HayUnaSolaHamburguesa(t *testing.T) {
 	defer w.Close()
 	w.SetPadded(false)
 	w.Resize(p.Ventana)
-	var cajones, barras int
+	var barras []*ui.BarraMovil
 	recorrer(w.Content(), func(o fyne.CanvasObject) {
-		switch o.(type) {
-		case *BotonCajon:
-			cajones++
-		case *ui.BarraMovil:
-			barras++
+		if b, es := o.(*ui.BarraMovil); es {
+			barras = append(barras, b)
 		}
 	})
-	if cajones != 1 || barras != 0 {
-		t.Errorf("a 360 hay %d botones del cajón del ERP y %d barras móviles; quiero 1 y 0", cajones, barras)
+	if len(barras) != 1 || barras[0].AlMenu == nil {
+		t.Fatalf("a 360 hay %d barras móviles; quiero una, con el «☰»", len(barras))
+	}
+}
+
+// TestEnElTelefonoElMenuVaEnLaBarraDeLaSuite: montado como en cmd/erp, a 390 la barra
+// móvil del armazón ES la de la suite (arriba del todo y de su alto) y la vista empieza
+// justo debajo, sin otra fila para el «☰».
+func TestEnElTelefonoElMenuVaEnLaBarraDeLaSuite(t *testing.T) {
+	defer ui.TactilDePrueba(true)()
+	p := pantallaDePrueba(t)
+	p.Ventana = fyne.NewSize(390, 844)
+	barra, restaurar := ui.BarraSuiteDePrueba(traductor(t), iconos.ERP)
+	defer restaurar()
+	w := test.NewWindow(barra.Montar(p.Objeto()))
+	defer w.Close()
+	w.SetPadded(false)
+	w.Resize(p.Ventana)
+	fyne.DoAndWait(func() {})
+	var movil *ui.BarraMovil
+	recorrer(w.Content(), func(o fyne.CanvasObject) {
+		if b, es := o.(*ui.BarraMovil); es {
+			movil = b
+		}
+	})
+	if movil == nil {
+		t.Fatal("a 390 no hay barra móvil")
+	}
+	donde := fyne.CurrentApp().Driver().AbsolutePositionForObject
+	if y, alto := donde(movil).Y, movil.Size().Height; y != 0 || alto != ui.AltoBarraSuite() {
+		t.Errorf("la barra móvil está en y=%v con %v de alto; quiero arriba del todo y %v, la de la suite", y, alto, ui.AltoBarraSuite())
+	}
+	if y := donde(p.scrollMain).Y; y != ui.AltoBarraSuite() {
+		t.Errorf("la vista empieza en y=%v; quiero justo bajo la barra única (%v)", y, ui.AltoBarraSuite())
 	}
 }

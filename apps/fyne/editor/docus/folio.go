@@ -610,8 +610,11 @@ func (f *Folio) AjustarAlAncho() {
 	f.ctx.PonerZoom(int(disponible/ancho*20+0.5) * 5)
 }
 
-// ajusteInicial encuadra el folio al abrir. Con el dedo no baja de 75%: el cuerpo
-// normal de 16 conserva 12 dp, y el papel A4 real se alcanza con el scroll en dos ejes.
+// ajusteInicial encuadra el folio al abrir: el papel entero a lo ancho, como la web. Con
+// el dedo y el teléfono TUMBADO no baja de 75%: con tan poco alto lo que se hace es leer,
+// el cuerpo normal de 16 conserva 12 dp y el papel A4 se alcanza con el scroll en dos
+// ejes. De pie abría también al 75 % y el papel no cabía a lo ancho (auditoría del
+// 2026-11-24): se ve entero y se acerca con los dedos o con el zoom.
 //
 // La web lo hace UNA vez, cuando el lienzo ya mide lo que va a medir. Aquí el primer
 // Layout llega con la ventana aún en su tamaño mínimo (SetContent va antes que Resize),
@@ -628,7 +631,7 @@ func (f *Folio) ajusteInicial(ancho float32) {
 	if disponible < pag {
 		z = max(int(disponible/pag*100), editor.ZoomMin)
 	}
-	if ui.EsTactil() {
+	if ui.EsTactil() && f.apaisado() {
 		z = max(z, 75)
 	}
 	if z == f.ctx.Zoom {
@@ -647,6 +650,16 @@ func (f *Folio) ajusteInicial(ancho float32) {
 			}
 		}
 	})
+}
+
+// apaisado es la ventana más ancha que alta: el teléfono tumbado.
+func (f *Folio) apaisado() bool {
+	c := fyne.CurrentApp().Driver().CanvasForObject(f)
+	if c == nil {
+		return false
+	}
+	t := c.Size()
+	return t.Width > t.Height
 }
 
 // ZoomExplicito retira el encuadre automático cuando la persona elige un porcentaje,

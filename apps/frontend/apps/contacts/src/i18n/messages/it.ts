@@ -57,6 +57,8 @@ export const it: AppCatalog<typeof en> = {
   'list.unstar': 'Togli {name} da speciali',
   'list.starredTitle': 'Speciale',
   'list.reviewDuplicates': 'Controlla i duplicati ({count})',
+  'list.selectMode': 'Seleziona',
+  'list.moreActions': 'Altre azioni',
   'list.count': { one: '{count} contatto', other: '{count} contatti' },
   'list.countFiltered': {
     one: '{shown} di {count} contatto',

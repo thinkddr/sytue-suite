@@ -1,0 +1,36 @@
+{
+  "//": "SPDX-License-Identifier: Apache-2.0 — Copyright (c) 2026 Daniel Delgado Ramos",
+  "//presupuestos": "La superficie de APP de Lighthouse-CI: Notes con sesión, su servidor de producción y sus datos. En una app con bóveda el LCP medía el texto de la puerta del cifrado, no la app; lo que se presupuesta es `sytue:app-ready` JUNTO AL LCP: la marca la pone la propia app al pintar sus datos (`marcarAppLista` de @sytue/ui, ADR 0086). Sin secretos en CI: la sesión se sella con un secreto efímero y los servicios Go se simulan (`test/e2e/lighthouse-app.mjs`, lo mismo que el arnés de medida del ADR 0086). Los asserts 'error' ROMPEN el build (CONVENTIONS §0.8). www sigue en `.lighthouserc.json`.",
+  "ci": {
+    "collect": {
+      "startServerCommand": "bun test/e2e/lighthouse-app.mjs",
+      "startServerReadyPattern": "lighthouse-app: listo",
+      "startServerReadyTimeout": 120000,
+      "url": ["http://localhost:4790/notes/prueba/"],
+      "numberOfRuns": 3,
+      "//maxWaitForLoad": "La app sigue viva después de cargar —los avisos del Hub reintentan con espera creciente, la puerta de la bóveda arranca tras la marca—, y Lighthouse espera la red y la CPU quietas hasta su tope de 45 s en cada pasada. Lo presupuestado ocurre en el primer par de segundos: con 15 s sobra, y la pasada no tarda un minuto.",
+      "settings": {
+        "preset": "desktop",
+        "onlyCategories": ["performance"],
+        "maxWaitForLoad": 15000
+      }
+    },
+    "assert": {
+      "assertMatrix": [
+        {
+          "matchingUrlPattern": "^(?!.*/producto/).*/(calendar|notes|contacts|mail|drive|photos|docs|sheets|slides|bases|cast|erp|one)/",
+          "assertions": {
+            "largest-contentful-paint": ["error", { "maxNumericValue": 2500 }],
+            "user-timings:sytue-app-ready": ["error", { "maxNumericValue": 2500 }],
+            "cumulative-layout-shift": ["error", { "maxNumericValue": 0.1 }],
+            "total-blocking-time": ["error", { "maxNumericValue": 200 }]
+          }
+        }
+      ]
+    },
+    "upload": {
+      "target": "filesystem",
+      "outputDir": ".lighthouseci/apps-reports"
+    }
+  }
+}

@@ -21,10 +21,7 @@ import type { SheetCommand } from '../src/editor/sheets/SheetCanvas';
 
 /** Los comandos del lienzo, leídos del tipo `SheetCommand` (no hay otra lista en tiempo de ejecución). */
 const COMANDOS = ((): string[] => {
-  const src = readFileSync(
-    new URL('../src/editor/sheets/SheetCanvas.tsx', import.meta.url),
-    'utf8',
-  );
+  const src = readFileSync(new URL('../src/editor/sheets/mando.ts', import.meta.url), 'utf8');
   const bloque = /export type SheetCommand =([\s\S]*?);\n/.exec(src)?.[1] ?? '';
   return [...bloque.matchAll(/\|\s*'([a-z0-9]+)'/g)].map((m) => m[1]!);
 })();

@@ -55,13 +55,29 @@ var ColoresAvatar = []string{"avatar-1", "avatar-2", "avatar-3", "avatar-4", "av
 
 // Las medidas del selector.
 var (
-	LadoBotonCamara   = tema.Espacio(7)   // h-7 w-7
-	FueraBotonCamara  = tema.Espacio(1)   // -right-1 -bottom-1
+	LadoBotonCamara = tema.Espacio(7) // h-7 w-7
+	// FueraBotonCamara es lo que el botón sale del avatar: `-right-2 -bottom-2`, uno más
+	// que el `-right-1 -bottom-1` de la web. Con el de la web, en el avatar de 64 de la
+	// ficha de Contacts el botón tapaba el pie de la segunda inicial (auditoría del
+	// 2026-11-24). Ver `ladoBotonCamara`.
+	FueraBotonCamara  = tema.Espacio(2)
 	anchoMenuAvatar   = tema.Espacio(56)  // w-56
 	rellenoMenuAvatar = tema.Espacio(2.5) // p-2.5
 	huecoMenuAvatar   = tema.Espacio(2)   // gap-2
 	huecoColores      = tema.Espacio(1.5) // gap-1.5
 )
+
+// ladoBotonCamara es el lado del botón para esa talla de avatar: el `h-7` de la web en el
+// de 64 y, en los menores, el `h-6` de 24, el mínimo de WCAG 2.5.8 (con el dedo el blanco
+// sigue siendo de 44). Medido, la tinta de las iniciales llega hasta y = 40,5 en el de 64
+// y hasta 30 en el de 48; con `-right-2 -bottom-2`, el de 28 empieza en 44 y el de 24 en
+// 32: los dos por debajo de las letras. El de 28 en el de 48 empezaría en 28, encima.
+func ladoBotonCamara(t TallaAvatar) float32 {
+	if t >= AvatarXL {
+		return LadoBotonCamara
+	}
+	return tema.Espacio(6)
+}
 
 // LadoIconoCamara es el `<Icon name="camera" size={14}>`.
 const LadoIconoCamara float32 = 14
@@ -86,11 +102,12 @@ func (s *SelectorAvatar) AccessibilityLabel() string {
 // pulsa, como en la web.
 func (s *SelectorAvatar) Tapped(e *fyne.PointEvent) {
 	lado := MedidaAvatar(s.Avatar.Talla).Width
-	x0 := lado + FueraBotonCamara - LadoBotonCamara
+	boton := ladoBotonCamara(s.Avatar.Talla)
+	x0 := lado + FueraBotonCamara - boton
 	if EsTactil() {
-		// Con el dedo, el blanco es de 44 (`pointer-coarse:after:-inset-2`): 8 más
-		// por cada lado del botón de 28, hacia dentro del avatar.
-		x0 -= (SueloTactilBarra - LadoBotonCamara) / 2
+		// Con el dedo, el blanco es de 44 (`pointer-coarse:after:-inset-2`): lo que le
+		// falte al botón por cada lado, hacia dentro del avatar.
+		x0 -= (SueloTactilBarra - boton) / 2
 	}
 	if e == nil || (e.Position.X >= x0 && e.Position.Y >= x0) {
 		s.Pulsable.Tapped(e)
@@ -203,8 +220,9 @@ func (r *selectorAvatarRenderer) Layout(t fyne.Size) {
 	lado := MedidaAvatar(r.s.Avatar.Talla)
 	r.s.Avatar.Move(fyne.NewPos(0, 0))
 	r.s.Avatar.Resize(lado)
-	pos := fyne.NewPos(lado.Width+FueraBotonCamara-LadoBotonCamara, lado.Height+FueraBotonCamara-LadoBotonCamara)
-	tam := fyne.NewSize(LadoBotonCamara, LadoBotonCamara)
+	boton := ladoBotonCamara(r.s.Avatar.Talla)
+	pos := fyne.NewPos(lado.Width+FueraBotonCamara-boton, lado.Height+FueraBotonCamara-boton)
+	tam := fyne.NewSize(boton, boton)
 	r.sombra.Ajustar(pos, tam, v)
 	r.fondo.Move(pos)
 	r.fondo.Resize(tam)

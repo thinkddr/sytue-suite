@@ -62,6 +62,7 @@ test('PqVaultGate prepares, activates, mounts children, and drains on unmount', 
     await act(() => {
       render(
         <PqVaultGate
+          autoSignIn={false}
           actor={actor}
           tenant="acme"
           locale="es"
@@ -105,6 +106,7 @@ test('PqVaultGate prompts sign-in on signin error and never mounts children', as
     await act(() => {
       render(
         <PqVaultGate
+          autoSignIn={false}
           actor={actor}
           tenant="acme"
           locale="en"
@@ -129,6 +131,118 @@ test('PqVaultGate prompts sign-in on signin error and never mounts children', as
   }
 });
 
+test('una clave de firma que pide identificarse de nuevo entra con reauth=1, y el inicio normal no', async () => {
+  for (const motivo of ['reauth', 'signin'] as const) {
+    const pasos: string[] = [];
+    const root = document.createElement('div');
+    document.body.appendChild(root);
+    try {
+      await act(() => {
+        render(
+          <PqVaultGate
+            autoSignIn={false}
+            actor={actor}
+            tenant="acme"
+            locale="es"
+            product="mail"
+            basePath="/mail"
+            openVault={async () =>
+              fakeVault({
+                scope: Object.freeze({ tenant: 'acme', subject: actor, product: 'mail' }),
+              } as Partial<PqVault>)
+            }
+            prepare={async () => {
+              throw new PqVaultError(motivo);
+            }}
+            navigate={(url) => pasos.push(url)}
+          >
+            <p data-secret="true">correo</p>
+          </PqVaultGate>,
+          root,
+        );
+      });
+      await until(() => root.querySelector('button') !== null);
+      expect(root.querySelector('[data-secret]')).toBeNull();
+      await act(() => {
+        root.querySelector<HTMLButtonElement>('button')!.click();
+      });
+      expect(pasos.length).toBe(1);
+      const url = new URL(pasos[0]!, 'https://mail.test');
+      expect(url.pathname).toBe('/mail/auth/login');
+      expect(url.searchParams.get('unlock')).toBe('1');
+      // Sin `max_age=0` el relevo entrega el código con la sesión de antes y Sytue
+      // ID vuelve a contestar `vault_key_reauth`: un bucle.
+      expect(url.searchParams.get('reauth')).toBe(motivo === 'reauth' ? '1' : null);
+    } finally {
+      await act(() => {
+        render(null, root);
+      });
+      root.remove();
+    }
+  }
+});
+
+test('sin clave aquí, con otra o con Sytue ID pidiendo identificarse, la puerta va sola a Sytue ID una vez', async () => {
+  for (const motivo of ['signin', 'wrong', 'reauth'] as const) {
+    sessionStorage.clear();
+    const pasos: string[] = [];
+    let abiertas = 0;
+    const montar = (root: HTMLElement) =>
+      render(
+        <PqVaultGate
+          actor={actor}
+          tenant="acme"
+          locale="es"
+          product="mail"
+          basePath="/mail"
+          openVault={async () => {
+            abiertas++;
+            if (motivo !== 'reauth') throw new PqVaultError(motivo);
+            return fakeVault({
+              scope: Object.freeze({ tenant: 'acme', subject: actor, product: 'mail' }),
+            } as Partial<PqVault>);
+          }}
+          prepare={async () => {
+            throw new PqVaultError('reauth');
+          }}
+          navigate={(url) => pasos.push(url)}
+        >
+          <p data-secret="true">correo</p>
+        </PqVaultGate>,
+        root,
+      );
+    const primera = document.createElement('div');
+    document.body.appendChild(primera);
+    try {
+      await act(() => montar(primera));
+      await until(() => pasos.length === 1);
+      // Sin pulsar nada: ningún botón, la puerta sigue «desbloqueando».
+      expect(primera.querySelector('button')).toBeNull();
+      expect(primera.querySelector('[data-secret]')).toBeNull();
+      const url = new URL(pasos[0]!, 'https://mail.test');
+      expect(url.pathname).toBe('/mail/auth/login');
+      expect(url.searchParams.get('unlock')).toBe('1');
+      expect(url.searchParams.get('reauth')).toBe(motivo === 'reauth' ? '1' : null);
+    } finally {
+      await act(() => render(null, primera));
+      primera.remove();
+    }
+    // De vuelta y aún igual: no se va otra vez (sería un bucle), se enseña el botón.
+    const vuelta = document.createElement('div');
+    document.body.appendChild(vuelta);
+    try {
+      await act(() => montar(vuelta));
+      await until(() => vuelta.querySelector('button') !== null);
+      expect(pasos.length).toBe(1);
+      expect(abiertas).toBe(2);
+    } finally {
+      await act(() => render(null, vuelta));
+      vuelta.remove();
+    }
+  }
+  sessionStorage.clear();
+});
+
 test('PqVaultGate mounts static children when encryption is disabled or inside MatrixStorageFixture', async () => {
   const root = document.createElement('div');
   document.body.appendChild(root);
@@ -137,6 +251,7 @@ test('PqVaultGate mounts static children when encryption is disabled or inside M
     await act(() => {
       render(
         <PqVaultGate
+          autoSignIn={false}
           actor={actor}
           tenant="acme"
           locale="en"
@@ -157,6 +272,7 @@ test('PqVaultGate mounts static children when encryption is disabled or inside M
       render(
         <MatrixStorageFixture>
           <PqVaultGate
+            autoSignIn={false}
             actor={actor}
             tenant="acme"
             locale="en"
@@ -193,6 +309,7 @@ test('PqVaultGate on a wrong key offers to sign in again or empty, and empties o
     await act(() => {
       render(
         <PqVaultGate
+          autoSignIn={false}
           actor={actor}
           tenant="acme"
           locale="es"
@@ -281,6 +398,7 @@ test('Drive: vaciar suelta antes la fuente congelada, y la bóveda nueva puede i
     await act(() => {
       render(
         <PqVaultGate
+          autoSignIn={false}
           actor={actor}
           tenant="acme"
           locale="es"
@@ -329,6 +447,7 @@ test('Drive: si soltar pide identificarse, a la vuelta suelta esa época y vací
   const puerta = (root: HTMLElement) =>
     render(
       <PqVaultGate
+        autoSignIn={false}
         actor={actor}
         tenant="acme"
         locale="es"
@@ -402,6 +521,7 @@ test('vaciar que pide identificarse antes de tocar la bóveda vacía a la vuelta
   const puerta = (root: HTMLElement) =>
     render(
       <PqVaultGate
+        autoSignIn={false}
         actor={actor}
         tenant="acme"
         locale="es"
@@ -484,6 +604,7 @@ test('PqVaultGate with another device copying into the vault waits, retries or c
     await act(() => {
       render(
         <PqVaultGate
+          autoSignIn={false}
           actor={actor}
           tenant="acme"
           locale="es"
@@ -541,7 +662,14 @@ test('el barrido reconoce la puerta: abriendo, cerrada y abierta (también con s
   const montar = async (openVault: () => Promise<PqVault>): Promise<void> => {
     await act(() => {
       render(
-        <PqVaultGate actor={actor} tenant="acme" locale="de" product="docs" openVault={openVault}>
+        <PqVaultGate
+          autoSignIn={false}
+          actor={actor}
+          tenant="acme"
+          locale="de"
+          product="docs"
+          openVault={openVault}
+        >
           <p data-app="true">Recientes</p>
         </PqVaultGate>,
         root,
@@ -586,6 +714,57 @@ test('el barrido reconoce la puerta: abriendo, cerrada y abierta (también con s
     expect(estado()).toBe('abierta');
   } finally {
     await desmontar();
+    root.remove();
+  }
+});
+
+test('un fallo genérico lleva en «Más información» y en la consola su código corto, sin datos', async () => {
+  const root = document.createElement('div');
+  document.body.appendChild(root);
+  const warnings: string[] = [];
+  const warn = console.warn;
+  console.warn = (...args: unknown[]) => {
+    warnings.push(args.map(String).join(' '));
+  };
+  // Lo que deja una importación de Drive que no entra: un error con su comprobación.
+  const failure = Object.assign(new Error('https://drive.example/rows?nombre=informe.pdf'), {
+    name: 'DriveImportError',
+    reason: 'invalid',
+    check: 'row_heads',
+  });
+  try {
+    await act(() => {
+      render(
+        <PqVaultGate
+          autoSignIn={false}
+          actor={actor}
+          tenant="acme"
+          locale="es"
+          product="notes"
+          openVault={async () => fakeVault()}
+          prepare={async () => {
+            throw failure;
+          }}
+        >
+          {() => <p data-ready="true">dentro</p>}
+        </PqVaultGate>,
+        root,
+      );
+    });
+    await until(() => root.querySelector('[data-sytue-boveda-fallo]') !== null);
+    const code = root.querySelector('[data-sytue-boveda-fallo]');
+    expect(code?.getAttribute('data-sytue-boveda-fallo')).toBe('prepare/drive.import.row_heads');
+    expect(code?.closest('details')).not.toBeNull();
+    expect(code?.textContent).toBe('prepare/drive.import.row_heads');
+    expect(warnings.some((w) => w.includes('prepare/drive.import.row_heads'))).toBe(true);
+    expect(root.textContent).not.toContain('informe.pdf');
+    expect(warnings.join('\n')).not.toContain('informe.pdf');
+    expect(root.querySelector('[data-ready]')).toBeNull();
+  } finally {
+    console.warn = warn;
+    await act(() => {
+      render(null, root);
+    });
     root.remove();
   }
 });

@@ -1013,14 +1013,18 @@ func (a *AreaTexto) CreateRenderer() fyne.WidgetRenderer {
 // ---- el renderer que comparten los dos ----
 
 type campoRenderer struct {
-	e       *Entrada
-	aro     *Aro
-	caja    *Caja
-	glifo   *iconos.Dibujo
-	objetos []fyne.CanvasObject
-	medida  func() fyne.Size
-	margenY float32
-	arriba  bool
+	e     *Entrada
+	aro   *Aro
+	radio float32
+	// aroAbierto: el aro va sin centro, como `box-shadow`. Lo lleva el campo del carril,
+	// que tiene el relleno translúcido (ver `ponerAro`).
+	aroAbierto bool
+	caja       *Caja
+	glifo      *iconos.Dibujo
+	objetos    []fyne.CanvasObject
+	medida     func() fyne.Size
+	margenY    float32
+	arriba     bool
 }
 
 func nuevoCampoRenderer(e *Entrada, radio float32, medida func() fyne.Size) *campoRenderer {
@@ -1029,18 +1033,14 @@ func nuevoCampoRenderer(e *Entrada, radio float32, medida func() fyne.Size) *cam
 	borde, relleno = e.bordePropio(borde, v), e.rellenoPropio(relleno, v)
 	r := &campoRenderer{
 		e:      e,
-		aro:    NuevoAroCon("focus-ring", radio, SinHueco, v),
+		radio:  radio,
 		caja:   NuevaCaja(relleno, borde, radio),
 		medida: medida,
 	}
 	if e.Icono != iconos.Ninguno {
 		r.glifo = iconos.TrazoConTinta(e.Icono, e.medida().icono, pista)
 	}
-	r.objetos = append(r.aro.Objetos(), r.caja.Objetos()...)
-	if r.glifo != nil {
-		r.objetos = append(r.objetos, r.glifo.Objeto())
-	}
-	r.objetos = append(r.objetos, e.env)
+	r.ponerAro(v)
 	// Igual que la pestaña: `widget.Entry` solo materializa su MARCA DE AGUA en su
 	// propio `Refresh`, y Fyne no lo llama antes del primer pintado. Sin esta línea,
 	// «Buscar contactos» no se pinta nunca —medido: 2 324 píxeles de tinta con marca
@@ -1048,6 +1048,35 @@ func nuevoCampoRenderer(e *Entrada, radio float32, medida func() fyne.Size) *cam
 	// la suite. Es la regla 7 del paquete.
 	r.Refresh()
 	return r
+}
+
+// ponerAro monta el aro que toca y la lista de objetos con él delante.
+//
+// EN EL CARRIL EL ARO VA ABIERTO. El aro relleno es un rectángulo del color del anillo
+// que el control TAPA con su caja opaca (punto 3 de `Aro`), y el campo del carril no la
+// tiene: su relleno es el velo translúcido `sidebar-field`. Enfocado, el anillo se veía
+// entero a través del velo y el buscador de la suite quedaba como una píldora maciza del
+// color de foco con el texto a ~1,3:1 (auditoría del 2026-11-24, en el teléfono y en
+// Marco). Abierto, pinta solo la franja de fuera, como el `box-shadow` de la web.
+func (r *campoRenderer) ponerAro(v tema.Variante) {
+	if r.aro != nil && r.aroAbierto == r.e.EnCarril {
+		return
+	}
+	visible := r.aro != nil && r.aro.visible
+	r.aroAbierto = r.e.EnCarril
+	r.aro = NuevoAroCon("focus-ring", r.radio, SinHueco, v)
+	if r.aroAbierto {
+		r.aro.Abierto()
+	}
+	r.objetos = append(r.aro.Objetos(), r.caja.Objetos()...)
+	if r.glifo != nil {
+		r.objetos = append(r.objetos, r.glifo.Objeto())
+	}
+	r.objetos = append(r.objetos, r.e.env)
+	if t := r.e.Size(); t.Width > 0 {
+		r.aro.Colocar(t)
+	}
+	r.aro.Ver(visible)
 }
 
 func (r *campoRenderer) MinSize() fyne.Size           { return r.medida() }
@@ -1115,6 +1144,7 @@ func (r *campoRenderer) Refresh() {
 		th.tintaTexto, th.tintaCursor, th.tintaMarca = texto, texto, pista
 		aro, tinta = "sidebar-focus", "sidebar-fg-muted"
 	}
+	r.ponerAro(v)
 	r.aro.CambiarToken(aro)
 	if r.glifo != nil {
 		r.glifo.DeToken(tinta) // la lupa, con el relleno ámbar del carril o el del tema

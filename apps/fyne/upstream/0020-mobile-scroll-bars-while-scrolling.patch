@@ -1,0 +1,263 @@
+From 5ca49b496f388cb16ca3fd5cf5c6e3f40a8a94f0 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Tue, 24 Nov 2026 22:38:00 +0000
+Subject: [PATCH] fix(widget): show the scroll bars only while scrolling on iOS
+ and Android
+
+scrollBarAlwaysVisible was true everywhere but macOS, so on a phone every
+list carried its bar for good, a dark 6 px rail on the right edge. The
+native lists of both systems show it only while the content moves.
+
+On iOS and Android the bars now use the scrolling state that macOS overlay
+scroll bars already had: a drag shows them, they stay while the finger is
+down (even if it rests), and they hide scrollEndDelay after the drag ends
+unless another one starts. Desktop behaviour is unchanged, macOS included.
+New tests cover showing, staying, hiding and a drag that cancels the hide,
+and that the desktop never enters the scrolling state.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01K7a9FPvLA4FsHbm41nkUrM
+---
+ internal/widget/scroller.go                |  54 ++++++++---
+ internal/widget/scroller_behavior_other.go |   5 +-
+ internal/widget/scroller_mobile.go         |  12 ++-
+ internal/widget/scroller_mobile_test.go    | 100 +++++++++++++++++++++
+ 4 files changed, 156 insertions(+), 15 deletions(-)
+ create mode 100644 internal/widget/scroller_mobile_test.go
+
+diff --git a/internal/widget/scroller.go b/internal/widget/scroller.go
+index 2bf6a98..1e2c7d4 100644
+--- a/internal/widget/scroller.go
++++ b/internal/widget/scroller.go
+@@ -1,6 +1,7 @@
+ package widget
+ 
+ import (
++	"runtime"
+ 	"time"
+ 
+ 	"fyne.io/fyne/v2"
+@@ -11,7 +12,15 @@ import (
+ 	"fyne.io/fyne/v2/theme"
+ )
+ 
+-const scrollEndDelay = 500 * time.Millisecond
++// scrollEndDelay is how long the bars stay after the last scroll, where they only
++// show while scrolling. A variable so that tests can wait less.
++var scrollEndDelay = 500 * time.Millisecond
++
++// mobileScrollBars is true on iOS and Android, where the bars only show while the
++// content moves, as they do in the native lists of both systems. Elsewhere bars
++// follow the desktop rules (scrollBarAlwaysVisible). A variable so that tests can
++// turn it on anywhere.
++var mobileScrollBars = runtime.GOOS == "ios" || runtime.GOOS == "android"
+ 
+ // ScrollDirection represents the directions in which a Scroll can scroll its child content.
+ type ScrollDirection = fyne.ScrollDirection
+@@ -619,20 +628,43 @@ func (s *Scroll) Scrolled(ev *fyne.ScrollEvent) {
+ 	}
+ 	if !scrollBarAlwaysVisible() {
+ 		s.scrolling = true
+-		if s.scrollEndTimer != nil {
+-			s.scrollEndTimer.Reset(scrollEndDelay)
+-		} else {
+-			s.scrollEndTimer = time.AfterFunc(scrollEndDelay, func() {
+-				fyne.Do(func() {
+-					s.scrolling = false
+-					s.refreshBars()
+-				})
+-			})
+-		}
++		s.endScrollingAfterDelay()
+ 		s.refreshBars()
+ 	}
+ }
+ 
++// startScrolling shows the bars, where they only show while scrolling, until
++// endScrollingAfterDelay. It is for a drag: the bars stay while the finger is down,
++// even if it rests. It reports whether the bars were hidden and need a refresh.
++func (s *Scroll) startScrolling() bool {
++	if scrollBarAlwaysVisible() {
++		return false
++	}
++	if s.scrollEndTimer != nil {
++		s.scrollEndTimer.Stop()
++	}
++	if s.scrolling {
++		return false
++	}
++	s.scrolling = true
++	return true
++}
++
++// endScrollingAfterDelay hides the bars scrollEndDelay from now, unless scrolling
++// starts again before that.
++func (s *Scroll) endScrollingAfterDelay() {
++	if s.scrollEndTimer != nil {
++		s.scrollEndTimer.Reset(scrollEndDelay)
++		return
++	}
++	s.scrollEndTimer = time.AfterFunc(scrollEndDelay, func() {
++		fyne.Do(func() {
++			s.scrolling = false
++			s.refreshBars()
++		})
++	})
++}
++
+ func (s *Scroll) refreshBars() {
+ 	s.updateOffset(0, 0)
+ 	s.refreshWithoutOffsetUpdate()
+diff --git a/internal/widget/scroller_behavior_other.go b/internal/widget/scroller_behavior_other.go
+index 0eee74b..30a1ce6 100644
+--- a/internal/widget/scroller_behavior_other.go
++++ b/internal/widget/scroller_behavior_other.go
+@@ -6,8 +6,11 @@ func isScrollerPageOnTap() bool {
+ 	return false
+ }
+ 
++// scrollBarAlwaysVisible is true on the desktops without a macOS-style preference
++// (all but macOS, and macOS under the ci tag). On iOS and Android
++// the bars only show while scrolling (mobileScrollBars).
+ func scrollBarAlwaysVisible() bool {
+-	return true
++	return !mobileScrollBars
+ }
+ 
+ func subscribeScrollerStyle(_ func()) uint64 { return 0 }
+diff --git a/internal/widget/scroller_mobile.go b/internal/widget/scroller_mobile.go
+index db8eb89..65952ab 100644
+--- a/internal/widget/scroller_mobile.go
++++ b/internal/widget/scroller_mobile.go
+@@ -4,13 +4,19 @@ package widget
+ 
+ import "fyne.io/fyne/v2"
+ 
+-// DragEnd will stop scrolling on mobile has stopped
++// DragEnd will stop scrolling on mobile has stopped.
++// Where the bars only show while scrolling, they hide shortly after.
+ func (s *Scroll) DragEnd() {
++	if s.scrolling {
++		s.endScrollingAfterDelay()
++	}
+ }
+ 
+-// Dragged will scroll on any drag - bar or otherwise - for mobile
++// Dragged will scroll on any drag - bar or otherwise - for mobile.
++// Where the bars only show while scrolling, they show until the drag ends.
+ func (s *Scroll) Dragged(e *fyne.DragEvent) {
+-	if s.updateOffset(e.Dragged.DX, e.Dragged.DY) {
++	shown := s.startScrolling()
++	if s.updateOffset(e.Dragged.DX, e.Dragged.DY) || shown {
+ 		s.refreshWithoutOffsetUpdate()
+ 	}
+ }
+diff --git a/internal/widget/scroller_mobile_test.go b/internal/widget/scroller_mobile_test.go
+new file mode 100644
+index 0000000..dcefe08
+--- /dev/null
++++ b/internal/widget/scroller_mobile_test.go
+@@ -0,0 +1,100 @@
++//go:build ci || no_glfw || android || ios || mobile
++
++package widget
++
++import (
++	"image/color"
++	"runtime"
++	"testing"
++	"time"
++
++	"github.com/stretchr/testify/assert"
++	"github.com/stretchr/testify/require"
++
++	"fyne.io/fyne/v2"
++	"fyne.io/fyne/v2/canvas"
++	"fyne.io/fyne/v2/internal/cache"
++	"fyne.io/fyne/v2/test"
++)
++
++// withMobileScrollBars runs the test as on iOS and Android, where the bars only show
++// while scrolling, with a short end delay.
++func withMobileScrollBars(t *testing.T) {
++	t.Helper()
++	mobile, delay := mobileScrollBars, scrollEndDelay
++	t.Cleanup(func() { mobileScrollBars, scrollEndDelay = mobile, delay })
++	mobileScrollBars, scrollEndDelay = true, 50*time.Millisecond
++	if scrollBarAlwaysVisible() && runtime.GOOS == "darwin" {
++		t.Skip("the macOS preference shows the bars always")
++	}
++}
++
++func TestScroll_MobileBarsShowOnlyWhileDragging(t *testing.T) {
++	test.NewTempApp(t)
++	withMobileScrollBars(t)
++
++	rect := canvas.NewRectangle(color.Black)
++	rect.SetMinSize(fyne.NewSize(100, 1000))
++	scroll := NewVScroll(rect)
++	scroll.Resize(fyne.NewSize(100, 100))
++	area := cache.Renderer(scroll).(*scrollContainerRenderer).vertArea
++	bar := cache.Renderer(area).(*scrollBarAreaRenderer).bar
++	require.True(t, area.Visible(), "the content is taller than the scroller")
++	assert.False(t, bar.Visible(), "no bar at rest")
++
++	scroll.Dragged(&fyne.DragEvent{Dragged: fyne.Delta{DY: -10}})
++	assert.Equal(t, float32(10), scroll.Offset.Y)
++	assert.True(t, bar.Visible(), "the bar shows while dragging")
++
++	// A finger resting on the list keeps the bar, however long it rests.
++	scroll.Dragged(&fyne.DragEvent{})
++	waitScrollEnd()
++	assert.True(t, bar.Visible(), "the bar stays until the drag ends")
++
++	scroll.DragEnd()
++	assert.True(t, bar.Visible(), "the bar fades only after the delay")
++	waitScrollEnd()
++	assert.False(t, bar.Visible(), "the bar hides once scrolling stops")
++	assert.Equal(t, float32(10), scroll.Offset.Y, "hiding the bar does not move the content")
++
++	// A drag that starts again before the delay ends keeps the bar.
++	scroll.Dragged(&fyne.DragEvent{Dragged: fyne.Delta{DY: -10}})
++	scroll.DragEnd()
++	scroll.Dragged(&fyne.DragEvent{Dragged: fyne.Delta{DY: -10}})
++	waitScrollEnd()
++	assert.True(t, bar.Visible(), "a new drag cancels the pending hide")
++	scroll.DragEnd()
++	waitScrollEnd()
++	assert.False(t, bar.Visible())
++}
++
++// waitScrollEnd waits past scrollEndDelay and runs, on the test goroutine, what the
++// end timer queued with fyne.Do.
++func waitScrollEnd() {
++	time.Sleep(4 * scrollEndDelay)
++	fyne.DoAndWait(func() {})
++}
++
++func TestScroll_DesktopBarsStayWhileDragging(t *testing.T) {
++	test.NewTempApp(t)
++	delay := scrollEndDelay
++	t.Cleanup(func() { scrollEndDelay = delay })
++	scrollEndDelay = 50 * time.Millisecond
++	if !scrollBarAlwaysVisible() {
++		t.Skip("the bars of this platform only show while scrolling")
++	}
++
++	rect := canvas.NewRectangle(color.Black)
++	rect.SetMinSize(fyne.NewSize(100, 1000))
++	scroll := NewVScroll(rect)
++	scroll.Resize(fyne.NewSize(100, 100))
++	area := cache.Renderer(scroll).(*scrollContainerRenderer).vertArea
++	bar := cache.Renderer(area).(*scrollBarAreaRenderer).bar
++	assert.True(t, bar.Visible())
++
++	scroll.Dragged(&fyne.DragEvent{Dragged: fyne.Delta{DY: -10}})
++	scroll.DragEnd()
++	waitScrollEnd()
++	assert.True(t, bar.Visible())
++	assert.False(t, scroll.scrolling, "no scrolling state where the bars always show")
++}
+-- 
+2.43.0
+

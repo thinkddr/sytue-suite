@@ -11,7 +11,7 @@
  * Aquí solo vive la decisión (qué marcador dispara qué orden); el DOM lo toca
  * RichText, que además comprueba que el marcador abre la línea.
  */
-import { htmlATexto, pegadoConFormato, textoPegado } from '@sytue/ui/browser/portapapeles';
+import { htmlATexto, pegadoConFormato, textoPegado } from './html.js';
 import { escapar, esURLWeb } from './captura.js';
 
 export interface AtajoMarkdown {

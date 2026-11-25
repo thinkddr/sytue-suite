@@ -19,10 +19,10 @@ import {
   readSheetName,
   readSheetState,
   readSheetValues,
-} from '../sheets/SheetCanvas';
-import type { SheetCommand } from '../sheets/SheetCanvas';
-import { dispatchSlidesCommand } from '../slides/SlidesCanvas';
-import type { SlidesCommand } from '../slides/SlidesCanvas';
+} from '../sheets/mando';
+import type { SheetCommand } from '../sheets/mando';
+import { dispatchSlidesCommand } from '../slides/mando';
+import type { SlidesCommand } from '../slides/mando';
 import type { EditorCommand, EditorContext } from '../types';
 import type { MacroStep } from '../macros';
 

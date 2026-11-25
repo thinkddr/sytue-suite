@@ -620,12 +620,12 @@ func TestLaAccionLateralGiraMientrasCarga(t *testing.T) {
 	a := NuevaAccionLateralCon("Actualizar", iconos.Trazo(iconos.Rotar, 16, "sidebar-fg-muted", tema.Claro), nil)
 	a.Girando = true
 	test.WidgetRenderer(a)
-	if a.giro == nil {
+	if !a.giro.andando() {
 		t.Fatal("con Girando la acción no gira")
 	}
 	a.Girando = false
 	a.Refresh()
-	if a.giro != nil {
+	if a.giro.andando() {
 		t.Error("al acabar la carga la acción sigue girando")
 	}
 }
@@ -673,17 +673,18 @@ func TestLaFilaPlegadaEnsenaSuRotuloAlPasar(t *testing.T) {
 
 // TestTodoBotonPrincipalDelLateralLlevaElPrimarioDelCarril: dentro de `bg-sidebar` la web
 // reasigna `--color-primary` y su rótulo para todo lo que cuelga, no solo para la
-// cabecera (appearance.css). Un principal o un secundario del cuerpo pasan al primario
-// del carril —blanco con el rótulo de su color en claro—; un fantasma no cambia.
+// cabecera (appearance.css). Un principal del cuerpo pasa al primario del carril
+// —blanco con el rótulo de su color en claro—; un fantasma no cambia, y el secundario,
+// de contorno (`bg-surface text-text`), tampoco: la reasignación no toca esos dos.
 // VISTO EN ROJO sin `azulSobreTinta`.
 func TestTodoBotonPrincipalDelLateralLlevaElPrimarioDelCarril(t *testing.T) {
 	principal, fantasma := NuevoBoton("Reintentar", nil), NuevoBoton("Ocultar", nil).Con(Fantasma, TallaSM)
 	secundario := NuevoBoton("Reintentar", nil).Con(Secundario, TallaXS)
 	l := NuevoLateral("Menú", container.NewVBox(NuevaSeccionLateral("Carpetas", principal, secundario), fantasma))
 	test.WidgetRenderer(l)
-	// Uno del color de marca sobre el carril, que es de ese color, no se vería: el secundario también cambia.
-	if r, _, _ := secundario.colores(tema.Claro); !secundario.SobreCromo || r != tema.Color("sidebar-primary", tema.Claro) {
-		t.Errorf("el secundario del lateral pinta %v y es `sidebar-primary`", r)
+	if r, tinta, _ := secundario.colores(tema.Claro); secundario.SobreCromo || r != tema.Color("surface", tema.Claro) ||
+		tinta != tema.Color("text", tema.Claro) {
+		t.Errorf("el secundario del lateral pinta %v con rótulo %v y es el contorno de `surface` y `text`", r, tinta)
 	}
 	if !principal.SobreCromo {
 		t.Error("el botón principal del cuerpo del lateral sigue en la tinta del carril")
@@ -699,7 +700,8 @@ func TestTodoBotonPrincipalDelLateralLlevaElPrimarioDelCarril(t *testing.T) {
 
 // TestElBotonDeLaCabeceraLlevaElAroDelCromo: sobre el carril claro el azul de `focus-ring`
 // se queda en 3,4:1 («Crear evento», medido en producción); la cabecera lo pasa al blanco
-// de `chrome-focus`, como la de Sidebar.tsx. Un botón fuera del menú sigue en azul.
+// de `chrome-focus`, como la de Sidebar.tsx. Un botón fuera del menú lleva el aro de los
+// botones con relleno, que es del color del texto (`.sytue-focus-ring-inset`).
 func TestElBotonDeLaCabeceraLlevaElAroDelCromo(t *testing.T) {
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	crear, suelto := NuevoBoton("Crear evento", nil), NuevoBoton("Guardar", nil)
@@ -707,7 +709,7 @@ func TestElBotonDeLaCabeceraLlevaElAroDelCromo(t *testing.T) {
 	for _, c := range []struct {
 		b     *Boton
 		token string
-	}{{crear, "sidebar-focus"}, {suelto, "focus-ring"}} {
+	}{{crear, "sidebar-focus"}, {suelto, "text"}} {
 		r := test.WidgetRenderer(c.b).(*botonRenderer)
 		if got := r.aro.anillo.FillColor; got != tema.Color(c.token, v) {
 			t.Errorf("el aro de «%s» pinta %v y es `%s`", c.b.Texto, got, c.token)

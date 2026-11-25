@@ -1035,10 +1035,15 @@ func (rr *rejillaRenderer) pintarTexto(cp *celdaPintada, c, f int, e Estilo, ico
 		cp.icono.Hide()
 		return
 	}
-	negrita, cursiva, alinear := r.L.Formato(c, f)
+	negrita, cursiva, _ := r.L.Formato(c, f)
+	alinear := r.L.AlinearPintado(c, f)
 	if papel == papelTotal {
-		// `tableTotalHtml` pinta `<b>total</b>` sin el envoltorio de la celda.
+		// `tableTotalHtml` pinta `<b>total</b>` sin el envoltorio de la celda: sin su
+		// alineación, solo con la de «General».
 		negrita, cursiva, alinear = true, false, ""
+		if _, numero := r.L.Valor(c, f).(float64); numero {
+			alinear = "right"
+		}
 	}
 	esc := escalonCelda(e, z)
 	t.TextSize = esc.Tam

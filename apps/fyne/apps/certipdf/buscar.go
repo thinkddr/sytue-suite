@@ -222,7 +222,6 @@ func (b *panelBuscar) coincidenciasVista(ancho float32) []fyne.CanvasObject {
 // y lo de después, en ámbar si va a quedar apretado.
 func (b *panelBuscar) filaCoincidencia(c Coincidencia, ancho float32) fyne.CanvasObject {
 	l := b.l
-	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	dentro := ancho - 2*tema.Espacio(2)
 	n := c.Pagina + 1
 	ir := enlaceBoton(l.t("pdf.page.n", i18n.Vars{"n": n}), "primary-text", func() {
@@ -234,8 +233,8 @@ func (b *panelBuscar) filaCoincidencia(c Coincidencia, ancho float32) fyne.Canva
 	if !c.Cabe {
 		tinta = "warning-text"
 	}
-	fondo := canvas.NewRectangle(tema.Color("bg-subtle", v))
-	fondo.CornerRadius = tema.RadioSM
+	fondo := ui.NuevoLiso("bg-subtle")
+	fondo.Radio = tema.RadioSM
 	return container.NewStack(fondo, container.New(ui.Margen{Izq: tema.Espacio(2), Arr: tema.Espacio(1), Der: tema.Espacio(2), Abj: tema.Espacio(1)},
 		container.New(ui.Columna{}, container.New(alPrincipio{}, ir),
 			nuevoTachado(c.Antes, tema.Texto2XS, "text-subtle", dentro),

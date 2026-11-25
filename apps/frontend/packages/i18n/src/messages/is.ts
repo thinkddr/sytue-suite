@@ -73,6 +73,8 @@ export const is: Catalog = {
   'vault.emptyUnderstood': 'Ég skil að gögnum sem dulkóðuð voru með glataða lyklinum verður eytt',
   'vault.failed':
     'Ekki tókst að opna dulkóðuðu gögnin. Reyndu aftur eða skráðu þig aftur inn í Sytue ID. Ef lykillinn glataðist geturðu tæmt dulkóðuð gögn þessa forrits.',
+  'vault.moreInfo': 'Nánari upplýsingar',
+  'vault.attention': 'Dulkóðuðu gögnin þín þarfnast athygli',
   'matrix.incoming': 'Staðfesta þetta tæki',
   'matrix.match': 'Þau passa saman',
   'matrix.mismatch': 'Þau passa ekki saman',

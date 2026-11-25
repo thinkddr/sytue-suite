@@ -121,3 +121,19 @@ test('el anuncio del chip vive en un solo nodo aria-live que no se desmonta', as
     ),
   ).toHaveLength(1);
 });
+
+/* En un teléfono el chip CEDE ancho, y no solo el botón: también las dos capas del
+   desplegable que lo envuelven, que son las que la cabecera reparte. Sin eso medían
+   «Gespeichert» entero y, con dos personas en el documento, «Teilen» se salía 12 px
+   de un teléfono de 320 (barrido móvil de producción, 2026-11-22 a 24). */
+test('en un teléfono el chip encoge con su desplegable', () => {
+  const { chip } = montar('saved');
+  const disparador = chip!.parentElement!;
+  const desplegable = disparador.parentElement!;
+  expect(desplegable.parentElement!.tagName).toBe('HEADER');
+  for (const capa of [chip!, disparador, desplegable]) {
+    const clases = capa.className.split(/\s+/);
+    expect(clases.some((c) => c === 'min-w-0' || c === 'max-md:min-w-0')).toBe(true);
+  }
+  expect(desplegable.className.split(/\s+/)).toContain('max-md:shrink');
+});

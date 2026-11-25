@@ -118,6 +118,7 @@
   "compose.noAttachmentSend": "Wyślij mimo to",
   "compose.noAttachmentTitle": "Wysyłanie bez załączników",
   "compose.noDraftsFolder": "Nie znaleziono folderu Wersje robocze",
+  "compose.openFailed": "Nie udało się otworzyć edytora wiadomości. Spróbuj ponownie.",
   "compose.pastedImageDropped": "Wklejony obraz nie został dołączony",
   "compose.pastedImagesDropped": "Wklejone obrazy nie zostały dołączone",
   "compose.pastedImagesDroppedDescription": "Aby wysłać obrazy, dołącz je jako pliki.",

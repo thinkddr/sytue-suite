@@ -56,6 +56,17 @@ describe('EventChip', () => {
     expect(chip('en').some((x) => /^0?8:05/.test(x.texto))).toBe(true);
   });
 
+  test('mide al menos 24 px de alto (objetivo de WCAG 2.5.8), también con la letra pequeña', () => {
+    const boton = EventChip({
+      locale: 'es',
+      event: evento as never,
+      date: new Date(2026, 8, 10, 8, 5),
+      color: '#1e50a8',
+      onClick: () => {},
+    }) as Nodo;
+    expect(String(boton.props.class)).toContain('min-h-[max(24px,1.5rem)]');
+  });
+
   test('la variante expandida la enseña siempre', () => {
     const hora = chip('es', true).find((x) => x.texto === '08:05');
     expect(hora?.clase).not.toContain('hidden');

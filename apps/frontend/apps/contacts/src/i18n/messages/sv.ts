@@ -48,6 +48,8 @@ export const sv: AppCatalog<typeof en> = {
   'list.unstar': 'Ta bort {name} från stjärnmärkta',
   'list.starredTitle': 'Stjärnmärkta',
   'list.reviewDuplicates': 'Granska dubbletter ({count})',
+  'list.selectMode': 'Markera',
+  'list.moreActions': 'Fler åtgärder',
   'list.count': { one: '{count} kontakt', other: '{count} kontakter' },
   'list.countFiltered': {
     one: '{shown} av {count} kontakt',

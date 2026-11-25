@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 Daniel Delgado Ramos
-import { parseFragment, type DefaultTreeAdapterMap } from 'parse5';
+import type { DefaultTreeAdapterMap } from 'parse5';
+import { parseFragment } from './html.js';
 
 const HIDDEN = new Set(['script', 'style', 'template', 'noscript', 'iframe', 'object', 'embed']);
 const BLOCKS = new Set([

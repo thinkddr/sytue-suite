@@ -52,6 +52,8 @@ export const ro: AppCatalog<typeof en> = {
   'list.unstar': 'Scoate {name} din contactele cu stea',
   'list.starredTitle': 'Cu stea',
   'list.reviewDuplicates': 'Verifică duplicatele ({count})',
+  'list.selectMode': 'Selectează',
+  'list.moreActions': 'Mai multe acțiuni',
   'list.count': { one: '{count} contact', few: '{count} contacte', other: '{count} de contacte' },
   'list.countFiltered': {
     one: '{shown} din {count} contact',

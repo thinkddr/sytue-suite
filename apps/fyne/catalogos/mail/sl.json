@@ -118,6 +118,7 @@
   "compose.noAttachmentSend": "Vseeno pošlji",
   "compose.noAttachmentTitle": "Pošiljanje brez prilog",
   "compose.noDraftsFolder": "Mape Osnutki ni bilo mogoče najti",
+  "compose.openFailed": "Urejevalnika sporočila ni bilo mogoče odpreti. Poskusite znova.",
   "compose.pastedImageDropped": "Prilepljena slika ni bila vključena",
   "compose.pastedImagesDropped": "Prilepljene slike niso bile vključene",
   "compose.pastedImagesDroppedDescription": "Če želite poslati slike, jih priložite kot datoteke.",

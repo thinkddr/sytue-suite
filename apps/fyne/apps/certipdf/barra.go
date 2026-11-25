@@ -186,6 +186,13 @@ type Barra struct {
 	DesdeDrive bool
 	// PanelAbierto es el `aria-expanded` del botón del cajón.
 	PanelAbierto bool
+	// Titulo es el nombre del documento, delante de las pestañas: no se decía en
+	// ninguna parte de la ventana (auditoría del 2026-11-24).
+	Titulo string
+	// EnBarraApp es la cinta por debajo de `md`: la salida, el cajón y el título van en
+	// la barra de la app (la de la suite en el teléfono) y la fila empieza por las
+	// pestañas. Eran ~200 px de cromo en dos barras.
+	EnBarraApp bool
 
 	// Portal es donde se pintan las pistas de sus botones, fuera del desplazador que las
 	// recortaría. Nil: junto al botón.
@@ -320,15 +327,18 @@ func (b *Barra) cambio() {
 func (b *Barra) Activa() PestanaCinta { return b.activa }
 
 // Objeto compone la cinta: `border-border bg-surface flex flex-col border-b`.
+//
+// Los tres rellenos son `ui.Liso`, que resuelve su token al pintarse: con rectángulos
+// resueltos aquí, la cinta y la tira de pestañas se quedaban en el tema en que se
+// compusieron al cambiarlo en caliente.
 func (b *Barra) Objeto() fyne.CanvasObject {
-	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
-	banda := canvas.NewRectangle(tema.Color("bg-subtle", v))
+	banda := ui.NuevoLiso("bg-subtle")
 	grupos, s := deslizableCon(b.bandaDeGrupos())
 	// La banda es el `<Toolbar>` que la web enmascara entero —fondo incluido— sobre el
 	// `bg-surface` de la cinta.
 	cinta := conMascara(container.New(ui.Margen{Izq: margenFila, Arr: rellenoCintaY, Der: margenFila, Abj: rellenoCintaY}, grupos), s, "surface")
 	return container.New(pilaBarra{b: b},
-		canvas.NewRectangle(tema.Color("surface", v)), canvas.NewRectangle(tema.Color("border", v)), banda,
+		ui.NuevoLiso("surface"), ui.NuevoLiso("border"), banda,
 		b.fila(), cinta)
 }
 
@@ -380,28 +390,42 @@ func (b *Barra) fila() fyne.CanvasObject {
 		v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 		rueda = ui.NuevaRueda(16, "text-muted", v)
 	}
-	return container.New(&filaBarra{}, b.pista(salida, salida.Rotulo), b.pista(cajon, cajon.Rotulo), tira, rueda)
+	titulo := ui.NuevoRotulo(b.Titulo, tema.TextoSM, ui.SemiNegrita, "text")
+	titulo.Truncar = true
+	return container.New(&filaBarra{b: b}, b.pista(salida, salida.Rotulo), b.pista(cajon, cajon.Rotulo), tira, rueda, titulo)
 }
 
-// filaBarra coloca [salida, cajón, tira, rueda]. El cajón es `lg:hidden`, y `lg:` mide
-// la VENTANA con el rem de 16: 1024. La fila ocupa la ventana entera de ancho, así que
-// su propio ancho es el de la ventana.
-type filaBarra struct{}
+// filaBarra coloca [salida, cajón, tira, rueda, título]. El cajón es `lg:hidden`, y `lg:`
+// mide la VENTANA con el rem de 16: 1024. La fila ocupa la ventana entera de ancho, así
+// que su propio ancho es el de la ventana.
+type filaBarra struct{ b *Barra }
 
 // Estrecho es `max-lg:`: por debajo de 1024 el panel es un cajón.
 const Estrecho float32 = 1024
+
+// Medidas del título del documento en la fila: hasta `max-w-72` y un `gap-3` hasta las
+// pestañas, que son lo primero que no se puede quedar sin sitio.
+var (
+	anchoMaxTitulo = tema.Espacio(72)
+	huecoTitulo    = tema.Espacio(3)
+	anchoMinTitulo = tema.Espacio(16)
+)
 
 func (*filaBarra) MinSize(objs []fyne.CanvasObject) fyne.Size {
 	return fyne.NewSize(2*margenFila+2*ladoSalida, AltoFilaBarra())
 }
 
-func (*filaBarra) Layout(objs []fyne.CanvasObject, t fyne.Size) {
+func (f *filaBarra) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 	y := margenFila
 	x := margenFila
-	objs[0].Move(fyne.NewPos(x, y))
-	objs[0].Resize(fyne.NewSize(ladoSalida, ladoSalida))
-	x += ladoSalida + margenFila
-	if t.Width < Estrecho {
+	enBarra := f.b != nil && f.b.EnBarraApp
+	esconder(objs[0], enBarra)
+	if !enBarra {
+		objs[0].Move(fyne.NewPos(x, y))
+		objs[0].Resize(fyne.NewSize(ladoSalida, ladoSalida))
+		x += ladoSalida + margenFila
+	}
+	if t.Width < Estrecho && !enBarra {
 		objs[1].Show()
 		objs[1].Move(fyne.NewPos(x, y))
 		objs[1].Resize(fyne.NewSize(ladoSalida, ladoSalida))
@@ -417,10 +441,22 @@ func (*filaBarra) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 		objs[3].Move(fyne.NewPos(t.Width-16-tema.Espacio(2), y+(ladoSalida-16)/2))
 		objs[3].Resize(fyne.NewSize(16, 16))
 	}
+	// El título, delante de las pestañas y solo con lo que estas le dejan: hasta
+	// `max-w-72`, y fuera si no le quedan ni `w-16` (en la barra de la app ya va en ella).
+	pestanas := contenidoDe(objs[2]).Width
+	titulo := objs[4].(*ui.Rotulo) //nolint:errcheck,forcetypeassert // fila() lo pone ahí
+	cabe := min(ui.Medir(titulo.Texto, tema.TextoSM, ui.SemiNegrita).Width, anchoMaxTitulo,
+		t.Width-x-margenFila-rueda-pestanas-huecoTitulo)
+	esconder(titulo, enBarra || titulo.Texto == "" || cabe < min(anchoMinTitulo, ui.Medir(titulo.Texto, tema.TextoSM, ui.SemiNegrita).Width))
+	if titulo.Visible() {
+		titulo.Move(fyne.NewPos(x+tema.Espacio(1), y+(ladoSalida-tema.TextoSM.Linea)/2))
+		titulo.Resize(fyne.NewSize(cabe, tema.TextoSM.Linea))
+		x += tema.Espacio(1) + cabe + huecoTitulo
+	}
 	// `min-w-0` con `flex-1` detrás: la tira mide lo que sus pestañas y, si no caben, se
 	// desliza.
 	alto := objs[2].MinSize().Height
-	ancho := min(contenidoDe(objs[2]).Width, max(t.Width-x-margenFila-rueda, 0))
+	ancho := min(pestanas, max(t.Width-x-margenFila-rueda, 0))
 	objs[2].Move(fyne.NewPos(x, y+(ladoSalida-alto)/2))
 	objs[2].Resize(fyne.NewSize(ancho, alto))
 }
@@ -775,8 +811,10 @@ func (b *Barra) controlDeGrosor() fyne.CanvasObject {
 		b.Grosor = int(math.Round(v))
 		b.cambio()
 	}).Con(rotulo)
-	// El `<input type="range">` de la cinta va SIN estilo: es el de Chromium.
-	d.Paso, d.Nativo = 1, true
+	// El de la suite, con su primario: el `<input type="range">` sin estilo era el azul
+	// de Chromium (#0075ff), el único azul de la cinta (auditoría del 2026-11-24). La web
+	// lo tiñe con `accent-primary`.
+	d.Paso = 1
 	hueco := canvas.NewRectangle(color.Transparent)
 	hueco.SetMinSize(fyne.NewSize(AnchoDeslizadorGrosor, d.MinSize().Height))
 	return container.New(ui.Margen{Izq: tema.Espacio(2)},

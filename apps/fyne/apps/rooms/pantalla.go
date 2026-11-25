@@ -48,8 +48,11 @@ type Pantalla struct {
 	capaEntrante *fyne.Container
 
 	armazon *ui.Armazon
-	raiz    fyne.CanvasObject
-	pagina  fyne.CanvasObject
+	// movil es la barra de la app del armazón: en una ventana estrecha lleva el «☰», el
+	// nombre del canal y sus acciones, y en el teléfono es la de la suite.
+	movil  *ui.BarraMovil
+	raiz   fyne.CanvasObject
+	pagina fyne.CanvasObject
 }
 
 // VistaCanal es la columna de la derecha: cabecera, historial y caja de escribir. Se
@@ -126,9 +129,25 @@ func NuevaPantalla(t *i18n.Translator, l i18n.Locale) *Pantalla {
 	}
 	p.Canal = nuevoCanal(t, l)
 	p.armazon = ui.NuevoArmazon(p.Canal)
-	// La hamburguesa es la de la cabecera del canal, como en ChatApp.tsx: con la barra
-	// móvil del armazón salían dos, una encima de otra (visto en ventana real a 360).
-	p.armazon.SinBarraMovil = true
+	// En una ventana estrecha la cabecera del canal sube a la barra de la app, que en el
+	// teléfono es la de la suite: una sola barra con el «☰», «#equipo» y las acciones.
+	// Eran dos, y el nombre se quedaba en «eq…» por el rótulo de «Llamar».
+	p.movil = ui.NuevaBarraMovil()
+	p.movil.RotuloAbrir, p.movil.RotuloCerrar, p.movil.RotuloVolver =
+		t.T("sidebar.openChannels", nil), t.T("ui.closeNav", nil), t.T("ui.backToList", nil)
+	p.movil.AlMenu = func() {
+		if p.armazon.CajonAbierto {
+			p.armazon.CerrarCajon()
+		} else {
+			p.armazon.AbrirCajon()
+		}
+	}
+	p.armazon.BarraMovil = p.movil
+	p.armazon.AlCajon = func(abierto bool) {
+		p.movil.CajonAbierto = abierto
+		p.movil.Refresh()
+	}
+	p.Canal.Cabecera.Movil = p.movil
 	// La conversación es la pantalla principal: su estado de detalle no debe
 	// desactivar el gesto que abre el carril de canales.
 	p.armazon.MenuEnDetalle = true
@@ -280,10 +299,21 @@ func (c *VistaCanal) ConFranjaLlamada() bool {
 // altoArriba es lo que ocupan la cabecera y, si se ve, la franja de la llamada: donde
 // empieza el historial.
 func (c *VistaCanal) altoArriba() float32 {
-	if c.ConFranjaLlamada() {
-		return AltoCabecera + MedidaFranjaLlamada().Height
+	alto := float32(0)
+	if c.conCabecera() {
+		alto = AltoCabecera
 	}
-	return AltoCabecera
+	if c.ConFranjaLlamada() {
+		alto += MedidaFranjaLlamada().Height
+	}
+	return alto
+}
+
+// conCabecera dice si se pinta la cabecera del canal: no en una ventana estrecha con
+// barra de la app, que ya lleva su nombre y sus acciones, salvo mientras se edita el
+// tema, que se escribe en ella.
+func (c *VistaCanal) conCabecera() bool {
+	return !c.estrecha() || c.Cabecera.Movil == nil || c.Cabecera.EditandoTema
 }
 
 // estrecha es la ventana por debajo de `md` (768).
@@ -369,7 +399,8 @@ func (r *canalRenderer) Layout(t fyne.Size) {
 		}
 	}
 	for _, o := range []fyne.CanvasObject{c.Cabecera, c.Llamada, c.Historial, c.alFinal, c.escribiendo, c.Compositor} {
-		if c.sinCanal || tapado || (o == c.alFinal && !c.ViendoHistorial) || (o == c.Llamada && !c.ConFranjaLlamada()) {
+		if c.sinCanal || tapado || (o == c.alFinal && !c.ViendoHistorial) || (o == c.Llamada && !c.ConFranjaLlamada()) ||
+			(o == c.Cabecera && !c.conCabecera()) {
 			o.Hide()
 			continue
 		}
@@ -407,12 +438,16 @@ func (r *canalRenderer) Layout(t fyne.Size) {
 
 func (r *canalRenderer) colocarContenido(t fyne.Size) {
 	c := r.c
-	c.Cabecera.Move(fyne.NewPos(0, 0))
-	c.Cabecera.Resize(fyne.NewSize(t.Width, AltoCabecera))
+	cabecera := float32(0)
+	if c.conCabecera() {
+		cabecera = AltoCabecera
+		c.Cabecera.Move(fyne.NewPos(0, 0))
+		c.Cabecera.Resize(fyne.NewSize(t.Width, AltoCabecera))
+	}
 	arriba := c.altoArriba()
 	if c.ConFranjaLlamada() {
-		c.Llamada.Move(fyne.NewPos(0, AltoCabecera))
-		c.Llamada.Resize(fyne.NewSize(t.Width, arriba-AltoCabecera))
+		c.Llamada.Move(fyne.NewPos(0, cabecera))
+		c.Llamada.Resize(fyne.NewSize(t.Width, arriba-cabecera))
 	}
 	alto := c.Compositor.medidaPara(t.Width).Height
 	yCaja := max(t.Height-alto, arriba+AltoEscribiendo)
@@ -450,7 +485,12 @@ func (r *canalRenderer) Refresh() {
 	r.c.escribiendo.Color = tema.Color("text-subtle", v)
 	r.c.escribiendo.Refresh()
 	// La cabecera y la caja de escribir llevan el nombre del canal: cambiar de canal
-	// no cambia su tamaño, y sin esto seguirían diciendo el del anterior.
+	// no cambia su tamaño, y sin esto seguirían diciendo el del anterior. Sin canal, la
+	// barra de la app se queda sin nombre ni acciones.
+	if r.c.sinCanal && r.c.Cabecera.Movil != nil && r.c.Cabecera.Movil.Titulo != "" {
+		r.c.Cabecera.Movil.Titulo, r.c.Cabecera.Movil.Acciones = "", nil
+		r.c.Cabecera.Movil.Refresh()
+	}
 	if !r.c.sinCanal {
 		r.c.Cabecera.Refresh()
 		r.c.Compositor.Refresh()

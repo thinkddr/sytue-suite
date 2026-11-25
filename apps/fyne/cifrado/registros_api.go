@@ -335,6 +335,7 @@ func (h *registros) fallar() {
 	h.destino = destinoFallo
 	h.mu.Unlock()
 	vacio := ui.NuevoVacio(h.translate("error.connection"), "")
+	vacio.Tono = ui.VacioError // DS-06: es un fallo, no una lista vacía
 	vacio.Accion = ui.NuevoBoton(h.translate("action.retry"), h.decidir)
 	h.enseñar(vacio)
 }

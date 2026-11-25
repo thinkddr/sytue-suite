@@ -17,6 +17,8 @@ import { act } from 'preact/test-utils';
 setupJsdom();
 
 const { RichTextEditor } = await import('./RichTextEditor.js');
+// parse5 baja con el redactor (`ComposeModal` lo espera antes de montarlo).
+await (await import('../client/richtext.js')).cargarRichText();
 
 let pedidos: [string, string | undefined][] = [];
 // Como el navegador: `insertHTML` escribe donde está la selección y deja el cursor detrás,

@@ -115,6 +115,7 @@
   "compose.noAttachmentSend": "Trimite oricum",
   "compose.noAttachmentTitle": "Trimiteți fără atașamente",
   "compose.noDraftsFolder": "Dosarul Ciorne nu a fost găsit",
+  "compose.openFailed": "Editorul mesajului nu a putut fi deschis. Încercați din nou.",
   "compose.pastedImageDropped": "Imaginea lipită nu a fost inclusă",
   "compose.pastedImagesDropped": "Imaginile lipite nu au fost incluse",
   "compose.pastedImagesDroppedDescription": "Pentru a trimite imagini, atașați-le ca fișiere.",

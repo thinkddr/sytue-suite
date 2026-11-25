@@ -22,8 +22,8 @@ import { executeEditingCommand } from '@sytue/ui/browser/editing';
 import type { DocKind } from '@sytue/api-clients';
 import { getEditorRoot } from '../canvas/exec';
 import { useT } from '../context';
-import { dispatchSheetCommand } from '../sheets/SheetCanvas';
-import { dispatchSlidesCommand } from '../slides/SlidesCanvas';
+import { dispatchSheetCommand } from '../sheets/mando';
+import { dispatchSlidesCommand } from '../slides/mando';
 import { RibbonGroup, RibbonSelect } from './primitives';
 
 interface Bloque {

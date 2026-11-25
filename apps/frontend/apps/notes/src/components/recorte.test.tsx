@@ -12,6 +12,7 @@
  * layout: `getBoundingClientRect` devuelve ceros y un test de píxeles pasaría
  * siempre. El alto se midió con un navegador de verdad.
  */
+import '../client/html-estatico.js';
 import { GlobalRegistrator } from '@happy-dom/global-registrator';
 import { afterEach, expect, test } from 'bun:test';
 import { render } from 'preact';

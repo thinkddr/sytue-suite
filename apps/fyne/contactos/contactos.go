@@ -203,12 +203,97 @@ type Pantalla struct {
 	callando bool // el buscador se está poniendo al día desde fuera
 	virtual  *widget.List
 	cuerpo   fyne.CanvasObject
+	// reservaLista es la fila vacía del final de `virtual` para el botón flotante.
+	reservaLista *ui.ReservaEnLista
 	// filas es qué índice enseña cada fila que la lista ha rellenado (ver tecladoDeFila).
 	filas map[*FilaContacto]int
 	// filasLista son las filas de la lista virtual, cabeceras A–Z incluidas, y filaDe
 	// la fila de cada contacto (ver montarFilas).
 	filasLista []filaLista
 	filaDe     []int
+
+	// armazon y montada son el armazón del último Construir y lo que se colgó en la
+	// ventana (él, o él con la capa del botón flotante): `Actualizar` cambia sus columnas
+	// en su sitio en vez de rehacer el árbol entero (ver Actualizar).
+	armazon *ui.Armazon
+	montada fyne.CanvasObject
+	// conCapa es si el último Construir llevaba la capa del botón flotante.
+	conCapa bool
+	// alAnchoFicha son las piezas de la ficha montada que toman el ancho de su tarjeta
+	// al armarse (ver ajustarAnchoFicha).
+	alAnchoFicha []func(ancho float32)
+	// listaPendiente es la lista que la ventana cambió de ancho mientras no se veía: se
+	// rehace al volver a verse (medidorVentana).
+	listaPendiente bool
+}
+
+// Partes son las columnas de la pantalla que un cambio obliga a rehacer.
+type Partes uint8
+
+const (
+	// ParteMenu es el carril de la izquierda; ParteLista, la lista con su cabecera y
+	// su buscador; ParteFicha, la ficha y la barra móvil, que dice si se ve.
+	ParteMenu Partes = 1 << iota
+	ParteLista
+	ParteFicha
+	// Todo es todo lo de arriba y el botón flotante.
+	Todo = ParteMenu | ParteLista | ParteFicha
+)
+
+// Actualizar rehace solo esas columnas y las cuelga en el armazón que YA está en la
+// ventana. Rehacer la pantalla entera con cada tecla del buscador o cada píxel de ancho
+// dejaba un árbol nuevo por pulsación, que Fyne retiene un minuto. Devuelve false si
+// no hay armazón montado o la forma de la pantalla cambia (con o sin botón flotante):
+// entonces toca `Construir`.
+func (p *Pantalla) Actualizar(partes Partes) bool {
+	a := p.armazon
+	if a == nil || p.conCapa == p.SinConexion {
+		return false
+	}
+	// Lo que se descuelga se suelta en cuanto lo nuevo está colocado (ui.SoltarArboles).
+	var viejos []fyne.CanvasObject
+	if partes&Todo == Todo {
+		// Lo mismo que Construir, con las piezas nuevas en el armazón de siempre.
+		viejos = append(viejos, a.Menu, a.Panel, a.Contenido, a.BarraMovil)
+		a.Menu, a.Panel, a.Contenido = p.menu(), p.lista(), p.ficha()
+		p.listaPendiente = false
+		p.configurarArmazon(a)
+		if c, ok := p.montada.(*fyne.Container); ok && len(c.Objects) == 2 {
+			viejos = append(viejos, c.Objects[1])
+			c.Objects[1] = p.capaFlotante()
+			c.Refresh()
+		}
+		a.Refresh()
+		p.soltar(viejos)
+		return true
+	}
+	if partes&ParteMenu != 0 {
+		viejos = append(viejos, a.Menu)
+		a.Menu = p.menu()
+	}
+	if partes&ParteLista != 0 {
+		viejos = append(viejos, a.Panel)
+		a.Panel, p.listaPendiente = p.lista(), false
+	}
+	if partes&ParteFicha != 0 {
+		viejos = append(viejos, a.Contenido, a.BarraMovil)
+		a.Contenido = p.ficha()
+		a.DetalleAbierto = p.DetalleAbierto
+		a.BarraMovil = p.barraMovil(a)
+	}
+	a.Refresh()
+	p.soltar(viejos)
+	return true
+}
+
+// soltarArboles es `ui.SoltarArboles`; el guardián de la memoria retenida lo cambia para
+// medir sin él.
+var soltarArboles = ui.SoltarArboles
+
+// soltar suelta lo que la pantalla acaba de descolgar, salvo lo que sigue montado y lo
+// que la lista reutiliza de un repintado a otro (el buscador y la lista virtual).
+func (p *Pantalla) soltar(viejos []fyne.CanvasObject) {
+	soltarArboles(viejos, p.montada, p.buscador, p.virtual, p.cuerpo)
 }
 
 func (p *Pantalla) t(clave string, vars i18n.Vars) string {
@@ -230,16 +315,29 @@ func (p *Pantalla) locale() i18n.Locale {
 func (p *Pantalla) Construir() fyne.CanvasObject {
 	a := ui.NuevoArmazon(p.ficha())
 	a.Menu = p.menu()
-	a.Panel = p.lista()
+	a.Panel, p.listaPendiente = p.lista(), false
 	a.ClavePreferenciaPanel = "sytue.contacts.panel-width"
+	p.configurarArmazon(a)
+	p.armazon, p.montada, p.conCapa = a, a, !p.SinConexion
+	if p.SinConexion {
+		return a
+	}
+	p.montada = container.NewStack(a, p.capaFlotante())
+	return p.montada
+}
+
+// configurarArmazon pone en el armazón lo que no son columnas: si se ve la ficha, el
+// cajón y la barra móvil.
+func (p *Pantalla) configurarArmazon(a *ui.Armazon) {
 	a.DetalleAbierto = p.DetalleAbierto
 	// El velo del armazón cierra el cajón por su cuenta: se entera por AlCajon.
 	a.CajonAbierto = p.CajonAbierto
 	a.AlCajon = func(abierto bool) { p.CajonAbierto = abierto }
 	a.BarraMovil = p.barraMovil(a)
-	if p.SinConexion {
-		return a
-	}
+}
+
+// capaFlotante es la capa del botón flotante de «Nuevo contacto».
+func (p *Pantalla) capaFlotante() fyne.CanvasObject {
 	// «Nuevo contacto al alcance del pulgar: en móvil el menú lateral es un cajón
 	// cerrado» (MobileFab en ContactsApp.tsx).
 	fab := ui.NuevoBotonFlotante(p.t("nav.newContact", nil), iconos.Mas, p.AlCrearContacto)
@@ -255,7 +353,7 @@ func (p *Pantalla) Construir() fyne.CanvasObject {
 		velo.SetMinSize(fab.MinSize())
 		capa = append(capa, velo)
 	}
-	return container.NewStack(a, container.New(ui.CapaFlotante{}, capa...))
+	return container.New(ui.CapaFlotante{}, capa...)
 }
 
 // barraMovil es la de AppShell: el menú (o «volver», con la ficha abierta) y, en la
@@ -266,6 +364,10 @@ func (p *Pantalla) barraMovil(a *ui.Armazon) *ui.BarraMovil {
 	if p.Activa != nil {
 		b.Titulo = nombreLibreta(*p.Activa)
 	}
+	// Con la lista a la vista la barra no lleva título y la única ponía la marca,
+	// «Contacts», encima de una lista que se llama «Contactos» (y que no lo escribe:
+	// `RepiteLaBarra`); la ficha decía «Contactos». El mismo nombre traducido en las dos.
+	b.Respaldo = p.t("list.title", nil)
 	b.EnDetalle, b.CajonAbierto = p.DetalleAbierto, p.CajonAbierto
 	b.RotuloAbrir, b.RotuloCerrar, b.RotuloVolver = p.t("ui.openNav", nil), p.t("ui.closeNav", nil), p.t("ui.backToList", nil)
 	b.AlMenu = func() {

@@ -48,6 +48,8 @@ export const hu: AppCatalog<typeof en> = {
   'list.unstar': '{name} eltávolítása a csillagozottak közül',
   'list.starredTitle': 'Csillagozott',
   'list.reviewDuplicates': 'Duplikátumok átnézése ({count})',
+  'list.selectMode': 'Kijelölés',
+  'list.moreActions': 'További műveletek',
   'list.count': { one: '{count} névjegy', other: '{count} névjegy' },
   'list.countFiltered': { one: '{shown}/{count} névjegy', other: '{shown}/{count} névjegy' },
   'list.countWithLabel': '{summary} · {label}',

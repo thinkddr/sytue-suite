@@ -73,6 +73,8 @@ export const lv: Catalog = {
   'vault.emptyUnderstood': 'Saprotu, ka ar zaudēto atslēgu šifrētie dati tiks dzēsti',
   'vault.failed':
     'Šifrētos datus neizdevās atvērt. Mēģiniet vēlreiz vai pierakstieties Sytue ID vēlreiz. Ja atslēga ir zaudēta, varat iztukšot šīs lietotnes šifrētos datus.',
+  'vault.moreInfo': 'Vairāk informācijas',
+  'vault.attention': 'Taviem šifrētajiem datiem nepieciešama uzmanība',
   'matrix.incoming': 'Verificēt šo ierīci',
   'matrix.match': 'Sakrīt',
   'matrix.mismatch': 'Nesakrīt',

@@ -1,0 +1,546 @@
+From b7ee47cc6a71a464b79673331573171917f4cd41 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Tue, 24 Nov 2026 22:37:46 +0000
+Subject: [PATCH] perf(container): keep a ThemeOverride's scope while its theme
+ is the same
+
+Applying an override reset the SVG and text-metric caches of the whole app
+for EACH widget it walked (internal/cache/theme.go), and every
+ThemeOverride.Refresh walked the content again with a new scope, so a new
+cache ID: a themed list paid for both on every refresh, and every row a
+list created under it reset the caches once more.
+
+- cache.NewOverrideScope resets the theme caches once, when a scope is
+  created; OverrideScope.Apply walks a tree without touching them.
+  OverrideTheme keeps its behaviour (a new scope per call).
+- ThemeOverride keeps its scope while Theme is the same value and creates a
+  new one (new cache ID, one reset) when another theme is assigned. Theme
+  values of a type that cannot be compared get a new scope each time, as
+  before. A theme changed in place keeps its scope; assign a new value for
+  its icons to be rendered again.
+- Objects that already belong to the scope are not stored again: re-applying
+  a scope to 800 objects went from 800 allocations to none.
+
+Measured in the Sytue suite with the uncommitted fork in a go.work, a Mail
+inbox Refresh (50 and 2000 threads): -15-21 % wall and -22-25 % CPU per
+refresh, allocations 3950 -> 2412 (-39 %) and bytes -49 %; the calendar
+month and week paint, -10-29 % with 6-19 % fewer allocations. New tests
+show applying a scope keeps the caches and that assigning another theme
+still gives a new scope and renders the icons in its colours.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01K7a9FPvLA4FsHbm41nkUrM
+---
+ container/theme.go              |  40 +++++++++-
+ container/theme_scope_test.go   | 130 ++++++++++++++++++++++++++++++++
+ internal/cache/overrides.go     |  22 +++++-
+ internal/cache/overrides_old.go |  10 ++-
+ internal/cache/theme.go         |  41 +++++++---
+ internal/cache/theme_test.go    | 117 ++++++++++++++++++++++++++++
+ 6 files changed, 342 insertions(+), 18 deletions(-)
+ create mode 100644 container/theme_scope_test.go
+ create mode 100644 internal/cache/theme_test.go
+
+diff --git a/container/theme.go b/container/theme.go
+index 729fc85..bd3bfad 100644
+--- a/container/theme.go
++++ b/container/theme.go
+@@ -1,6 +1,8 @@
+ package container
+ 
+ import (
++	"reflect"
++
+ 	"fyne.io/fyne/v2"
+ 	"fyne.io/fyne/v2/internal/cache"
+ 	intTheme "fyne.io/fyne/v2/internal/theme"
+@@ -21,6 +23,13 @@ type ThemeOverride struct {
+ 	holder *fyne.Container
+ 
+ 	features *themeFeatures
++
++	// scope is what this container applies to its content, created for scopeTheme.
++	// It is kept while Theme does not change, so a Refresh walks the content again
++	// for new objects without giving them a new cache ID: a new one would mean
++	// rendering every themed icon again and resetting the theme caches of the app.
++	scope      *cache.OverrideScope
++	scopeTheme fyne.Theme
+ }
+ 
+ // NewThemeOverride provides a container where the child widgets are themed by the specified theme.
+@@ -35,13 +44,13 @@ func NewThemeOverride(obj fyne.CanvasObject, th fyne.Theme) *ThemeOverride {
+ 	t := &ThemeOverride{Content: obj, Theme: th, holder: NewStack(obj), features: &themeFeatures{}}
+ 	t.ExtendBaseWidget(t)
+ 
+-	cache.OverrideTheme(obj, addFeatures(th, t))
++	t.themeScope().Apply(obj)
+ 	obj.Refresh() // required as the widgets passed in could have been initially rendered with default theme
+ 	return t
+ }
+ 
+ func (t *ThemeOverride) CreateRenderer() fyne.WidgetRenderer {
+-	cache.OverrideTheme(t.Content, addFeatures(t.Theme, t))
++	t.themeScope().Apply(t.Content)
+ 
+ 	return &overrideRenderer{parent: t, objs: []fyne.CanvasObject{t.holder}}
+ }
+@@ -52,7 +61,7 @@ func (t *ThemeOverride) Refresh() {
+ 		t.holder.Refresh()
+ 	}
+ 
+-	cache.OverrideTheme(t.Content, addFeatures(t.Theme, t))
++	t.themeScope().Apply(t.Content)
+ 	t.Content.Refresh()
+ 	t.BaseWidget.Refresh()
+ }
+@@ -67,6 +76,31 @@ func (t *ThemeOverride) SetDeviceIsMobile(on bool) {
+ 	t.Refresh()
+ }
+ 
++// themeScope returns the scope for the current Theme, creating a new one (and so a new
++// cache ID) only when Theme is not the value the current scope was created for.
++// A theme that is changed in place keeps its scope: assign a new value to Theme
++// for its icons to be rendered again.
++func (t *ThemeOverride) themeScope() *cache.OverrideScope {
++	if t.scope == nil || !sameTheme(t.scopeTheme, t.Theme) {
++		t.scope = cache.NewOverrideScope(addFeatures(t.Theme, t))
++		t.scopeTheme = t.Theme
++	}
++	return t.scope
++}
++
++// sameTheme reports whether a and b are the same theme value. Values of a type that
++// cannot be compared (a struct holding a map, say) never are, rather than panicking.
++func sameTheme(a, b fyne.Theme) bool {
++	ta := reflect.TypeOf(a)
++	if ta != reflect.TypeOf(b) {
++		return false
++	}
++	if ta != nil && !ta.Comparable() {
++		return false
++	}
++	return a == b
++}
++
+ // themeFeatures is what a ThemeOverride tells the themed objects about itself. The
+ // theme holds this and not the container: the theme is kept against every object it
+ // covers, and a pointer back to the container (and so to those same objects) kept them
+diff --git a/container/theme_scope_test.go b/container/theme_scope_test.go
+new file mode 100644
+index 0000000..17805a5
+--- /dev/null
++++ b/container/theme_scope_test.go
+@@ -0,0 +1,130 @@
++package container
++
++import (
++	"image"
++	"image/color"
++	"strconv"
++	"testing"
++
++	"github.com/stretchr/testify/assert"
++	"github.com/stretchr/testify/require"
++
++	"fyne.io/fyne/v2"
++	"fyne.io/fyne/v2/internal/cache"
++	"fyne.io/fyne/v2/test"
++	"fyne.io/fyne/v2/theme"
++	"fyne.io/fyne/v2/widget"
++)
++
++// A ThemeOverride walks its content again on every Refresh, and a list under one
++// themes each row it creates. While the theme is the same, neither may give the
++// content a new cache ID nor reset the theme caches of the whole app: both made every
++// themed icon and text measure again, on every refresh of a themed list.
++func TestThemeOverride_RefreshKeepsScopeAndThemeCaches(t *testing.T) {
++	test.NewTempApp(t)
++	rows := 3
++	var icons []*widget.Icon
++	list := widget.NewList(
++		func() int { return rows },
++		func() fyne.CanvasObject {
++			icon := widget.NewIcon(theme.MailComposeIcon())
++			icons = append(icons, icon)
++			return NewHBox(icon, widget.NewLabel(""))
++		},
++		func(id widget.ListItemID, o fyne.CanvasObject) {
++			o.(*fyne.Container).Objects[1].(*widget.Label).SetText(strconv.Itoa(id))
++		})
++	o := NewThemeOverride(list, test.Theme())
++	w := test.NewTempWindow(t, o)
++	w.Resize(fyne.NewSize(200, 300))
++	w.Canvas().Capture()
++
++	scope := cache.WidgetScopeID(list)
++	require.NotEmpty(t, scope)
++	created := len(icons)
++	cache.SetSvg("probe.svg", nil, image.NewNRGBA(image.Rect(0, 0, 1, 1)), 1, 1)
++	cache.SetFontMetrics("probe", 12, fyne.TextStyle{}, nil, fyne.NewSize(10, 12), 9)
++
++	rows = 60
++	o.Refresh()
++	list.Refresh()
++	list.ScrollToBottom()
++	w.Canvas().Capture()
++	o.Refresh()
++	w.Canvas().Capture()
++
++	assert.Equal(t, scope, cache.WidgetScopeID(list), "same theme, same scope")
++	require.Greater(t, len(icons), created, "the list should create rows")
++	for _, icon := range icons {
++		assert.Equal(t, scope, cache.WidgetScopeID(icon))
++	}
++	assert.NotNil(t, cache.GetSvg("probe.svg", nil, 1, 1), "the SVG cache was reset")
++	size, _ := cache.GetFontMetrics("probe", 12, fyne.TextStyle{}, nil)
++	assert.Equal(t, fyne.NewSize(10, 12), size, "the text metrics cache was reset")
++}
++
++// Assigning another theme still gives the content a new scope, and its icons are
++// rendered again in the new colours.
++func TestThemeOverride_ThemeChangeRendersIconsAgain(t *testing.T) {
++	test.NewTempApp(t)
++	red := color.NRGBA{R: 0xff, A: 0xff}
++	blue := color.NRGBA{B: 0xff, A: 0xff}
++	button := widget.NewButtonWithIcon("", theme.HomeIcon(), nil)
++	o := NewThemeOverride(button, tintTheme{test.Theme(), red})
++	w := test.NewTempWindow(t, o)
++	w.SetPadded(false)
++	w.Resize(fyne.NewSize(40, 40))
++	img := w.Canvas().Capture()
++	assert.Positive(t, countPixels(img, red))
++	assert.Zero(t, countPixels(img, blue))
++	first := cache.WidgetScopeID(button)
++
++	o.Theme = tintTheme{test.Theme(), red} // an equal value is the same theme
++	o.Refresh()
++	assert.Equal(t, first, cache.WidgetScopeID(button))
++
++	cache.SetSvg("probe.svg", nil, image.NewNRGBA(image.Rect(0, 0, 1, 1)), 1, 1)
++	o.Theme = tintTheme{test.Theme(), blue}
++	o.Refresh()
++	assert.NotEqual(t, first, cache.WidgetScopeID(button), "another theme, another scope")
++	assert.Nil(t, cache.GetSvg("probe.svg", nil, 1, 1), "a new scope resets the caches")
++	img = w.Canvas().Capture()
++	assert.Zero(t, countPixels(img, red))
++	assert.Positive(t, countPixels(img, blue))
++
++	// A theme value that cannot be compared gets a new scope each time, as before.
++	o.Theme = mapTheme{Theme: test.Theme(), m: map[string]int{}}
++	o.Refresh()
++	second := cache.WidgetScopeID(button)
++	o.Refresh()
++	assert.NotEqual(t, second, cache.WidgetScopeID(button))
++}
++
++type tintTheme struct {
++	fyne.Theme
++	fg color.Color
++}
++
++func (t tintTheme) Color(n fyne.ThemeColorName, v fyne.ThemeVariant) color.Color {
++	if n == theme.ColorNameForeground {
++		return t.fg
++	}
++	return t.Theme.Color(n, v)
++}
++
++type mapTheme struct {
++	fyne.Theme
++	m map[string]int
++}
++
++func countPixels(img image.Image, c color.NRGBA) (n int) {
++	b := img.Bounds()
++	for y := b.Min.Y; y < b.Max.Y; y++ {
++		for x := b.Min.X; x < b.Max.X; x++ {
++			if color.NRGBAModel.Convert(img.At(x, y)) == c {
++				n++
++			}
++		}
++	}
++	return n
++}
+diff --git a/internal/cache/overrides.go b/internal/cache/overrides.go
+index a42ed48..05d86b9 100644
+--- a/internal/cache/overrides.go
++++ b/internal/cache/overrides.go
+@@ -14,7 +14,7 @@ import (
+ // object alive. A plain map kept every object ever placed under a ThemeOverride for good:
+ // canvas primitives are never deleted (only widgets are, when their renderer expires),
+ // and a primitive's closures (a Raster generator, say) held the whole screen that built it.
+-type overrideMap struct{ m sync.Map } // weak.Pointer[byte] → *overrideScope
++type overrideMap struct{ m sync.Map } // weak.Pointer[byte] → *OverrideScope
+ 
+ func overrideKey(o fyne.CanvasObject) (weak.Pointer[byte], bool) {
+ 	v := reflect.ValueOf(o)
+@@ -24,7 +24,7 @@ func overrideKey(o fyne.CanvasObject) (weak.Pointer[byte], bool) {
+ 	return weak.Make((*byte)(v.UnsafePointer())), true
+ }
+ 
+-func (m *overrideMap) Load(o fyne.CanvasObject) (*overrideScope, bool) {
++func (m *overrideMap) Load(o fyne.CanvasObject) (*OverrideScope, bool) {
+ 	k, ok := overrideKey(o)
+ 	if !ok {
+ 		return nil, false
+@@ -33,15 +33,29 @@ func (m *overrideMap) Load(o fyne.CanvasObject) (*overrideScope, bool) {
+ 	if !ok {
+ 		return nil, false
+ 	}
+-	return v.(*overrideScope), true
++	return v.(*OverrideScope), true
+ }
+ 
+-func (m *overrideMap) Store(o fyne.CanvasObject, s *overrideScope) {
++func (m *overrideMap) Store(o fyne.CanvasObject, s *OverrideScope) {
+ 	if k, ok := overrideKey(o); ok {
+ 		m.m.Store(k, s)
+ 	}
+ }
+ 
++// StoreIfChanged stores s for o unless o already has it. Applying a scope again walks
++// the whole tree, and most of it already belongs to the scope: storing it anyway costs
++// an allocation per object for nothing.
++func (m *overrideMap) StoreIfChanged(o fyne.CanvasObject, s *OverrideScope) {
++	k, ok := overrideKey(o)
++	if !ok {
++		return
++	}
++	if v, ok := m.m.Load(k); ok && v.(*OverrideScope) == s {
++		return
++	}
++	m.m.Store(k, s)
++}
++
+ func (m *overrideMap) Delete(o fyne.CanvasObject) {
+ 	if k, ok := overrideKey(o); ok {
+ 		m.m.Delete(k)
+diff --git a/internal/cache/overrides_old.go b/internal/cache/overrides_old.go
+index 8ff7406..8d8da35 100644
+--- a/internal/cache/overrides_old.go
++++ b/internal/cache/overrides_old.go
+@@ -9,5 +9,13 @@ import (
+ 
+ // overrideMap without weak pointers (before Go 1.24) keeps its objects alive.
+ type overrideMap struct {
+-	async.Map[fyne.CanvasObject, *overrideScope]
++	async.Map[fyne.CanvasObject, *OverrideScope]
++}
++
++// StoreIfChanged stores s for o unless o already has it.
++func (m *overrideMap) StoreIfChanged(o fyne.CanvasObject, s *OverrideScope) {
++	if old, ok := m.Load(o); ok && old == s {
++		return
++	}
++	m.Store(o, s)
+ }
+diff --git a/internal/cache/theme.go b/internal/cache/theme.go
+index 200beec..6a48837 100644
+--- a/internal/cache/theme.go
++++ b/internal/cache/theme.go
+@@ -12,20 +12,42 @@ var (
+ 	overrideCount atomic.Uint32
+ )
+ 
+-type overrideScope struct {
++// OverrideScope is a theme applied to a tree of objects. Its cache ID keys the theme
++// caches of the objects it covers, so a scope can be applied again (to new or refreshed
++// content) without invalidating anything rendered under it before.
++type OverrideScope struct {
+ 	th      fyne.Theme
+ 	cacheID string
+ }
+ 
++// NewOverrideScope creates a scope for th with a cache ID of its own.
++//
++// The theme caches are reset here, once per new scope, and not for each object it
++// covers: applying a scope does not touch the caches, so walking a tree with many
++// widgets, or walking it again on every refresh, keeps what the app has already
++// rendered.
++func NewOverrideScope(th fyne.Theme) *OverrideScope {
++	id := overrideCount.Add(1)
++	ResetThemeCaches()
++	return &OverrideScope{th: th, cacheID: strconv.Itoa(int(id))}
++}
++
++// Apply makes o, and anything it contains, use the theme of this scope.
++// Objects that already belong to this scope are left as they are.
++func (s *OverrideScope) Apply(o fyne.CanvasObject) {
++	overrideTheme(o, s)
++}
++
+ // OverrideTheme allows an app to specify that a single object should use a different theme to the app.
+ // This should be used sparingly to avoid a jarring user experience.
+ // If the object is a container it will theme the children, if it is a canvas primitive it will do nothing.
+ //
++// Each call creates a new scope; to theme the same tree again with the same theme,
++// keep the scope from NewOverrideScope and Apply it instead.
++//
+ // Since: 2.5
+ func OverrideTheme(o fyne.CanvasObject, th fyne.Theme) {
+-	id := overrideCount.Add(1)
+-	s := &overrideScope{th: th, cacheID: strconv.Itoa(int(id))}
+-	overrideTheme(o, s)
++	NewOverrideScope(th).Apply(o)
+ }
+ 
+ func OverrideThemeMatchingScope(o, parent fyne.CanvasObject) bool {
+@@ -56,13 +78,13 @@ func WidgetTheme(o fyne.CanvasObject) fyne.Theme {
+ 	return scope.th
+ }
+ 
+-func overrideContainer(c *fyne.Container, s *overrideScope) {
++func overrideContainer(c *fyne.Container, s *OverrideScope) {
+ 	for _, o := range c.Objects {
+ 		overrideTheme(o, s)
+ 	}
+ }
+ 
+-func overrideTheme(o fyne.CanvasObject, s *overrideScope) {
++func overrideTheme(o fyne.CanvasObject, s *OverrideScope) {
+ 	if _, ok := o.(interface{ SetDeviceIsMobile(bool) }); ok { // ThemeOverride without the import loop
+ 		return // do not apply this theme over a new scope
+ 	}
+@@ -73,13 +95,12 @@ func overrideTheme(o fyne.CanvasObject, s *overrideScope) {
+ 	case *fyne.Container:
+ 		overrideContainer(c, s)
+ 	default:
+-		overrides.Store(c, s)
++		overrides.StoreIfChanged(c, s)
+ 	}
+ }
+ 
+-func overrideWidget(w fyne.Widget, s *overrideScope) {
+-	ResetThemeCaches()
+-	overrides.Store(w, s)
++func overrideWidget(w fyne.Widget, s *OverrideScope) {
++	overrides.StoreIfChanged(w, s)
+ 
+ 	r := Renderer(w)
+ 	if r == nil {
+diff --git a/internal/cache/theme_test.go b/internal/cache/theme_test.go
+new file mode 100644
+index 0000000..429c556
+--- /dev/null
++++ b/internal/cache/theme_test.go
+@@ -0,0 +1,117 @@
++package cache
++
++import (
++	"image"
++	"testing"
++
++	"github.com/stretchr/testify/assert"
++
++	"fyne.io/fyne/v2"
++)
++
++// The theme caches belong to the whole app. A scope is applied to every object it
++// covers, again on each refresh of a ThemeOverride and to each new row of a list
++// under one, so applying it must not reset them: only creating a scope does, once.
++func TestOverrideScope_ApplyKeepsThemeCaches(t *testing.T) {
++	defer func() { testClearAll(); ResetThemeCaches() }()
++	scope := NewOverrideScope(nil)
++	tree, widgets := themedTree(50)
++	seedThemeCaches()
++
++	scope.Apply(tree)
++	for _, w := range widgets {
++		assert.Equal(t, scope.cacheID, WidgetScopeID(w))
++	}
++	assertThemeCachesSeeded(t, "applying a scope to 50 widgets")
++
++	scope.Apply(tree)
++	assertThemeCachesSeeded(t, "applying the scope again")
++
++	row, _ := themedTree(1)
++	assert.True(t, OverrideThemeMatchingScope(row, widgets[0]))
++	assertThemeCachesSeeded(t, "a new row taking the scope of its list")
++
++	other := NewOverrideScope(nil)
++	assert.Nil(t, GetSvg("probe.svg", nil, 1, 1), "a new scope resets the caches")
++	other.Apply(tree)
++	for _, w := range widgets {
++		assert.Equal(t, other.cacheID, WidgetScopeID(w), "a new scope replaces the old one")
++	}
++}
++
++func TestOverrideTheme_NewScopeEachCall(t *testing.T) {
++	defer func() { testClearAll(); ResetThemeCaches() }()
++	tree, widgets := themedTree(2)
++
++	OverrideTheme(tree, nil)
++	first := WidgetScopeID(widgets[0])
++	assert.NotEmpty(t, first)
++	assert.Equal(t, first, WidgetScopeID(widgets[1]))
++
++	seedThemeCaches()
++	OverrideTheme(tree, nil)
++	assert.NotEqual(t, first, WidgetScopeID(widgets[0]))
++	assert.Nil(t, GetSvg("probe.svg", nil, 1, 1), "a new scope resets the caches")
++}
++
++// Applying a scope again stores nothing for the objects that already have it: a
++// store allocates, once per object of the tree, on every refresh.
++func TestOverrideScope_ApplyAgainDoesNotAllocate(t *testing.T) {
++	defer func() { testClearAll(); ResetThemeCaches() }()
++	scope := NewOverrideScope(nil)
++	tree, _ := themedTree(20)
++	scope.Apply(tree)
++
++	assert.Zero(t, testing.AllocsPerRun(5, func() { scope.Apply(tree) }))
++}
++
++func BenchmarkOverrideScope_ApplyAgain(b *testing.B) {
++	defer func() { testClearAll(); ResetThemeCaches() }()
++	scope := NewOverrideScope(nil)
++	tree, _ := themedTree(200)
++	scope.Apply(tree)
++	b.ReportAllocs()
++	b.ResetTimer()
++	for b.Loop() {
++		scope.Apply(tree)
++	}
++}
++
++func seedThemeCaches() {
++	SetSvg("probe.svg", nil, image.NewNRGBA(image.Rect(0, 0, 1, 1)), 1, 1)
++	SetFontMetrics("probe", 12, fyne.TextStyle{}, nil, fyne.NewSize(10, 12), 9)
++}
++
++func assertThemeCachesSeeded(t *testing.T, after string) {
++	t.Helper()
++	assert.NotNil(t, GetSvg("probe.svg", nil, 1, 1), "SVG cache reset by %s", after)
++	size, _ := GetFontMetrics("probe", 12, fyne.TextStyle{}, nil)
++	assert.Equal(t, fyne.NewSize(10, 12), size, "text metrics reset by %s", after)
++}
++
++// themedTree is a container of n widgets, each holding a widget and a primitive.
++func themedTree(n int) (*fyne.Container, []fyne.Widget) {
++	tree := &fyne.Container{}
++	var widgets []fyne.Widget
++	for range n {
++		inner := &parentWidget{children: []fyne.CanvasObject{&primitive{}}}
++		outer := &parentWidget{children: []fyne.CanvasObject{inner, &primitive{}}}
++		tree.Objects = append(tree.Objects, outer)
++		widgets = append(widgets, outer, inner)
++	}
++	return tree, widgets
++}
++
++type parentWidget struct {
++	fyne.Widget
++	children []fyne.CanvasObject
++}
++
++func (w *parentWidget) CreateRenderer() fyne.WidgetRenderer {
++	return &dummyWidgetRenderer{widget: &dummyWidget{}, objects: w.children}
++}
++
++type primitive struct {
++	fyne.CanvasObject
++	_ int // not zero-sized, so that each one has an address of its own
++}
+-- 
+2.43.0
+

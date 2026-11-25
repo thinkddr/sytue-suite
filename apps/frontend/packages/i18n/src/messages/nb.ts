@@ -73,6 +73,8 @@ export const nb: Catalog = {
   'vault.emptyUnderstood': 'Jeg forstår at data kryptert med den tapte nøkkelen blir slettet',
   'vault.failed':
     'De krypterte dataene kunne ikke åpnes. Prøv igjen eller logg på Sytue ID igjen. Hvis nøkkelen er tapt, kan du tømme appens krypterte data.',
+  'vault.moreInfo': 'Mer informasjon',
+  'vault.attention': 'De krypterte dataene dine trenger oppmerksomhet',
   'matrix.incoming': 'Bekreft denne enheten',
   'matrix.match': 'De stemmer overens',
   'matrix.mismatch': 'De stemmer ikke overens',

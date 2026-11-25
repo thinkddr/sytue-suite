@@ -32,7 +32,7 @@
  * no pasan por numfmt) y el ancho real de «_»/«?» (se aproximan a un espacio).
  * Self-test: packages/office/test/sheets-numfmt-mask.test.ts (bun test).
  */
-import { formatNumber } from '@sytue/formula';
+import { formatNumber } from '@sytue/formula/ligero';
 
 /** Resultado de aplicar una máscara: texto + color opcional (de [Color]). */
 export interface MaskResult {

@@ -48,6 +48,8 @@ export const el: AppCatalog<typeof en> = {
   'list.unstar': 'Αφαίρεση της επαφής {name} από τις επαφές με αστέρι',
   'list.starredTitle': 'Με αστέρι',
   'list.reviewDuplicates': 'Έλεγχος διπλότυπων ({count})',
+  'list.selectMode': 'Επιλογή',
+  'list.moreActions': 'Περισσότερες ενέργειες',
   'list.count': { one: '{count} επαφή', other: '{count} επαφές' },
   'list.countFiltered': { one: '{shown} από {count} επαφή', other: '{shown} από {count} επαφές' },
   'list.countWithLabel': '{summary} · {label}',

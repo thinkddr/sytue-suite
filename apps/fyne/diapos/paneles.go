@@ -140,10 +140,9 @@ func (a armazonPanel) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 }
 
 func (e *Editor) armazon(tope float32, titulo, pista string, cuerpo, pie fyne.CanvasObject) fyne.CanvasObject {
-	v := e.variante()
 	objs := []fyne.CanvasObject{
-		canvas.NewRectangle(tema.Color("surface", v)), canvas.NewRectangle(tema.Color("border", v)),
-		nuevaCabeceraPanel(titulo, pista, tema.Espacio(1.5), v), cuerpo,
+		ui.NuevoLiso("surface"), ui.NuevoLiso("border"),
+		nuevaCabeceraPanel(titulo, pista, tema.Espacio(1.5), e.variante()), cuerpo,
 	}
 	if pie != nil {
 		objs = append(objs, pie)
@@ -153,10 +152,9 @@ func (e *Editor) armazon(tope float32, titulo, pista string, cuerpo, pie fyne.Ca
 
 // vacioPanel es `border-t px-3 py-3` con la frase `sytue-meta` de «elige uno».
 func (e *Editor) vacioPanel(frase string) fyne.CanvasObject {
-	v := e.variante()
 	return container.New(&rellenoCaja{arriba: tema.Borde + tema.Espacio(3), abajo: tema.Espacio(3), lados: tema.Espacio(3)},
-		canvas.NewRectangle(tema.Color("surface", v)), canvas.NewRectangle(tema.Color("border", v)),
-		ui.NuevoParrafo(frase, tema.TextoXS, ui.Normal, "text-subtle", v))
+		ui.NuevoLiso("surface"), ui.NuevoLiso("border"),
+		ui.NuevoParrafo(frase, tema.TextoXS, ui.Normal, "text-subtle", e.variante()))
 }
 
 // rellenoCaja pone un contenido con su relleno encima de un fondo y una línea arriba.
@@ -215,13 +213,12 @@ func (f filaPie) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 }
 
 func (e *Editor) pie(botones ...fyne.CanvasObject) fyne.CanvasObject {
-	v := e.variante()
 	objs := make([]fyne.CanvasObject, 0, 2+len(botones))
-	objs = append(objs, canvas.NewRectangle(tema.Color("surface", v)), canvas.NewRectangle(tema.Color("border", v)))
+	objs = append(objs, ui.NuevoLiso("surface"), ui.NuevoLiso("border"))
 	var divisor fyne.CanvasObject
 	for _, b := range botones {
 		if b == nil { // el divisor: `mx-1 h-4 w-px bg-border`
-			divisor = canvas.NewRectangle(tema.Color("border", v))
+			divisor = ui.NuevoLiso("border")
 			b = divisor
 		}
 		objs = append(objs, b)
@@ -551,7 +548,6 @@ func (e *Editor) selectorPanel(rotulo string, ancho float32, ops []editor.Opcion
 // efecto) y la secuencia de la diapositiva, paso a paso, con su efecto, su disparador
 // y los botones de subir, bajar y quitar.
 func (e *Editor) panelAnim() fyne.CanvasObject {
-	v := e.variante()
 	if e.activa < 0 || e.activa >= len(e.m.Diapos) {
 		return nil
 	}
@@ -595,7 +591,7 @@ func (e *Editor) panelAnim() fyne.CanvasObject {
 		}
 		var filas []fyne.CanvasObject
 		for i, pl := range plan {
-			filas = append(filas, e.filaAnim(i, len(plan), pl, cajas[pl.Caja], v))
+			filas = append(filas, e.filaAnim(i, len(plan), pl, cajas[pl.Caja]))
 		}
 		partes = append(partes, container.NewScroll(container.New(&rellenoCuerpo{
 			arriba: tema.Espacio(1), abajo: tema.Espacio(1), lados: tema.Espacio(2),
@@ -659,7 +655,7 @@ func (filaAñadir) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 // filaAnim es un `<li>` de la secuencia: `flex items-center gap-1.5 rounded-sm px-1
 // py-0.5`, con el paso, el nombre (que elige la caja), la categoría, el efecto, el
 // disparador y los tres botones.
-func (e *Editor) filaAnim(i, n int, pl Planeada, c Caja, v tema.Variante) fyne.CanvasObject {
+func (e *Editor) filaAnim(i, n int, pl Planeada, c Caja) fyne.CanvasObject {
 	id, k := pl.Caja, pl.Indice
 	rotulo := e.rotuloCaja(c)
 	if c.ID == "" {
@@ -685,9 +681,9 @@ func (e *Editor) filaAnim(i, n int, pl Planeada, c Caja, v tema.Variante) fyne.C
 	}
 	orden := pl.Anim.Orden
 	objs := []fyne.CanvasObject{
-		nuevoPasoAnim(pl.Paso, tema.Color("primary", v)),
+		nuevoPasoAnim(pl.Paso),
 		nombre,
-		nuevaEtiquetaCategoria(e.t(clavesCategoria[pl.Categoria]), v),
+		nuevaEtiquetaCategoria(e.t(clavesCategoria[pl.Categoria])),
 		e.selectorPanel(e.ctx.Traducir("slides.anim.effectOf", i18n.Vars{"label": rotulo}), anchoSelectEfecto,
 			e.efectosDe(pl.Categoria), pl.Anim.Tipo, false,
 			func(s string) { e.cambiar(func() { e.m.PonerEfecto(e.activa, id, k, s) }, true) }),
@@ -729,20 +725,28 @@ func (filaSecuencia) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 
 // pasoAnim es el círculo del paso: `grid h-5 w-5 rounded-full text-2xs font-semibold
 // text-white` sobre el acento.
-func nuevoPasoAnim(paso int, acento color.NRGBA) fyne.CanvasObject {
+func nuevoPasoAnim(paso int) fyne.CanvasObject {
 	lado := tema.Espacio(5)
-	fondo := canvas.NewCircle(acento)
+	fondo := canvas.NewCircle(color.Transparent)
 	t := ui.Texto(strconv.Itoa(paso), tema.Texto2XS, ui.SemiNegrita, color.NRGBA{R: 255, G: 255, B: 255, A: 255})
-	return container.New(&centrado{lado: lado}, fondo, t)
+	return container.New(&centrado{lado: lado, fondo: fondo}, fondo, t)
 }
 
 // centrado es un cuadrado de `lado` con el primer hijo a todo el tamaño y el texto en
-// el centro.
-type centrado struct{ lado float32 }
+// el centro. El círculo va en `primary`, resuelto en Layout: es lo que Fyne vuelve a
+// llamar en cada contenedor al cambiar de tema, y el panel no se recompone entonces.
+type centrado struct {
+	lado  float32
+	fondo *canvas.Circle
+}
 
 func (c *centrado) MinSize([]fyne.CanvasObject) fyne.Size { return fyne.NewSize(c.lado, c.lado) }
 
 func (c *centrado) Layout(objs []fyne.CanvasObject, t fyne.Size) {
+	if acento := tema.Color("primary", tema.De(fyne.CurrentApp().Settings().ThemeVariant())); c.fondo.FillColor != acento {
+		c.fondo.FillColor = acento
+		c.fondo.Refresh()
+	}
 	objs[0].Resize(t)
 	if tx, ok := objs[1].(*canvas.Text); ok {
 		m := ui.Medir(tx.Text, tema.Texto2XS, ui.SemiNegrita)
@@ -752,19 +756,39 @@ func (c *centrado) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 
 // nuevaEtiquetaCategoria es `border-border text-text-muted text-2xs rounded-sm border
 // px-1 leading-4`.
-func nuevaEtiquetaCategoria(texto string, v tema.Variante) fyne.CanvasObject {
+func nuevaEtiquetaCategoria(texto string) fyne.CanvasObject {
 	e := tema.Escalon{Tam: tema.Texto2XS.Tam, Linea: 14}
 	// El relleno es el del panel: `ui.Caja` pinta el borde como una caja entera debajo,
-	// y un relleno transparente la dejaría ver.
-	caja := ui.NuevaCaja(tema.Color("surface", v), tema.Color("border", v), tema.RadioSM)
-	t := ui.Texto(texto, e, ui.Normal, tema.Color("text-muted", v))
+	// y un relleno transparente la dejaría ver. Los colores, en Layout (ver pintar).
+	caja := ui.NuevaCaja(color.NRGBA{}, color.NRGBA{A: 1}, tema.RadioSM)
+	t := ui.Texto(texto, e, ui.Normal, color.NRGBA{})
 	ancho := ui.Medir(texto, e, ui.Normal).Width + 2*tema.Espacio(1) + 2*tema.Borde
-	return container.New(&etiquetaLayout{ancho: ancho, e: e}, append(caja.Objetos(), t)...)
+	l := &etiquetaLayout{ancho: ancho, e: e, caja: caja, texto: t}
+	l.pintar()
+	return container.New(l, append(caja.Objetos(), t)...)
 }
 
 type etiquetaLayout struct {
 	ancho float32
 	e     tema.Escalon
+	caja  *ui.Caja
+	texto *canvas.Text
+	// v es la variante con que se pintó, y pintada si ya se pintó alguna vez.
+	v       tema.Variante
+	pintada bool
+}
+
+// pintar resuelve el papel, el borde y la tinta con la variante en vigor. Va también en
+// Layout, que es lo que Fyne vuelve a llamar en cada contenedor al cambiar de tema.
+func (l *etiquetaLayout) pintar() {
+	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
+	if l.pintada && v == l.v {
+		return
+	}
+	l.v, l.pintada = v, true
+	l.caja.Pintar(tema.Color("surface", v), tema.Color("border", v))
+	l.texto.Color = tema.Color("text-muted", v)
+	l.texto.Refresh()
 }
 
 func (l *etiquetaLayout) MinSize([]fyne.CanvasObject) fyne.Size {
@@ -772,6 +796,7 @@ func (l *etiquetaLayout) MinSize([]fyne.CanvasObject) fyne.Size {
 }
 
 func (l *etiquetaLayout) Layout(objs []fyne.CanvasObject, t fyne.Size) {
+	l.pintar()
 	n := len(objs) - 1
 	objs[0].Resize(t)
 	if n == 2 {

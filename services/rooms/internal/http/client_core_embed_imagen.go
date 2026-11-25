@@ -20,9 +20,18 @@ import "embed"
 // compilación. Es el mismo FS que el de desarrollo: los patrones se solapan con el
 // directorio y no duplican nada.
 //
+// Las variantes precomprimidas (`.br`, `.gz`) también van por nombre: sin ellas Rooms
+// serviría los wasm sin comprimir y Traefik volvería a comprimirlos en cada descarga.
+//
 //go:embed client_core_assets
 //go:embed client_core_assets/core.wasm client_core_assets/wasm_exec.js
+//go:embed client_core_assets/core.wasm.br client_core_assets/core.wasm.gz client_core_assets/wasm_exec.js.br client_core_assets/wasm_exec.js.gz
+//go:embed client_core_assets/vault/core.wasm client_core_assets/vault/wasm_exec.js
+//go:embed client_core_assets/vault/core.wasm.br client_core_assets/vault/core.wasm.gz client_core_assets/vault/wasm_exec.js.br client_core_assets/vault/wasm_exec.js.gz
 //go:embed client_core_assets/office/core.wasm client_core_assets/office/wasm_exec.js
+//go:embed client_core_assets/office/core.wasm.br client_core_assets/office/core.wasm.gz client_core_assets/office/wasm_exec.js.br client_core_assets/office/wasm_exec.js.gz
 //go:embed client_core_assets/mail/core.wasm client_core_assets/mail/wasm_exec.js
+//go:embed client_core_assets/mail/core.wasm.br client_core_assets/mail/core.wasm.gz client_core_assets/mail/wasm_exec.js.br client_core_assets/mail/wasm_exec.js.gz
 //go:embed client_core_assets/pdf/core.wasm client_core_assets/pdf/wasm_exec.js
+//go:embed client_core_assets/pdf/core.wasm.br client_core_assets/pdf/core.wasm.gz client_core_assets/pdf/wasm_exec.js.br client_core_assets/pdf/wasm_exec.js.gz
 var clientCoreAssets embed.FS

@@ -9,6 +9,7 @@ import {
   assertFixtureTheme, describeWizardState, prepareFixtureTheme,
 } from './lib/wizard-checks.mjs';
 import { es } from '../../apps/frontend/apps/notes/src/i18n/messages/es.ts';
+import { atajoDelSistema } from '../../apps/frontend/packages/ui/src/lib/atajos.ts';
 
 const URL = process.env.NOTEPADS_UX_URL;
 if (!URL) throw new Error('NOTEPADS_UX_URL es obligatorio');
@@ -241,25 +242,62 @@ async function herramientasDelEditor(page, leerNotas) {
       },
       { fragmento, propiedad },
     );
+  // LOS NOMBRES SON LOS QUE OYE UN LECTOR DE PANTALLA, y la barra los escribe así
+  // desde que cabe en una fila (BarraConMas): el selector de estilo lleva el bloque
+  // en curso («Estilo del texto: Párrafo», que contiene el «Párrafo» que se ve), el
+  // botón de enlazar lleva su atajo, y las opciones de un menú, el atajo de la
+  // derecha. El atajo se escribe como en la página: con ⌘ si el navegador es de Mac.
+  const mac = await page.evaluate(() => /Mac|iP(hone|ad|od)/i.test(navigator.platform));
+  const conAtajo = (rotulo, atajo) => `${rotulo} ${atajoDelSistema(atajo, mac)}`;
+  const selectorDeEstilo = (bloque) => `${es['editor.block']}: ${bloque}`;
   try {
     const barra = tarjeta.getByRole('toolbar').first();
+    // LO QUE NO CABE EN LA FILA SE ELIGE EN «MÁS», con el mismo rótulo: en 320 px
+    // el selector de estilo, el color y el enlace solo están ahí. Cada herramienta
+    // se usa por donde la tiene quien está delante de esa pantalla, y las dos vías
+    // tienen que conservar el editor y la selección.
+    const herramienta = async ({ boton, opcion, rol = 'menuitem' }) => {
+      await seleccionar();
+      const enFila = barra.getByRole('button', { name: boton, exact: true });
+      if ((await enFila.count()) > 0) {
+        await enFila.click();
+        return false;
+      }
+      await barra.getByRole('button', { name: es['editor.more'], exact: true }).click();
+      const mas = page.getByRole('menu', { name: es['editor.more'], exact: true });
+      await mas.waitFor();
+      await sigueEditando();
+      await mas.getByRole(rol, { name: opcion, exact: true }).click();
+      await mas.waitFor({ state: 'hidden' });
+      return true;
+    };
+
     contextoActual.fase = 'editor-bloque';
-    await seleccionar();
-    await barra.getByRole('button', { name: es['editor.block'], exact: true }).click();
-    const bloques = page.getByRole('menu', { name: es['editor.block'], exact: true });
-    await bloques.waitFor();
-    await sigueEditando();
-    await bloques.getByRole('menuitem', { name: es['editor.h2'], exact: true }).click();
+    const titulo2 = conAtajo(es['editor.h2'], 'Ctrl+Alt+2');
+    const desdeMas = await herramienta({
+      boton: selectorDeEstilo(es['editor.paragraph']),
+      opcion: titulo2,
+      rol: 'menuitemcheckbox',
+    });
+    if (!desdeMas) {
+      const bloques = page.getByRole('menu', { name: es['editor.block'], exact: true });
+      await bloques.waitFor();
+      await sigueEditando();
+      await bloques.getByRole('menuitemradio', { name: titulo2, exact: true }).click();
+      // El selector de estilo puede permanecer abierto; Escape cierra esa capa,
+      // mientras que el Escape del editor, comprobado abajo, sí termina la edición.
+      if (await bloques.isVisible()) {
+        await bloques.getByRole('menuitemradio').first().focus();
+        await page.keyboard.press('Escape');
+      }
+      await bloques.waitFor({ state: 'hidden' });
+      // El nombre del selector sigue al bloque: quien no ve el rótulo lo oye.
+      await barra
+        .getByRole('button', { name: selectorDeEstilo(es['editor.h2']), exact: true })
+        .waitFor();
+    }
     await sigueEditando();
     assert.equal(await editor.locator('h2').textContent(), 'Texto seleccionado y resto intacto.');
-    // El selector de estilo puede permanecer abierto; Escape cierra esa capa,
-    // mientras que el Escape del editor, comprobado abajo, sí termina la edición.
-    if (await bloques.isVisible()) {
-      await bloques.getByRole('menuitem').first().focus();
-      await page.keyboard.press('Escape');
-    }
-    await bloques.waitFor({ state: 'hidden' });
-    await sigueEditando();
 
     contextoActual.fase = 'editor-teclado';
     await seleccionar();
@@ -269,8 +307,8 @@ async function herramientasDelEditor(page, leerNotas) {
     assert.notEqual(await estilo('Texto ', 'fontStyle'), 'italic');
 
     contextoActual.fase = 'editor-color';
-    await seleccionar();
-    await barra.getByRole('button', { name: es['editor.textColor'], exact: true }).click();
+    // Sin sitio en la fila, el panel de colores cuelga de «Más»: el mismo diálogo.
+    await herramienta({ boton: es['editor.textColor'], opcion: es['editor.textColor'] });
     const colores = page.getByRole('dialog', { name: es['editor.textColor'], exact: true });
     await colores.waitFor();
     await sigueEditando();
@@ -281,8 +319,12 @@ async function herramientasDelEditor(page, leerNotas) {
     assert.notEqual(await estilo('Texto ', 'color'), 'rgb(185, 28, 28)');
 
     contextoActual.fase = 'editor-enlace';
-    await seleccionar();
-    await barra.getByRole('button', { name: es['editor.linkTool'], exact: true }).click();
+    await herramienta({
+      boton: es['editor.shortcut']
+        .replace('{label}', es['editor.linkTool'])
+        .replace('{keys}', atajoDelSistema('Ctrl+K', mac)),
+      opcion: conAtajo(es['editor.linkTool'], 'Ctrl+K'),
+    });
     const enlace = page.getByRole('dialog', { name: es['editor.linkTool'], exact: true });
     const url = 'https://sytue.example/editor';
     await enlace.getByRole('textbox', { name: es['editor.linkTool'], exact: true }).fill(url);

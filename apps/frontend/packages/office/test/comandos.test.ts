@@ -88,7 +88,7 @@ describe('atajos', () => {
     // rejilla de la hoja con `dispatchSheetCommand`: un atajo de documento sobre un
     // comando que `exec` no conoce sería una tecla que no hace nada.
     const deTexto = new Set(union('types.ts', 'EditorCommand'));
-    const deHoja = new Set(union('sheets/SheetCanvas.tsx', 'SheetCommand'));
+    const deHoja = new Set(union('sheets/mando.ts', 'SheetCommand'));
     expect(deTexto.size).toBeGreaterThan(30);
     expect(deHoja.size).toBeGreaterThan(50);
     for (const id of IDS) {

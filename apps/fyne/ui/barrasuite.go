@@ -783,8 +783,17 @@ func barraDeCarril(ancho float32) bool {
 	return ancho > 0 && (ancho < CorteEsquinaMarca || tema.EsMarco())
 }
 
+// anchoEsquinaPintada es lo que PINTA la esquina de marca: el ancho del menú con menú
+// lateral debajo y, sin él, la marca ceñida. Con el cromo «papel» y sin menú lateral, nada:
+// ahí la esquina es el fondo de la página (`sidebar-bg` es `bg`) junto a una barra de
+// `topbar-bg`, y quedaba un bloque pálido suelto a la izquierda de una barra blanca
+// (Hub, Docus, Calcus, Diapos y CertiPDF; auditoría del 2026-11-24). Sin esquina la barra
+// es continua y la marca va sobre ella con la misma tinta (`sidebar-fg` es `text`).
 func (b *BarraSuite) anchoEsquinaPintada(ancho, marca float32) float32 {
 	if !b.conMenuLateral() {
+		if tema.EsPapel() {
+			return 0
+		}
 		return esquinaCenida(marca)
 	}
 	return AnchoEsquinaMarca(ancho, marca)
@@ -1040,6 +1049,9 @@ func (r *barraSuiteRenderer) layoutAncho(t fyne.Size, lado, y, desplaza, canalon
 	}
 	pintada := r.b.anchoEsquinaPintada(t.Width, m.Width)
 	r.esquina.Resize(fyne.NewSize(pintada, AltoBarraSuite()))
+	if pintada <= 0 {
+		r.esquina.Hide()
+	}
 
 	// El buscador, centrado en lo que queda entre las dos, hasta su ancho canónico.
 	desde, hasta := reserva+HuecoBarra, x-HuecoBarra

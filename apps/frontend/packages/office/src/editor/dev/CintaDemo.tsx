@@ -21,6 +21,7 @@ import type { EditorContext } from '../types';
 import { EditorCtx, EditorI18nCtx } from '../context';
 import { EditorLayout } from '../layout/EditorLayout';
 import { Ribbon } from '../ribbon/Ribbon';
+import { EDITORES } from '../tipos/todos';
 
 const nada = (): void => undefined;
 const nadaAsync = (): Promise<void> => Promise.resolve();
@@ -88,7 +89,7 @@ export function CintaDemo(props: {
           <div class="h-dvh">
             <EditorLayout
               header={<div class="h-10 border-b" />}
-              ribbon={<Ribbon ctx={ctx} />}
+              ribbon={<Ribbon ctx={ctx} cuerpos={EDITORES[props.kind].cuerpos} />}
               rail={null}
               settings={null}
               status={<div class="h-6 border-t" />}

@@ -1,9 +1,5 @@
 /* SPDX-License-Identifier: Apache-2.0 */
-import {
-  Attachment as MatrixAttachment,
-  EncryptedAttachment,
-  initAsync,
-} from '@matrix-org/matrix-sdk-crypto-wasm';
+import { matrixAttachments } from './attachment-wasm.js';
 import {
   isStorageProduct,
   MatrixSecurityError,
@@ -288,7 +284,7 @@ export async function prepareStorageBlock(
   ) {
     throw new StorageRecordError();
   }
-  await initAsync();
+  const { Attachment: MatrixAttachment } = await matrixAttachments();
   const plainCopy = new Uint8Array(plaintext.byteLength);
   plainCopy.set(plaintext);
   const plainSha256 = await sha256Hex(plainCopy);
@@ -450,7 +446,12 @@ export async function downloadStorageBlock(
     ciphertext.fill(0);
     throw new MatrixSecurityError('identity');
   }
-  await initAsync();
+  const { Attachment: MatrixAttachment, EncryptedAttachment } = await matrixAttachments().catch(
+    (error: unknown) => {
+      ciphertext.fill(0);
+      throw error;
+    },
+  );
   const attachment = new EncryptedAttachment(ciphertext, JSON.stringify(block.matrix_file));
   try {
     const decrypted = MatrixAttachment.decrypt(attachment);

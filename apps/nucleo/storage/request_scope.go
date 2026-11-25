@@ -3,7 +3,6 @@ package storage
 
 import (
 	"errors"
-	"net/http"
 	"strings"
 )
 
@@ -12,7 +11,7 @@ var ErrRequestScopeMismatch = errors.New("storage: request scope differs from au
 // ValidateRequestScope compares public job routing with the server's separately
 // authenticated identity. It rejects missing and repeated headers, including
 // maps assembled with different key casing, before callers touch a data source.
-func ValidateRequestScope(header http.Header, expected Scope) error {
+func ValidateRequestScope(header map[string][]string, expected Scope) error {
 	if !expected.Valid() {
 		return ErrRecord
 	}

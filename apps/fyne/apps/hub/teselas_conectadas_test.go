@@ -15,6 +15,7 @@ import (
 
 	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
+	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/webref"
 )
@@ -67,8 +68,11 @@ func TestLasConectadasMidenLoQueLasPropias(t *testing.T) {
 						if x := r.teselas[i].Position().X; c.Position().X != x {
 							t.Errorf("la conectada %d empieza en x=%v y su columna en %v", i, c.Position().X, x)
 						}
-						if forma == "marco" && !cerca(c.Size().Height, AltoTeselaCompacta) {
-							t.Errorf("en Marco la conectada mide %v de alto y la propia %v", c.Size().Height, AltoTeselaCompacta)
+						// En Marco, la compacta: una línea de descripción y, en el
+						// teléfono, las que pida hasta dos, con la misma regla que las propias.
+						quiero := AltoTeselaCompactaCon(LineasCompacta(c.App.Description, c.Size().Width, ancho < ui.CorteSM))
+						if forma == "marco" && !cerca(c.Size().Height, quiero) {
+							t.Errorf("en Marco la conectada mide %v de alto y la propia %v", c.Size().Height, quiero)
 						}
 					}
 					// El borde es el de la de producto (`border-border-subtle`).

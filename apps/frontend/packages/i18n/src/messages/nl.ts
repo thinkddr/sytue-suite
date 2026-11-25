@@ -76,6 +76,8 @@ export const nl: Catalog = {
     'Ik begrijp dat de met de verloren sleutel versleutelde gegevens worden verwijderd',
   'vault.failed':
     'De versleutelde gegevens konden niet worden geopend. Probeer het opnieuw of meld je opnieuw aan bij Sytue ID. Is de sleutel kwijt, dan kun je de versleutelde gegevens van deze app legen.',
+  'vault.moreInfo': 'Meer informatie',
+  'vault.attention': 'Je versleutelde gegevens vragen je aandacht',
   'matrix.incoming': 'Dit apparaat verifiëren',
   'matrix.match': 'Ze komen overeen',
   'matrix.mismatch': 'Ze komen niet overeen',

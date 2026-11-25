@@ -6,6 +6,7 @@ package calendario
 import (
 	"context"
 	"image/color"
+	"slices"
 	"strconv"
 	"time"
 
@@ -88,7 +89,11 @@ func (a *App) sondearRecordatorios(vida context.Context) {
 
 // llegaronRecordatorios aplica una ronda del sondeo: quita los descartados, anuncia los
 // nuevos y repinta la campana (y el panel, si está abierto).
+//
+// Una ronda que no cambia nada —lo normal: el sondeo es de cada minuto— no repinta. Antes
+// rehacía la pantalla entera cada minuto aunque la campana dijera lo mismo.
 func (a *App) llegaronRecordatorios(lista []api.Reminder, err error) {
+	cambia := a.recCargando || a.recError != (err != nil)
 	a.recCargando = false
 	a.recError = err != nil
 	if err == nil {
@@ -98,8 +103,13 @@ func (a *App) llegaronRecordatorios(lista []api.Reminder, err error) {
 				frescos = append(frescos, r)
 			}
 		}
+		cambia = cambia || !slices.Equal(frescos, a.P.Recordatorios)
 		a.P.Recordatorios = frescos
 		a.anunciar(frescos)
+	}
+	// A medianoche, «hoy» cambia de día aunque la campana diga lo mismo.
+	if !cambia && inicioDelDia(a.P.ahora(), a.P.zona()).Equal(a.diaPintado) {
+		return
 	}
 	a.pintarPanelRecordatorios()
 	a.pintar()

@@ -477,6 +477,7 @@ func (a *avisosBarra) contenido() []fyne.CanvasObject {
 		out = append(out, esqueletosDeLista(3)...)
 	case estado == fallo:
 		vacio := NuevoVacio(a.t.T("notifications.failed", nil), a.t.T("error.connection", nil))
+		vacio.Tono = VacioError // DS-06
 		vacio.Accion = NuevoBoton(a.t.T("action.retry", nil), func() {
 			a.menu.Cerrar()
 			a.mu.Lock()

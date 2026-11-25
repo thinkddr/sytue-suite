@@ -53,6 +53,8 @@ export const cs: AppCatalog<typeof en> = {
   'list.unstar': 'Odebrat {name} z označených hvězdičkou',
   'list.starredTitle': 'S hvězdičkou',
   'list.reviewDuplicates': 'Zkontrolovat duplicity ({count})',
+  'list.selectMode': 'Vybrat',
+  'list.moreActions': 'Další akce',
   'list.count': {
     one: '{count} kontakt',
     few: '{count} kontakty',

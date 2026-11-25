@@ -63,6 +63,8 @@ export const en = {
   'list.unstar': 'Remove {name} from starred',
   'list.starredTitle': 'Starred',
   'list.reviewDuplicates': 'Review duplicates ({count})',
+  'list.selectMode': 'Select',
+  'list.moreActions': 'More actions',
   'list.count': { one: '{count} contact', other: '{count} contacts' },
   'list.countFiltered': {
     one: '{shown} of {count} contact',

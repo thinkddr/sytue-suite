@@ -15,7 +15,7 @@
  * opción no sabría por qué no está.
  */
 import type { DocsKey } from '../../i18n';
-import type { SheetCommand } from './SheetCanvas';
+import type { SheetCommand } from './mando';
 
 /** Las tres variantes del menú, como en Excel y en Sheets. */
 export type ZonaMenu = 'celdas' | 'columnas' | 'filas';

@@ -28,7 +28,7 @@ export {
 } from './locale.js';
 
 export type { Catalog, MessageKey, PluralForms } from './messages/index.js';
-export { catalogs } from './messages/index.js';
+export { catalogs, catalogFor } from './messages/index.js';
 
 export type { Vars, Translate } from './translate.js';
 export {

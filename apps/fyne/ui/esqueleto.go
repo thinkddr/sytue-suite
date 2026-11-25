@@ -33,8 +33,9 @@ import (
 // Por el PULSO, que es la mitad de lo que un esqueleto comunica: `.sytue-skeleton`
 // anima la opacidad entre 1 y 0,55 cada 1600 ms, y sin él la pantalla parece congelada
 // y no cargando. Una animación infinita necesita dónde pararse cuando el bloque
-// desaparece, y eso es `WidgetRenderer.Destroy`: un `canvas.Rectangle` suelto se lo
-// lleva el recolector con la animación todavía repintándolo.
+// desaparece: el widget se entera de que ya no se pinta (animacionSinFin) y la duerme, y
+// `WidgetRenderer.Destroy` la para del todo. Un `canvas.Rectangle` suelto no se entera de
+// nada y la animación seguiría repintándolo.
 //
 // Una animación POR BLOQUE: Fyne las tica todas desde una sola goroutina, así que son
 // cierres en la lista del animador, no hilos. Para una LISTA de carga, que son decenas
@@ -65,9 +66,9 @@ type Esqueleto struct {
 	// sería un destello.
 	Tinte string
 
-	mu   sync.Mutex
-	fase float32
-	anim *fyne.Animation
+	mu     sync.Mutex
+	fase   float32
+	latido animacionSinFin
 }
 
 var (
@@ -189,40 +190,31 @@ func (e *Esqueleto) arrancar(bloque *canvas.Rectangle) {
 	if MenosMovimiento() {
 		return
 	}
-	a := fyne.NewAnimation(DuracionPulso, func(p float32) {
+	e.latido.arrancar(DuracionPulso, func(p float32) {
 		e.mu.Lock()
 		e.fase = p
 		e.mu.Unlock()
 		bloque.FillColor = e.tinta()
 		bloque.Refresh()
 	})
-	a.Curve = fyne.AnimationLinear
-	a.RepeatCount = fyne.AnimationRepeatForever
-	e.mu.Lock()
-	e.anim = a
-	e.mu.Unlock()
-	a.Start()
 }
 
-// Parar detiene el pulso. Lo llama el renderer al destruirse.
-func (e *Esqueleto) Parar() {
-	e.mu.Lock()
-	a := e.anim
-	e.anim = nil
-	e.mu.Unlock()
-	if a != nil {
-		a.Stop()
-	}
-}
+// Parar detiene el pulso para siempre: ya no lo despierta volver a pintarse. Lo llama el
+// renderer al destruirse; lo que sale del árbol o se esconde se duerme solo
+// (animacionSinFin) y vuelve a latir al pintarse otra vez.
+func (e *Esqueleto) Parar() { e.latido.parar() }
 
 type esqueletoRenderer struct {
 	e      *Esqueleto
 	bloque *canvas.Rectangle
 }
 
-func (r *esqueletoRenderer) MinSize() fyne.Size           { return MedidaEsqueleto(r.e) }
-func (r *esqueletoRenderer) Objects() []fyne.CanvasObject { return []fyne.CanvasObject{r.bloque} }
-func (r *esqueletoRenderer) Destroy()                     { r.e.Parar() }
+func (r *esqueletoRenderer) MinSize() fyne.Size { return MedidaEsqueleto(r.e) }
+func (r *esqueletoRenderer) Objects() []fyne.CanvasObject {
+	r.e.latido.pintada()
+	return []fyne.CanvasObject{r.bloque}
+}
+func (r *esqueletoRenderer) Destroy() { r.e.Parar() }
 func (r *esqueletoRenderer) Layout(t fyne.Size) {
 	if f := r.e.Fraccion; f > 0 && f < 1 {
 		t.Width = float32(int(t.Width*f + 0.5))

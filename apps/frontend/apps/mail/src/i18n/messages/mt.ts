@@ -505,6 +505,7 @@ export const mt: AppCatalog<typeof en> = {
   'compose.templates': 'Mudelli',
   'compose.templatesEmpty': 'Għad m’għandekx mudelli. Oħloqhom fis-settings ta’ Mail.',
   'compose.attachFailed': 'L-attachment ma setax jinqara',
+  'compose.openFailed': "L-editur tal-messaġġ ma setax jinfetaħ. Erġa' pprova.",
   'compose.pastedImageDropped': 'L-immaġni li waħħalt ma ġietx inkluża',
   'compose.pastedImagesDropped': 'L-immaġnijiet li waħħalt ma ġewx inklużi',
   'compose.pastedImagesDroppedDescription': 'Biex tibgħat immaġnijiet, waħħalhom bħala fajls.',

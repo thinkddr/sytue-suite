@@ -112,6 +112,7 @@
   "compose.noAttachmentSend": "Saada ikkagi",
   "compose.noAttachmentTitle": "Saatmine ilma manusteta",
   "compose.noDraftsFolder": "Kausta Mustandid ei leitud",
+  "compose.openFailed": "Sõnumiredaktorit ei õnnestunud avada. Proovige uuesti.",
   "compose.pastedImageDropped": "Kleebitud pilti ei lisatud",
   "compose.pastedImagesDropped": "Kleebitud pilte ei lisatud",
   "compose.pastedImagesDroppedDescription": "Piltide saatmiseks lisage need failidena.",

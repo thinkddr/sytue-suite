@@ -5,6 +5,7 @@ package certipdf
 
 import (
 	"context"
+	"image/color"
 	"math"
 	"os"
 	"strconv"
@@ -354,18 +355,35 @@ type leyenda struct {
 	hueco  *canvas.Rectangle
 	rotulo *ui.Rotulo
 	dentro fyne.CanvasObject
+	// papel y borde son los colores con que se pintó la última vez (ver pintar).
+	papel, borde color.NRGBA
 }
 
 func nuevaLeyenda(texto string, dentro fyne.CanvasObject, ancho float32) fyne.CanvasObject {
-	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	l := &leyenda{
-		caja:   ui.NuevaCaja(tema.Color("surface", v), tema.Color("border", v), tema.RadioMD),
-		hueco:  canvas.NewRectangle(tema.Color("surface", v)),
+		caja:   ui.NuevaCaja(color.NRGBA{}, color.NRGBA{A: 1}, tema.RadioMD),
+		hueco:  canvas.NewRectangle(color.Transparent),
 		rotulo: ui.NuevoRotulo(texto, tema.Texto2XS, ui.Normal, "text-muted"),
 		dentro: dentro,
 	}
+	l.pintar()
 	objs := append(l.caja.Objetos(), l.hueco, l.rotulo, dentro)
 	return container.New(anchoFijo{ancho: ancho}, container.New(l, objs...))
+}
+
+// pintar resuelve el papel y el borde con la variante en vigor. Va también en Layout,
+// que es lo que Fyne vuelve a llamar en cada contenedor al cambiar el tema: resueltos
+// solo al componer el panel, se quedaban en el tema en que nació.
+func (l *leyenda) pintar() {
+	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
+	papel, borde := tema.Color("surface", v), tema.Color("border", v)
+	if papel == l.papel && borde == l.borde {
+		return
+	}
+	l.papel, l.borde = papel, borde
+	l.caja.Pintar(papel, borde)
+	l.hueco.FillColor = papel
+	l.hueco.Refresh()
 }
 
 // Las medidas del `<fieldset>`: el borde a media línea de la leyenda y la leyenda a
@@ -382,6 +400,7 @@ func (l *leyenda) MinSize([]fyne.CanvasObject) fyne.Size {
 }
 
 func (l *leyenda) Layout(_ []fyne.CanvasObject, t fyne.Size) {
+	l.pintar()
 	l.caja.Redimensionar(fyne.NewSize(t.Width, t.Height-bordeLeyenda))
 	// Redimensionar coloca en (0,0): se baja la caja entera a la altura del borde.
 	caja := l.caja.Objetos()

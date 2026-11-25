@@ -449,6 +449,7 @@ export const hu: AppCatalog<typeof en> = {
   'compose.templates': 'Sablonok',
   'compose.templatesEmpty': 'Még nincsenek sablonok. A Mail beállításaiban hozhatja létre őket.',
   'compose.attachFailed': 'Nem sikerült beolvasni a mellékletet',
+  'compose.openFailed': 'Nem sikerült megnyitni az üzenetszerkesztőt. Próbálja újra.',
   'compose.pastedImageDropped': 'A beillesztett kép nem került bele',
   'compose.pastedImagesDropped': 'A beillesztett képek nem kerültek bele',
   'compose.pastedImagesDroppedDescription': 'Képek küldéséhez csatolja őket fájlként.',

@@ -30,7 +30,7 @@ import {
   usePaletaDeLaSuite,
   type ComandoDeApp,
 } from '@sytue/shell';
-import { MatrixStorageGate } from '@sytue/shell/matrix';
+import { MatrixStorageGate } from '@sytue/shell/vault';
 import { getAccessToken } from '@sytue/auth/client';
 import {
   Badge,
@@ -62,6 +62,7 @@ import {
   useScrollRestante,
   useToast,
   withBase,
+  marcarAppLista,
 } from '@sytue/ui';
 import type { Locale } from '@sytue/i18n';
 import { formatDate, translate } from '@sytue/i18n';
@@ -401,6 +402,13 @@ function ErpAppInterna({
     // Solo al montar: el catálogo no cambia durante la sesión.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // `sytue:app-ready`: el catálogo ya está pintado y, si se entró por un modelo, su
+  // lista (o el motivo de que no llegue). Lo que se presupuesta en vez del LCP y lo
+  // que espera la bóveda para abrirse detrás.
+  useEffect(() => {
+    if (error || sinPermiso || (catalogo && (!modelo || pagina))) marcarAppLista();
+  }, [error, sinPermiso, catalogo, modelo, pagina]);
 
   // Primera vez: sin perfil y sin ningún área encendida, lo que toca es el
   // asistente, no una cuadrícula de treinta y tres tarjetas apagadas. Solo si

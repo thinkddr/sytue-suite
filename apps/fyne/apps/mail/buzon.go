@@ -8,7 +8,9 @@ import (
 	"context"
 	"errors"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
 	"slices"
 	"strings"
 	"time"
@@ -1366,10 +1368,16 @@ func carpetaDe(m api.Mailbox) Carpeta {
 }
 
 // estadoDe decide qué estado vacío dice la verdad sobre un error: un 403 es falta de
-// permiso, un error que no es una respuesta del servidor es que no hay red, y lo
-// demás es un fallo con reintento.
+// permiso, un fallo de la RED (no se llegó al servidor: `net.Error` o `*url.Error`, que
+// es como los devuelve `http.Client`) es «sin conexión», y lo demás es un fallo con
+// reintento. Antes todo lo que no era una respuesta HTTP se daba por falta de red, así
+// que un error del servidor dentro de una respuesta (`serverFail` de JMAP, un JSON
+// ilegible) salía como «Sin conexión» con la red funcionando. Es la regla de
+// `diapos.EstadoDe`.
 func estadoDe(err error) Estado {
 	var e *api.Error
+	var red net.Error
+	var ue *url.Error
 	switch {
 	case errors.As(err, &e) && e.Status == http.StatusForbidden:
 		return SinPermiso
@@ -1377,6 +1385,8 @@ func estadoDe(err error) Estado {
 		return Error
 	case errors.Is(err, context.Canceled):
 		return Error
+	case errors.As(err, &red), errors.As(err, &ue):
+		return SinConexion
 	}
-	return SinConexion
+	return Error
 }

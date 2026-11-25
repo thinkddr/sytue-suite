@@ -15,6 +15,7 @@ import {
   EmptyState,
   SectionHeader,
   ToastProvider,
+  marcarAppLista,
 } from '@sytue/ui';
 import type { Locale } from '@sytue/i18n';
 import type { Project } from '../lib/types.js';
@@ -72,6 +73,9 @@ function ProjectsInner({ projects: initial, live: initialLive, locale, error }: 
   const [projects] = useState(initial);
   const [live] = useState(initialLive);
   const [query, setQuery] = useState('');
+  // `sytue:app-ready`: la lista llega con sus proyectos del servidor; pintada e
+  // hidratada, la app está lista. Lo que se presupuesta en vez del LCP.
+  useEffect(() => marcarAppLista(), []);
   /**
    * Los enlaces de siempre (`?new=1` de la paleta y de marcadores, `?template=…`
    * de la galería) abrían aquí un modal de alta. El alta es ahora el asistente de

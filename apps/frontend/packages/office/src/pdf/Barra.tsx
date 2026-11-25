@@ -357,7 +357,8 @@ export function BarraHerramientas(p: Props) {
                   step="1"
                   value={p.grosor}
                   onInput={(e) => p.onGrosor(Number((e.target as HTMLInputElement).value))}
-                  class="sytue-focus-ring w-16"
+                  // `accent-primary`: sin él era el azul de Chromium, el único de la cinta.
+                  class="sytue-focus-ring accent-primary w-16"
                   aria-label={t('pdf.thickness')}
                 />
               </label>

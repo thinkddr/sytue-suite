@@ -69,8 +69,8 @@ func botonPrimario(texto string, esc tema.Escalon, px, py float32, alPulsar func
 func avisoAmbar(texto string, ancho float32) fyne.CanvasObject {
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	m := tema.Espacio(2)
-	fondo := canvas.NewRectangle(tema.Color("warning-bg", v))
-	fondo.CornerRadius = 0.25 * tema.Rem
+	fondo := ui.NuevoLiso("warning-bg")
+	fondo.Radio = 0.25 * tema.Rem
 	p := ui.NuevoParrafo(texto, tema.Texto2XS, ui.Normal, "warning-text", v).A(ancho - 2*m)
 	return container.NewStack(fondo, container.New(ui.Margen{Izq: m, Arr: m, Der: m, Abj: m}, p))
 }

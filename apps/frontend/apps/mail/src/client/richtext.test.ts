@@ -6,10 +6,13 @@
 // DOM del propio compositor y luego se envía. Cada caso de aquí es un vector que
 // se probó a mano contra la lista blanca.
 import { expect, test } from 'bun:test';
+import { readFileSync } from 'node:fs';
 import { setupJsdom } from '../../test/dom.js';
 
 setupJsdom();
 import {
+  cargarRichText,
+  richTextCargado,
   sanitizeHtml,
   htmlToText,
   isHtmlEmpty,
@@ -17,6 +20,9 @@ import {
   ficheroDeDatos,
   incrustarImagenesPegadas,
 } from './richtext.js';
+
+// parse5 (con entities) baja al abrir el redactor, no con el JS inicial de Mail.
+await cargarRichText();
 
 // --- lo que TIENE que pasar (formato de correo de verdad) -------------------
 
@@ -185,4 +191,29 @@ test('failed inline attachment conversion drops the data image safely', async ()
     async () => null,
   );
   expect(html).toBe('<p>text</p>');
+});
+
+// --- parse5 perezoso ---------------------------------------------------------
+
+test('parse5 ya cargado: htmlToText e isHtmlEmpty siguen siendo síncronos', async () => {
+  expect(richTextCargado()).toBe(true);
+  await cargarRichText(); // idempotente
+  expect(htmlToText('<p>uno</p><p>dos<br>tres</p>')).toBe('uno\ndos\ntres');
+  expect(isHtmlEmpty('<p>&nbsp;</p><br>')).toBe(true);
+});
+
+test('pegar tras la carga perezosa sanea igual que antes', () => {
+  const pegado =
+    '<p onclick="x()">Hola <script>alert(1)</script><b>mundo</b></p><img src="javascript:x">';
+  const limpio = sanitizeHtml(pegado);
+  expect(limpio).not.toContain('script');
+  expect(limpio).not.toContain('onclick');
+  expect(limpio).not.toContain('javascript:');
+  expect(htmlToText(limpio)).toBe('Hola mundo');
+});
+
+test('parse5 no está en las importaciones estáticas del redactor', () => {
+  const fuente = readFileSync(new URL('./richtext.ts', import.meta.url), 'utf8');
+  expect(fuente).not.toMatch(/^import \{[^}]*\} from '@sytue\/ui\/browser\/portapapeles'/m);
+  expect(fuente).toContain("import('@sytue/ui/browser/portapapeles')");
 });

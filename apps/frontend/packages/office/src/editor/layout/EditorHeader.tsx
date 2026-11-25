@@ -307,6 +307,11 @@ export function EditorHeader({ ctx }: { ctx: EditorContext }): JSX.Element {
       ) : (
         <MenuHistorial
           ctx={ctx}
+          // El chip encoge con su desplegable, no solo por dentro: sin esto el
+          // envoltorio del menú medía «Gespeichert» entero y, con dos personas en el
+          // documento, «Teilen» se salía 12 px de un teléfono de 320 (barrido móvil
+          // de producción, 2026-11-22 a 24; en castellano, 44 px).
+          class="max-md:min-w-0 max-md:shrink"
           trigger={(trigger) => (
             <button type="button" class={CHIP_GUARDADO} title={t('versions.history')} {...trigger}>
               <span class={`h-1.5 w-1.5 shrink-0 rounded-full ${chipDot}`} aria-hidden="true" />

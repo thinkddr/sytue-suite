@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 /** Durable immutable input in the existing encrypted local cache; not another E2E format. */
 import { streamCaptureSource, type StorageCaptureSource } from './storage-stream-source.js';
-import { createSHA256 } from 'hash-wasm';
+import { createSHA256 } from './sha256.js';
 import { maxCipherBlockBytes, type MatrixStorageScope } from '@sytue/config/matrix';
 import { storageScope, storageIdentifier } from './storage.js';
 import { fields, hash, digest, invalid, maxStorageFileBytes } from './storage-file-codec.js';

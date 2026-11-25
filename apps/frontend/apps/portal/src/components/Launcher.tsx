@@ -57,6 +57,7 @@ import {
   cx,
   useAhora,
   Glifo,
+  marcarAppLista,
 } from '@sytue/ui';
 import { appsRecordadas, detalleDe, recordarApps } from '@sytue/shell';
 import { appUrl, esSoloDeOrganizaciones, orgActual, suiteApex } from '@sytue/config';
@@ -473,6 +474,13 @@ export function Launcher({
       });
     return () => controller.abort();
   }, [retry]);
+
+  // `sytue:app-ready`: las teselas llegan pintadas del servidor; lo que el portal pide
+  // al abrir es la actividad reciente. Con ella (o su fallo) en pantalla, la app está
+  // lista: es lo que se presupuesta en vez del LCP y lo que espera la bóveda.
+  useEffect(() => {
+    if (recent !== null || recentError) marcarAppLista();
+  }, [recent, recentError]);
 
   return (
     <div class="marco:py-5 mx-auto w-full max-w-[var(--container-content,1280px)] px-6 py-8">

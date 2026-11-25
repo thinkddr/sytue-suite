@@ -19,7 +19,7 @@ import {
   abrirHojaDeAtajos,
   useAtajosDeApp,
 } from '@sytue/shell';
-import { MatrixStorageGate } from '@sytue/shell/matrix';
+import { MatrixStorageGate } from '@sytue/shell/vault';
 import { useConnectivity } from '@sytue/offline/preact';
 import {
   AppShell,
@@ -47,6 +47,7 @@ import {
   Glifo,
   useEstrecha,
   DURACION_DESHACER,
+  marcarAppLista,
 } from '@sytue/ui';
 import type { SytueUser } from '@sytue/auth';
 import {
@@ -483,6 +484,13 @@ function CalendarView({ user, hubBaseUrl, locale }: Props): JSX.Element {
     () => [...calendars, ...sharedCalendars.filter((c) => !c.readOnly)],
     [calendars, sharedCalendars],
   );
+
+  // `sytue:app-ready`: el mes ya enseña sus eventos (o por qué no). Es lo que se
+  // presupuesta en vez del LCP, y lo que espera la bóveda para abrirse detrás.
+  useEffect(() => {
+    if (!loadingCals && !loadingEvents && (eventsByCal.range === rangeKey || error))
+      marcarAppLista();
+  }, [loadingCals, loadingEvents, eventsByCal.range, rangeKey, error]);
 
   // Carga de eventos: un listEvents por calendario visible aun no cacheado para
   // el rango actual, en paralelo. Conmutar un checkbox ya cargado es instantaneo.

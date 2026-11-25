@@ -62,6 +62,10 @@ func TestLasFilasDeLosDialogosMidenLoDeLaHoja(t *testing.T) {
 // sigue viéndose cuando el puntero pasa de la tarjeta al propio botón —que es cuando
 // Fyne le dice a la tarjeta que el puntero se ha ido—. Sin red no hay «…».
 //
+// En reposo el botón todavía no existe: lo que hay es su hueco, del mismo tamaño, y el
+// botón nace al pasar el ratón por la tarjeta, en ese sitio (`ponerMas`). Para quien la
+// mira es lo mismo de antes: nada en reposo, el «…» al pasar, y la cabecera igual.
+//
 // VISTO EN ROJO (2026-09-22, en el frontal): sin el aviso de `botonMas`, al pasar al
 // botón la tarjeta lo esconde y el test lo dice. Deshecho.
 func TestElMasSeEnseñaAlPasarYNoParpadea(t *testing.T) {
@@ -73,12 +77,20 @@ func TestElMasSeEnseñaAlPasarYNoParpadea(t *testing.T) {
 	tj.Resize(fyne.NewSize(300, 120))
 	w.Resize(fyne.NewSize(320, 140))
 
-	if tj.mas == nil || tj.mas.Visible() {
-		t.Fatal("en reposo el «…» tiene que existir y no verse")
+	if tj.mas != nil && tj.mas.Visible() {
+		t.Fatal("en reposo el «…» no tiene que verse")
+	}
+	r := test.WidgetRenderer(tj).(*tarjetaRenderer)
+	hueco := r.der[len(r.der)-1].o
+	if _, ok := hueco.(*huecoMas); !ok || hueco.Visible() || hueco.MinSize() != ui.MedidaBotonIcono(ui.LadoIconoSM) {
+		t.Fatalf("en reposo la cabecera tiene que guardarle al «…» su sitio sin pintarlo: %T", hueco)
 	}
 	tj.MouseIn(nil)
-	if !tj.mas.Visible() {
+	if tj.mas == nil || !tj.mas.Visible() {
 		t.Fatal("con la tarjeta encima el «…» tiene que verse")
+	}
+	if tj.mas.Position() != hueco.Position() || tj.mas.Size() != hueco.Size() {
+		t.Errorf("el «…» nace en %v %v y su hueco estaba en %v %v", tj.mas.Position(), tj.mas.Size(), hueco.Position(), hueco.Size())
 	}
 	// Lo que hace Fyne al pasar al botón: MouseOut a la tarjeta y MouseIn al botón.
 	tj.MouseOut()

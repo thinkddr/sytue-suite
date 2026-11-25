@@ -501,6 +501,7 @@ export const pl: AppCatalog<typeof en> = {
   'compose.templates': 'Szablony',
   'compose.templatesEmpty': 'Nie masz jeszcze szablonów. Utwórz je w ustawieniach Maila.',
   'compose.attachFailed': 'Nie udało się odczytać załącznika',
+  'compose.openFailed': 'Nie udało się otworzyć edytora wiadomości. Spróbuj ponownie.',
   'compose.pastedImageDropped': 'Wklejony obraz nie został dołączony',
   'compose.pastedImagesDropped': 'Wklejone obrazy nie zostały dołączone',
   'compose.pastedImagesDroppedDescription': 'Aby wysłać obrazy, dołącz je jako pliki.',

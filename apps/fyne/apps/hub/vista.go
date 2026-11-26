@@ -21,7 +21,7 @@ import (
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/ajustes"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
-	"git.sytue.eu/sytue/one/apps/nucleo/auth"
+	"git.sytue.eu/sytue/one/apps/nucleo/autorizacion"
 	"git.sytue.eu/sytue/one/apps/nucleo/ficheros"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 )
@@ -65,13 +65,12 @@ var _ Buzon = (*api.Hub)(nil)
 
 // Cuenta es de dónde salen los claims de quien ha entrado: su clase de organización,
 // su plan, sus roles y permisos, y la organización activa que encabeza los enlaces a
-// otras apps (ADR 0056). Lo cumple `*auth.Session`.
+// otras apps (ADR 0056). Lo cumple `*auth.Session` (lo comprueba vista_test.go: aquí
+// no se importa `auth`, para que el Hub de Sytue Office no enlace la sesión).
 type Cuenta interface {
-	Reclamos(ctx context.Context) (auth.Reclamos, error)
+	Reclamos(ctx context.Context) (autorizacion.Reclamos, error)
 	Organizacion() string
 }
-
-var _ Cuenta = (*auth.Session)(nil)
 
 // Integrable es lo que la portada le pide a la pasarela de integraciones: las
 // aplicaciones conectadas y los productos sustituidos. Lo cumple `*api.Integraciones`.

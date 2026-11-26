@@ -110,7 +110,8 @@ func (c *Contexto) AtajoZoom(s *desktop.CustomShortcut) bool {
 // ellos, y si lo era lo hace. La hoja (`AtajosDelMarco`) los enseña: si se añade uno aquí,
 // va también allí.
 func (c *Contexto) AtajoDelEditor(s *desktop.CustomShortcut) bool {
-	return c.AtajoImprimir(s) || c.AtajoZoom(s) || c.AtajoRecuento(s) || c.AtajoAyudaPulsado(s)
+	return c.AtajoImprimir(s) || c.AtajoZoom(s) || c.AtajoRecuento(s) || c.AtajoAyudaPulsado(s) ||
+		c.AtajoGuardarFichero(s)
 }
 
 // AtajosDelEditor son las combinaciones que [Contexto.AtajoDelEditor] atiende, para

@@ -6,7 +6,7 @@ import "git.sytue.eu/sytue/one/apps/nucleo/storage/records"
 // NewHistoricalSource has the same domain guards as New, but exposes no CRUD
 // or view of the historical identity to an application presenter.
 func NewHistoricalSource(cfg Config) (*records.HistoricalSource, error) {
-	configuration, err := recordsConfiguration(cfg)
+	configuration, err := recordsConfiguration(cfg, false)
 	if err != nil {
 		return nil, err
 	}

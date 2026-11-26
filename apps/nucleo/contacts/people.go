@@ -51,12 +51,7 @@ func (r *Repository) Create(ctx context.Context, book string, in api.ContactInpu
 		Book  string
 		Input api.ContactInput
 	}{book, in}, func(snapshot *Snapshot) (Aggregate, error) {
-		person, err := contactInput(in)
-		if err != nil {
-			return Aggregate{}, err
-		}
-		person.UID = card.NewUID()
-		return snapshot.NewPerson(book, person, "", time.Now().UTC())
+		return snapshot.PrepararAlta(book, in, time.Now().UTC())
 	})
 	if err != nil {
 		return api.Contact{}, err
@@ -66,11 +61,7 @@ func (r *Repository) Create(ctx context.Context, book string, in api.ContactInpu
 
 func (r *Repository) ImportCard(ctx context.Context, book, data string) (api.Contact, error) {
 	change, err := r.mutateAggregate(ctx, "import-card", struct{ Book, Data string }{book, data}, func(snapshot *Snapshot) (Aggregate, error) {
-		person, canonical, err := card.ImportCard(data)
-		if err != nil {
-			return Aggregate{}, err
-		}
-		return snapshot.NewPerson(book, person, canonical, time.Now().UTC())
+		return snapshot.PrepararTarjeta(book, data, time.Now().UTC())
 	})
 	if err != nil {
 		return api.Contact{}, err
@@ -93,14 +84,16 @@ func (s *Snapshot) NewPerson(book string, person card.Contact, base string, now 
 	if !found {
 		return Aggregate{}, queryError(http.StatusNotFound, "private_address_book_not_found")
 	}
-	people, err := s.visiblePeople()
+	exists := false
+	err = s.cadaVisible(func(value *ContactView) bool {
+		exists = value.AddressBookID == book && value.UID == person.UID
+		return !exists
+	})
 	if err != nil {
 		return Aggregate{}, err
 	}
-	for _, value := range people {
-		if value.AddressBookID == book && value.UID == person.UID {
-			return Aggregate{}, queryError(http.StatusConflict, "contact_uid_exists")
-		}
+	if exists {
+		return Aggregate{}, queryError(http.StatusConflict, "contact_uid_exists")
 	}
 	person.ID, person.ObjectID = uuid.New(), uuid.New()
 	person.AddressBookID = uuid.MustParse(book)

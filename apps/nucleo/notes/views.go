@@ -85,6 +85,9 @@ func (r *Repository) visibleNotes(ctx context.Context) (map[string]api.Notebook,
 		}
 		return nil
 	})
+	if err == nil {
+		err = r.estadosDeNotas(ctx, notes)
+	}
 	return books, notes, err
 }
 

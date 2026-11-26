@@ -42,6 +42,13 @@ type Repository struct {
 	albumCheckpoints        map[string]albumCheckpointProjection
 	albumProjectionsRetired bool
 	sourcePlans             *SourcePlanStore
+	// formatosExtra son los formatos de entrada que la ingesta directa admite además de
+	// JPEG, PNG y GIF (AdmitirFormatos).
+	formatosExtra map[string]bool
+	// liberarAlPurgar: Purgar suelta además el original y las derivadas (LiberarAlPurgar).
+	liberarAlPurgar bool
+	// linea es la línea de tiempo ya proyectada para una revisión del catálogo (linea.go).
+	linea lineaProyectada
 }
 
 func binaryKind(kind string) bool {
@@ -85,6 +92,9 @@ func recordsConfigurationFor(cfg Config, r *Repository) records.Config {
 			}
 			if kind == "asset" {
 				_, _, err := r.ingestedAsset(raw)
+				if err == nil {
+					_, _, err = r.externalAsset(raw)
+				}
 				return err
 			}
 			return nil
@@ -105,6 +115,7 @@ func (r *Repository) Close() {
 	if r.sourcePlans != nil {
 		r.sourcePlans.Close()
 	}
+	r.linea.olvidar()
 	r.mediaMu.Lock()
 	r.editsByAsset = nil
 	r.membershipCache = nil
@@ -310,6 +321,10 @@ func (r *Repository) Snapshot(ctx context.Context) (*model.Snapshot, error) {
 func (r *Repository) Original(ctx context.Context, asset string, out io.Writer) error {
 	_, err := r.engine.ReadBinary(ctx, "original", asset, out)
 	if !errors.Is(err, ErrNotFound) {
+		return err
+	}
+	// Un original externo (FO-09) se lee de su fichero, comprobando que sigue siendo él.
+	if externo, err := r.originalExterno(ctx, asset, out); externo || err != nil && !errors.Is(err, ErrNotFound) {
 		return err
 	}
 	file, err := r.linkedOriginal(ctx, asset)

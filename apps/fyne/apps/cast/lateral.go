@@ -43,6 +43,9 @@ var destinos = []struct {
 func Lateral(v Vista, activa Seccion, alIr func(Seccion)) fyne.CanvasObject {
 	filas := make([]fyne.CanvasObject, 0, len(destinos))
 	for _, d := range destinos {
+		if !v.Tiene(d.sec) {
+			continue
+		}
 		tinta := "sidebar-fg-muted"
 		if d.sec == activa {
 			tinta = "sidebar-fg"
@@ -59,6 +62,9 @@ func Lateral(v Vista, activa Seccion, alIr func(Seccion)) fyne.CanvasObject {
 			f.Contador = strconv.Itoa(v.Denuncias)
 		}
 		filas = append(filas, f)
+	}
+	for _, d := range v.Destinos {
+		filas = append(filas, ui.NuevaFilaLateral(d.Rotulo, iconos.Trazo(d.Icono, ui.GlifoMenu, "sidebar-fg-muted", v.Variante).Objeto(), d.Al))
 	}
 	return ui.NuevoLateral(v.Traduce("ui.mainNav"), ui.NuevaSeccionLateral("", filas...))
 }

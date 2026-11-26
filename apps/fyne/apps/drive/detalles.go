@@ -401,9 +401,11 @@ func (dd *dialogoDetalles) pie() fyne.CanvasObject {
 	if !dd.el.Carpeta {
 		botones = append(botones, atajo(t("details.versions"), glifoReloj, func() { p.pedirVersiones(dd.el) }))
 	}
-	botones = append(botones,
-		atajo(t("details.share"), glifoEnlace, func() { p.pedirCompartir(dd.el) }),
-		ui.NuevoBoton(t("details.close"), func() { dd.d.Cerrar() }).Con(ui.Primario, ui.TallaMD))
+	// En el equipo no se comparte (DR-05).
+	if !p.enEquipo() {
+		botones = append(botones, atajo(t("details.share"), glifoEnlace, func() { p.pedirCompartir(dd.el) }))
+	}
+	botones = append(botones, ui.NuevoBoton(t("details.close"), func() { dd.d.Cerrar() }).Con(ui.Primario, ui.TallaMD))
 	return container.New(ui.PieAcciones{}, botones...)
 }
 

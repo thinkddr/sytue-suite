@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<albums>
+  <album><id>5f070500-0000-0000-0000-00000000000a</id><title>Verano 2023</title><shared>false</shared><photos><item>5f070500-0000-0000-0000-000000000001</item><item>5f070500-0000-0000-0000-000000000002</item></photos><created_at>2024-01-02T03:04:05Z</created_at><updated_at>2024-01-02T03:04:05Z</updated_at></album>
+  <album><id>5f070500-0000-0000-0000-00000000000b</id><title>Invierno</title><shared>true</shared><photos><item>5f070500-0000-0000-0000-000000000003</item><item>5f070500-0000-0000-0000-000000000004</item></photos><created_at>2024-01-02T03:04:05Z</created_at><updated_at>2024-01-02T03:04:05Z</updated_at></album>
+  <album><id>5f070500-0000-0000-0000-00000000000c</id><title>Vacío</title><shared>false</shared><photos></photos><created_at>2024-01-02T03:04:05Z</created_at><updated_at>2024-01-02T03:04:05Z</updated_at></album>
+  <album><id>5f070500-0000-0000-0000-00000000000d</id><title>Verano 2023</title><shared>false</shared><photos><item>5f070500-0000-0000-0000-000000000006</item><item>5f070500-0000-0000-0000-000000000007</item></photos><created_at>2024-01-02T03:04:05Z</created_at><updated_at>2024-01-02T03:04:05Z</updated_at></album>
+  <album><id>5f070500-0000-0000-0000-00000000000e</id><title>Flores</title><shared>false</shared><photos><item>5f070500-0000-0000-0000-000000000007</item><item>5f070500-0000-0000-0000-000000000008</item></photos><created_at>2024-01-02T03:04:05Z</created_at><updated_at>2024-01-02T03:04:05Z</updated_at></album>
+</albums>

@@ -29,6 +29,7 @@ func (a *App) engancharEtiquetasYLibretas() {
 	}
 	p.AlBorrarEtiqueta = a.borrarEtiqueta
 	p.AlCrearLibreta = func() { a.dialogoLibreta(nil) }
+	p.alCrearEnCuenta = func(g GrupoCuenta) { a.dialogoLibretaEnCuenta(g.CrearLibreta) }
 	p.AlRenombrarLibreta = func() {
 		if p.Activa != nil {
 			b := *p.Activa
@@ -163,6 +164,28 @@ func (a *App) dialogoLibreta(b *api.AddressBook) {
 					a.programarEn(scope, a.cargarEn)
 				}
 			})
+		})
+	a.mostrarEscritura("libreta", d, lienzo)
+}
+
+// dialogoLibretaEnCuenta es «Nueva libreta» en la sección de una cuenta (Sytue Office):
+// el mismo diálogo, que la crea en la cuenta. Aparece aquí con la sincronización, que
+// quien la crea pide; mientras, la lista se vuelve a cargar.
+func (a *App) dialogoLibretaEnCuenta(crear func(ctx context.Context, nombre string) error) {
+	lienzo, p := a.lienzo(), a.Pantalla
+	if lienzo == nil || crear == nil {
+		return
+	}
+	scope := a.capturar()
+	d := p.dialogoNombre(lienzo, "book.newTitle", "book.namePlaceholder", "book.nameRequired", "",
+		func(nombre string, listo func(error)) {
+			a.peticion(scope, func(ctx context.Context) error { return crear(ctx, nombre) },
+				"book.created", "book.createFailed", "common.tryAgainSoon", func(err error) {
+					listo(err)
+					if err == nil {
+						a.programarEn(scope, a.cargarEn)
+					}
+				})
 		})
 	a.mostrarEscritura("libreta", d, lienzo)
 }

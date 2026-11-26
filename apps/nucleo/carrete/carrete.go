@@ -43,6 +43,12 @@ import (
 // Sytue deja lo que guarda. Es una marca, no se traduce: es el nombre del producto.
 const AlbumPropio = "Sytue Photos"
 
+// ProfundidadMaxima es hasta dónde se baja en cada carpeta (la galería del escritorio y
+// las carpetas de Photos de Sytue Office): lo bastante para «Imágenes/2024/Vacaciones/Día
+// 3» y no tanto como para recorrer un disco entero enlazado ahí por error. Aquí y no en
+// carpeta.go, que no se compila en Android ni en Apple con cgo y quien la usa sí.
+const ProfundidadMaxima = 8
+
 // ErrNoDisponible es que ESTE sistema no tiene galería a la que llegar: el navegador, o
 // un binario compilado sin el puente nativo. Quien llama no ofrece la función; no es un
 // fallo que enseñar.
@@ -89,6 +95,11 @@ type Elemento struct {
 	Tamano int64
 	// Video: es un vídeo y no una foto.
 	Video bool
+	// Duracion, Ancho y Alto son los de un vídeo si el sistema los dice al listar
+	// (MediaStore, PhotoKit); cero si no. Quien lo importa los mide del fichero y estos
+	// le sirven de respaldo.
+	Duracion    time.Duration
+	Ancho, Alto int
 }
 
 // Disponible dice si este sistema tiene galería a la que llegar. No pregunta nada a la
@@ -242,9 +253,10 @@ func TipoDe(nombre string) string {
 // EsVideo dice si un tipo MIME es de vídeo.
 func EsVideo(tipo string) bool { return strings.HasPrefix(tipo, "video/") }
 
-// deLineas lee «id\tnombre\ttipo\tms\tbytes[\tv]» por línea —la «v» del final marca un
-// vídeo—: lo que devuelven el puente de Android (Carrete.listar) y el de PhotoKit. Una
-// línea mal formada se salta.
+// deLineas lee «id\tnombre\ttipo\tms\tbytes[\tv[\tduración\tancho\talto]]» por línea
+// —la «v» marca un vídeo, y detrás pueden ir su duración en milisegundos y sus lados—:
+// lo que devuelven el puente de Android (Carrete.listar) y el de PhotoKit. Una línea mal
+// formada se salta; un número que falta o no se lee es cero.
 func deLineas(ctx context.Context, texto string) ([]Elemento, error) { //nolint:unused // solo en los puentes de Android y PhotoKit
 	var l []Elemento
 	for linea := range strings.SplitSeq(texto, "\n") {
@@ -252,7 +264,7 @@ func deLineas(ctx context.Context, texto string) ([]Elemento, error) { //nolint:
 			return nil, err
 		}
 		c := strings.Split(linea, "\t")
-		if (len(c) != 5 && len(c) != 6) || c[0] == "" {
+		if len(c) < 5 || len(c) > 9 || c[0] == "" {
 			continue
 		}
 		ms, _ := strconv.ParseInt(c[3], 10, 64)
@@ -264,8 +276,25 @@ func deLineas(ctx context.Context, texto string) ([]Elemento, error) { //nolint:
 		if tipo == "" {
 			tipo = TipoDe(c[1])
 		}
-		video := len(c) == 6 && c[5] == "v"
-		l = append(l, Elemento{ID: c[0], Nombre: c[1], Tipo: tipo, Tomada: time.UnixMilli(ms), Tamano: tam, Video: video || EsVideo(tipo)})
+		video := len(c) >= 6 && c[5] == "v"
+		e := Elemento{ID: c[0], Nombre: c[1], Tipo: tipo, Tomada: time.UnixMilli(ms), Tamano: tam, Video: video || EsVideo(tipo)}
+		if video {
+			e.Duracion = time.Duration(numero(c, 6)) * time.Millisecond
+			e.Ancho, e.Alto = int(numero(c, 7)), int(numero(c, 8))
+		}
+		l = append(l, e)
 	}
 	return l, nil
+}
+
+// numero es la columna i de una línea como número positivo; cero si no está o no se lee.
+func numero(c []string, i int) int64 { //nolint:unused // solo en los puentes de Android y PhotoKit
+	if i >= len(c) {
+		return 0
+	}
+	n, err := strconv.ParseInt(c[i], 10, 64)
+	if err != nil || n < 0 || n > 1<<40 {
+		return 0
+	}
+	return n
 }

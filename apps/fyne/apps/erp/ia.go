@@ -124,6 +124,11 @@ type PanelIA struct {
 	AlProponer func(peticion, para string)
 	AlGuardar  func()
 	AlExcel    func()
+	// AlComprobarVIES es «Comprobar en VIES» en cada contacto nuevo del plan con NIF
+	// (vies.go), por la Ref del paso; nil, no se ofrece (lo de siempre). VIES es lo que
+	// contestó cada comprobación, por la Ref; se vacía con cada plan.
+	AlComprobarVIES func(ref string)
+	VIES            map[string]*EstadoVIES
 
 	peticion *ui.AreaTexto
 }
@@ -396,6 +401,12 @@ func (x *PanelIA) paso(v tema.Variante, paso api.ERPPasoPlan, ancho float32) (fy
 	p.add(o, h, 0)
 	if paso.Existente == nil {
 		if o, h := x.datosPaso(v, paso, modelo, dentro); h > 0 {
+			p.add(o, h, HuecoDos)
+		}
+		if nif := texto(paso.Data["nif"]); x.AlComprobarVIES != nil && paso.Modelo == ModeloContacto && strings.TrimSpace(nif) != "" {
+			pr := propuestoDe(x.tr, modelo, func(c string) string { return texto(paso.Data[c]) }, "propuesto")
+			ref := paso.Ref
+			o, h := bloqueVIES(x.tr, v, x.VIES[ref], pr, func() { x.AlComprobarVIES(ref) }, dentro)
 			p.add(o, h, HuecoDos)
 		}
 	}

@@ -38,15 +38,32 @@ type Row struct {
 
 // Snapshot is validated as a whole before a private import can be acknowledged.
 // All buffers returned by Rows are independent of the retained originals.
+//
+// Una Snapshot no cambia nunca una vez compuesta, ni los buffers JSON de sus filas: las
+// que derivan de ella comparten las filas que no cambian, y con ellas sus enlaces ya
+// descodificados, así que componer una descodifica solo las filas nuevas.
 type Snapshot struct {
 	scope storage.Scope
 	rows  map[string]Row
+	// links tiene, de cada fila, los campos de relación que decodeRow leyó de ese mismo
+	// buffer JSON: lo que miran validateRelation y aggregateOwnedRows.
+	links map[string]link
 }
 
 type relation struct {
 	kind, id, book, object, contact, group, uid string
 	owner                                       string
 	raw                                         map[string]json.RawMessage
+}
+
+// link es una relation descodificada sin sus campos JSON.
+type link struct {
+	kind, id, book, object, contact, group, uid string
+	owner                                       string
+}
+
+func (r relation) link() link {
+	return link{kind: r.kind, id: r.id, book: r.book, object: r.object, contact: r.contact, group: r.group, uid: r.uid, owner: r.owner}
 }
 
 func rowKey(kind, id string) string { return kind + "\x00" + id }
@@ -174,8 +191,7 @@ func NewSnapshot(scope storage.Scope, rows []Row) (*Snapshot, error) {
 	if !scope.Valid() || scope.Product != "contacts" {
 		return nil, ErrSnapshot
 	}
-	snapshot := &Snapshot{scope: scope, rows: make(map[string]Row, len(rows))}
-	relations := make(map[string]relation, len(rows))
+	snapshot := &Snapshot{scope: scope, rows: make(map[string]Row, len(rows)), links: make(map[string]link, len(rows))}
 	for _, row := range rows {
 		relation, err := decodeRow(scope, row)
 		key := rowKey(row.Kind, row.ID)
@@ -186,17 +202,69 @@ func NewSnapshot(scope storage.Scope, rows []Row) (*Snapshot, error) {
 			return nil, ErrSnapshot
 		}
 		row.JSON = slices.Clone(row.JSON)
-		snapshot.rows[key], relations[key] = row, relation
+		snapshot.rows[key], snapshot.links[key] = row, relation.link()
 	}
-	for _, row := range relations {
-		if err := validateRelation(row, relations); err != nil {
-			return nil, err
-		}
+	if err := validateLinks(snapshot.links); err != nil {
+		return nil, err
 	}
 	return snapshot, nil
 }
 
-func validateRelation(row relation, all map[string]relation) error {
+// compose es NewSnapshot sobre un mapa de filas, descodificando solo las que no tienen
+// enlace. La instantánea nueva se queda con rows y links: cada enlace tiene que salir
+// del mismo buffer JSON de su fila, y links no tiene claves que no estén en rows. Como
+// NewSnapshot, valida todas las relaciones.
+func compose(scope storage.Scope, rows map[string]Row, links map[string]link) (*Snapshot, error) {
+	if !scope.Valid() || scope.Product != "contacts" {
+		return nil, ErrSnapshot
+	}
+	for key, row := range rows {
+		if _, found := links[key]; found {
+			continue
+		}
+		relation, err := decodeRow(scope, row)
+		if err != nil {
+			return nil, err
+		}
+		links[key] = relation.link()
+	}
+	if len(links) != len(rows) {
+		return nil, ErrSnapshot
+	}
+	if err := validateLinks(links); err != nil {
+		return nil, err
+	}
+	return &Snapshot{scope: scope, rows: rows, links: links}, nil
+}
+
+func validateLinks(all map[string]link) error {
+	for _, row := range all {
+		if err := validateRelation(row, all); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// sameBuffer dice si a y b son el mismo buffer JSON, así que el enlace descodificado
+// de uno vale para el otro.
+func sameBuffer(a, b []byte) bool {
+	return len(a) == len(b) && (len(a) == 0 || &a[0] == &b[0])
+}
+
+// keptLinks son los enlaces de s que siguen valiendo para rows: los de las filas que
+// siguen siendo el mismo buffer.
+func (s *Snapshot) keptLinks(rows map[string]Row) map[string]link {
+	kept := make(map[string]link, len(rows))
+	for key, row := range rows {
+		if value, found := s.links[key]; found && sameBuffer(s.rows[key].JSON, row.JSON) {
+			kept[key] = value
+		}
+	}
+	return kept
+}
+
+func validateRelation(row link, all map[string]link) error {
 	switch row.kind {
 	case "book":
 		return nil
@@ -240,11 +308,25 @@ func (s *Snapshot) Rows() []Row {
 		row.JSON = slices.Clone(row.JSON)
 		rows = append(rows, row)
 	}
-	slices.SortFunc(rows, func(a, b Row) int {
-		if compared := strings.Compare(a.Kind, b.Kind); compared != 0 {
-			return compared
-		}
-		return strings.Compare(a.ID, b.ID)
-	})
+	slices.SortFunc(rows, compareRows)
 	return rows
+}
+
+// EachRow llama a fn con cada fila, en cualquier orden, hasta que fn devuelve false.
+// Las filas llevan los buffers JSON de la propia instantánea, que no cambian nunca y
+// comparten las que derivan de ella, así que el mismo buffer es la misma fila: fn solo
+// puede leerlos. Rows da copias propias.
+func (s *Snapshot) EachRow(fn func(Row) bool) {
+	for _, row := range s.rows {
+		if !fn(row) {
+			return
+		}
+	}
+}
+
+func compareRows(a, b Row) int {
+	if compared := strings.Compare(a.Kind, b.Kind); compared != 0 {
+		return compared
+	}
+	return strings.Compare(a.ID, b.ID)
 }

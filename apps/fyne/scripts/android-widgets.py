@@ -203,10 +203,117 @@ def prepare(args):
         (assets / "sytue-widget.json").write_text(json.dumps(config, ensure_ascii=False, separators=(",", ":")))
 
 
+# --- Sytue Office (SYTUE_ARBOL=cmd-local) -----------------------------------------------
+# La edición local no lleva widgets ni el broker de sesión (PLAN-EDICION-LOCAL §7.2): de lo
+# de arriba solo le sirven los iconos. Lo que sí puede llevar es ML Kit GenAI (la IA del
+# sistema, Gemini Nano): sus componentes y sus recursos, que `android-mlkit.py preparar`
+# deja en una carpeta, se enlazan aquí con los iconos, y de la tabla resultante salen las
+# clases R de cada biblioteca (Gradle las genera igual: con los identificadores finales).
+LOCAL = ("eu.sytue.nativo.Widgets", "eu.sytue.nativo.RefrescoWidgets", "eu.sytue.nativo.RelevoWidgets",
+         "eu.sytue.nativo.SesionProveedor", "eu.sytue.nativo.SesionDesbloqueo")
+
+
+def r_java(final, library, package):
+    """La clase R de `package` con los símbolos de su R.txt y los valores de la tabla final."""
+    values = {}
+    for line in final.splitlines():
+        parts = line.split(" ", 3)
+        if len(parts) == 4:
+            values[(parts[1], parts[2])] = (parts[0], parts[3])
+    types = {}
+    for line in library.splitlines():
+        parts = line.split(" ", 3)
+        if len(parts) != 4:
+            continue
+        kind, rtype, name = parts[0], parts[1], parts[2]
+        if (rtype, name) not in values:
+            raise ValueError("%s.R.%s.%s no está en la tabla enlazada" % (package, rtype, name))
+        final_kind, value = values[(rtype, name)]
+        if final_kind != kind:
+            raise ValueError("%s.R.%s.%s cambia de tipo al enlazar" % (package, rtype, name))
+        java_type = "int[]" if kind == "int[]" else "int"
+        types.setdefault(rtype, []).append("        public static final %s %s = %s;" % (java_type, name, value))
+    out = ["// Generado por android-widgets.py --edicion local: no se edita.",
+           "package %s;" % package, "", "public final class R {", "    private R() {}"]
+    for rtype in sorted(types):
+        out += ["", "    public static final class %s {" % rtype, "        private %s() {}" % rtype]
+        out += types[rtype]
+        out.append("    }")
+    out.append("}")
+    return "\n".join(out) + "\n"
+
+
+def prepare_office(args):
+    source = ET.parse(args.manifest)
+    root = source.getroot()
+    app = root.find("application")
+    package = root.get("package") or ""
+    if not re.fullmatch(r"eu\.sytue\.office\.[a-z]+", package) or app is None:
+        raise ValueError("el manifiesto no es de Sytue Office")
+    for name in LOCAL:
+        if root.find(".//*[@" + ATTR + "name='" + name + "']") is not None:
+            raise ValueError("Sytue Office no declara " + name + " (PLAN-EDICION-LOCAL §7.2)")
+    with tempfile.TemporaryDirectory(prefix="sytue-android-office-") as temp:
+        temp = Path(temp)
+        res = temp / "res"
+        res.mkdir()
+        app.attrib.update(icons(args.apk_root / "res", res))
+        overlays = []
+        if args.mlkit:
+            fragment = ET.parse(args.mlkit / "manifiesto.xml").getroot()
+            for child in fragment:
+                if child.tag == "application":
+                    for item in child:
+                        for key, value in item.attrib.items():
+                            item.set(key, value.replace("${applicationId}", package))
+                        app.append(item)
+                else:
+                    root.insert(list(root).index(app), child)
+            # Cada biblioteca como superposición, en el orden del fichero fijado; la app al final.
+            for n, folder in enumerate(sorted((args.mlkit / "res").iterdir())):
+                flat = temp / ("lib-%02d.zip" % n)
+                subprocess.run([str(args.aapt2), "compile", "--dir", str(folder), "-o", str(flat)], check=True)
+                overlays.append(flat)
+        manifest = temp / "AndroidManifest.xml"
+        write_xml(manifest, root)
+        compiled, linked, symbols = temp / "app.zip", temp / "resources.apk", temp / "R.txt"
+        subprocess.run([str(args.aapt2), "compile", "--dir", str(res), "-o", str(compiled)], check=True)
+        command = [str(args.aapt2), "link", "-o", str(linked), "--manifest", str(manifest),
+                   "-I", str(args.android_jar), "--min-sdk-version", str(args.min_sdk),
+                   "--target-sdk-version", str(args.target_sdk), "--auto-add-overlay",
+                   "--output-text-symbols", str(symbols)]
+        for flat in overlays + [compiled]:
+            command += ["-R", str(flat)]
+        subprocess.run(command, check=True)
+        shutil.rmtree(args.apk_root / "res")
+        with zipfile.ZipFile(linked) as archive:
+            for name in archive.namelist():
+                if name in ("AndroidManifest.xml", "resources.arsc") or name.startswith("res/"):
+                    archive.extract(name, args.apk_root)
+        if args.mlkit and args.r_java:
+            final = symbols.read_text()
+            for library in sorted((args.mlkit / "rtxt").glob("*.txt")):
+                pkg = library.stem
+                target = args.r_java / pkg.replace(".", "/") / "R.java"
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text(r_java(final, library.read_text(), pkg))
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     for key in ("appdir", "manifest", "apk-root", "aapt2", "android-jar"):
         parser.add_argument("--" + key, type=Path, required=True)
     parser.add_argument("--min-sdk", type=int, required=True)
     parser.add_argument("--target-sdk", type=int, required=True)
-    prepare(parser.parse_args())
+    # `local`: Sytue Office (SYTUE_ARBOL=cmd-local). Sin él, la conectada de siempre.
+    parser.add_argument("--edicion", choices=("conectada", "local"), default="conectada")
+    # Solo con --edicion local: la carpeta de `android-mlkit.py preparar` y dónde dejar las R.
+    parser.add_argument("--mlkit", type=Path)
+    parser.add_argument("--r-java", type=Path)
+    parsed = parser.parse_args()
+    if parsed.edicion == "local":
+        prepare_office(parsed)
+    elif parsed.mlkit or parsed.r_java:
+        parser.error("--mlkit y --r-java son de --edicion local")
+    else:
+        prepare(parsed)

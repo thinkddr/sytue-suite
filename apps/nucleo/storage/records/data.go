@@ -36,8 +36,12 @@ func (r *Repository) Selected(kind string) ([]storage.ObjectVersion, error) {
 	for _, heads := range r.heads {
 		for _, version := range heads {
 			var header struct{ Kind, Entity string }
-			if json.Unmarshal(version.Commit.Metadata, &header) != nil {
+			if kind, entity, ok := r.verified.header(version); ok {
+				header.Kind, header.Entity = kind, entity
+			} else if json.Unmarshal(version.Commit.Metadata, &header) != nil {
 				return nil, ErrSource
+			} else {
+				r.verified.putHeader(version, header.Kind, header.Entity)
 			}
 			if header.Kind == r.cfg.ReceiptKind {
 				continue

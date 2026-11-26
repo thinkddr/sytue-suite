@@ -41,7 +41,7 @@ func (a *App) menuCalendario(c api.Calendar, disparador fyne.CanvasObject) {
 		elemento("nav.rename", func() { a.formularioCalendario(&c) }),
 		elemento("nav.changeColour", func() { a.formularioCalendario(&c) }))
 	// Compartir con ACL: solo calendarios propios editables, no las suscripciones.
-	if !c.ReadOnly {
+	if !c.ReadOnly && !p.SinPersonas {
 		elems = append(elems, elemento("cal.share", func() { a.compartir(c) }))
 	}
 	if c.ID != "" {
@@ -132,7 +132,15 @@ func (a *App) descargarEventoICS(o Ocurrencia) {
 }
 
 // formularioCalendario es CalendarModal: nuevo (`c` nil) o renombrar y cambiar el color.
-func (a *App) formularioCalendario(c *api.Calendar) {
+func (a *App) formularioCalendario(c *api.Calendar) { a.formularioCalendarioCon(c, nil) }
+
+// formularioCalendarioEn es el mismo formulario para crear el calendario en una cuenta
+// (GrupoCuenta.CrearCalendario) en vez de en este equipo.
+func (a *App) formularioCalendarioEn(crear func(ctx context.Context, nombre, color string) error) {
+	a.formularioCalendarioCon(nil, crear)
+}
+
+func (a *App) formularioCalendarioCon(c *api.Calendar, enCuenta func(ctx context.Context, nombre, color string) error) {
 	lienzo := a.lienzo()
 	if lienzo == nil {
 		return
@@ -191,9 +199,12 @@ func (a *App) formularioCalendario(c *api.Calendar) {
 		in := api.CalendarInput{Name: nombreColeccion, DisplayName: n, Color: color}
 		a.escribir(func(ctx context.Context) error {
 			var err error
-			if editar {
+			switch {
+			case editar:
 				_, err = a.Cal.UpdateCalendar(ctx, c.ID, in)
-			} else {
+			case enCuenta != nil:
+				err = enCuenta(ctx, in.DisplayName, in.Color)
+			default:
 				_, err = a.Cal.CreateCalendar(ctx, in)
 			}
 			return err

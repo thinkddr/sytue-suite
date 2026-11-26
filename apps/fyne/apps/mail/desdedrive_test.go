@@ -4,6 +4,7 @@
 package mail
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"net/url"
@@ -68,5 +69,39 @@ func TestElEnlaceDeDriveAbreElRedactorConSusFicheros(t *testing.T) {
 	_, s, _, err := b.componer(rd.r.B, true)
 	if err != nil || !strings.Contains(s.Texto, traductor(t).T("compose.driveAttachmentsHeading", nil)+"\nFichero f1: https://drive.sytue.eu/drive/files/f1") {
 		t.Errorf("el cuerpo que se guarda es %q (%v)", s.Texto, err)
+	}
+}
+
+// Sytue Office: lo que otra app deja para Mail (el PDF de una factura del ERP) llega ya
+// leído en Redactar.Adjuntos y va al borrador como un adjunto del equipo, dentro del
+// mensaje; si el enlace pedía alguno que no se pudo recoger, se dice y se abre igual.
+func TestElRedactorAbreConLosAdjuntosQueLlegan(t *testing.T) {
+	b, _, _ := buzonConVentana(t, servicioConTodas(), fyne.NewSize(1280, 800))
+	pdf := []byte("%PDF-1.7 factura")
+	b.RedactarDesde(api.Redactar{
+		Para: "pagos@cliente.es", Asunto: "Factura FV-2026-00001", Cuerpo: "Adjunta.",
+		Adjuntos: []api.AdjuntoRedactar{{Nombre: "FV-2026-00001.pdf", Tipo: "application/pdf", Datos: pdf}},
+	})
+	rd := b.redaccion
+	if rd == nil {
+		t.Fatal("no se ha abierto el redactor")
+	}
+	if as := rd.r.B.Adjuntos; len(as) != 1 || as[0].Nombre != "FV-2026-00001.pdf" || as[0].Tipo != "application/pdf" || !bytes.Equal(as[0].Datos, pdf) {
+		t.Fatalf("adjuntos del borrador: %+v", as)
+	}
+	if _, titulo := ultimoAviso(b); titulo == traductor(t).T("compose.attachFailed", nil) {
+		t.Error("se avisó de un fallo que no hubo")
+	}
+	_, s, _, err := b.componer(rd.r.B, false)
+	if err != nil || len(s.Adjuntos) != 1 || s.Adjuntos[0].Nombre != "FV-2026-00001.pdf" {
+		t.Fatalf("el mensaje sale sin el PDF: %+v %v", s.Adjuntos, err)
+	}
+
+	b.RedactarDesde(api.Redactar{Para: "a@b.eu", SinAdjuntar: 1})
+	if b.redaccion == nil || len(b.redaccion.r.B.Adjuntos) != 0 {
+		t.Fatal("sin adjuntos que recoger, el redactor no se abre igual")
+	}
+	if _, titulo := ultimoAviso(b); titulo != traductor(t).T("compose.attachFailed", nil) {
+		t.Errorf("no se dice que un adjunto no llegó: %q", titulo)
 	}
 }

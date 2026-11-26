@@ -86,6 +86,10 @@ type PaginaAjustes struct {
 	Vacaciones *EstadoAjuste
 	// AlAbrir abre el editor de una fila, por su clave.
 	AlAbrir func(clave string)
+	// Ocultas son las filas que no se ofrecen, por su clave (la edición local no tiene
+	// alias, compartidos, S/MIME ni «Clientes de correo»). Un grupo sin filas no sale.
+	// Nil: todas, como siempre.
+	Ocultas map[string]bool
 
 	// desplaza dura lo que la página: rehacerla con cada dato no la devuelve arriba.
 	desplaza *container.Scroll
@@ -109,6 +113,8 @@ func (p *PaginaAjustes) estado(clave string) *EstadoAjuste {
 
 // Objeto monta la página sobre el fondo de la hoja: el `SettingsShell` de la suite con
 // una `SettingsSection` por grupo (§2.8: no se reimplementan por app).
+//
+//nolint:gocognit // Una sección por grupo de ajustes, montada de una vez como el SettingsShell de la web.
 func (p *PaginaAjustes) Objeto(v tema.Variante) fyne.CanvasObject {
 	t := p.T
 	p.botones = map[string]*ui.Boton{}
@@ -118,7 +124,19 @@ func (p *PaginaAjustes) Objeto(v tema.Variante) fyne.CanvasObject {
 	for _, g := range gruposAjustes {
 		lista := &listaAjustes{}
 		var objetos []fyne.CanvasObject
-		for i, e := range g.filas {
+		filas := g.filas
+		if len(p.Ocultas) > 0 {
+			filas = nil
+			for _, e := range g.filas {
+				if !p.Ocultas[e.clave] {
+					filas = append(filas, e)
+				}
+			}
+			if len(filas) == 0 {
+				continue
+			}
+		}
+		for i, e := range filas {
 			f := &filaAjuste{clave: e.clave}
 			if i > 0 {
 				// `divide-y divide-border`: el filete va ENTRE filas, no encima de la primera.
@@ -303,6 +321,7 @@ func (b *Buzon) verAjustes() {
 	if b.P.Ajustes == nil {
 		b.P.Ajustes = &PaginaAjustes{T: b.P.T, AlAbrir: b.abrirAjuste}
 	}
+	b.P.Ajustes.Ocultas = b.ajustesOcultos()
 	if c := b.P.Lienzo(); c != nil {
 		b.P.Ajustes.Ventana = c.Size().Width
 	}
@@ -324,6 +343,12 @@ func (b *Buzon) leerEstadoAjustes() {
 	b.P.Ajustes.Firma = strings.TrimSpace(b.firma) != ""
 	if b.S == nil {
 		b.P.Refrescar()
+		return
+	}
+	// La respuesta automática por cuenta, en el servidor de cada una (la edición local,
+	// M-10): se pregunta a cada servidor ahora, que la persona está mirando los Ajustes.
+	if rs, ok := b.S.(api.MailRespuestas); ok {
+		b.leerAutorespuestas(rs)
 		return
 	}
 	pedir(b, b.S.Vacation, func(v api.MailVacation, err error) {

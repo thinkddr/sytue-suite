@@ -5,45 +5,16 @@ package auth
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
-	"encoding/json"
 	"errors"
-	"strings"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/ajustes"
 )
 
-// IdentidadDrive es un contexto opaco estable. Cambiar un refresh token no cambia
-// este hash; un emisor, cliente, persona u organización diferentes sí lo hacen.
-func (i IdentitySnapshot) IdentidadDrive() string {
-	if i.Organization == "" {
-		return ""
-	}
-	return i.IdentidadSesion()
-}
-
-// IdentidadSesion is the shared opaque context for device work, independent of
-// whether this user mounted Drive in the operating system.
-func (i IdentitySnapshot) IdentidadSesion() string {
-	raw := i.contextoSesion()
-	if raw == nil {
-		return ""
-	}
-	sum := sha256.Sum256(raw)
-	return hex.EncodeToString(sum[:])
-}
-
-func (i IdentitySnapshot) contextoSesion() []byte {
-	if i.Issuer == "" || i.Client == "" || i.Subject == "" {
-		return nil
-	}
-	raw, _ := json.Marshal([]string{strings.TrimRight(i.Issuer, "/"), i.Client, i.Subject, i.Organization})
-	return raw
-}
+// IdentidadDrive, IdentidadSesion y su ContextoSesion son métodos de IdentitySnapshot
+// (`nucleo/autorizacion`).
 
 func (a *AlmacenSesion) publicarAccesoDrive(t Tokens) error {
-	identidad := (IdentitySnapshot{a.emisor, a.cliente, t.Subject, organizacionDe(t)}).IdentidadDrive()
+	identidad := (IdentitySnapshot{Issuer: a.emisor, Client: a.cliente, Subject: t.Subject, Organization: organizacionDe(t)}).IdentidadDrive()
 	return ajustes.PonerAccesoDrive(identidad, t.Refresh != "" && identidad != "" && !ajustes.Leer().DriveSistemaDesactivado)
 }
 

@@ -518,7 +518,15 @@ func validaData(data json.RawMessage) error {
 // El HTML de una nota, del tipo que sea, se sanea aquí (allowlist), no en el navegador: el
 // contenido de un cuaderno de organización lo pinta el navegador de OTRA persona,
 // así que el saneado tiene que estar en el lado que no se puede saltar.
-func (in *NoteInput) Normalize(encrypted bool) error {
+func (in *NoteInput) Normalize(encrypted bool) error { return in.normalizar(encrypted, SanitizeHTML) }
+
+// NormalizeConFicheros es Normalize de la edición local (Sytue Office, N-07): el cuerpo
+// conserva además los enlaces a ficheros de este equipo (SanitizeHTMLConFicheros).
+func (in *NoteInput) NormalizeConFicheros(encrypted bool) error {
+	return in.normalizar(encrypted, SanitizeHTMLConFicheros)
+}
+
+func (in *NoteInput) normalizar(encrypted bool, sanear func(string) string) error {
 	if in.Kind == "" {
 		in.Kind = KindText
 	}
@@ -528,7 +536,7 @@ func (in *NoteInput) Normalize(encrypted bool) error {
 	if err := in.hechaOCancelada(); err != nil {
 		return err
 	}
-	if err := in.normalizaContenido(encrypted); err != nil {
+	if err := in.normalizaContenido(encrypted, sanear); err != nil {
 		return err
 	}
 	if len(in.Data) == 0 || (encrypted && string(in.Data) == "null") {
@@ -564,7 +572,7 @@ func (in *NoteInput) Normalize(encrypted bool) error {
 // normalizaContenido deja el cuerpo de la nota como toca según venga cifrada o
 // en claro. Sale de `Normalize` porque son las dos ramas más largas y su tamaño
 // escondía el resto de comprobaciones, que son de una línea cada una.
-func (in *NoteInput) normalizaContenido(encrypted bool) error {
+func (in *NoteInput) normalizaContenido(encrypted bool, sanear func(string) string) error {
 	in.ContentCipher = strings.TrimSpace(in.ContentCipher)
 	if encrypted {
 		if in.ContentCipher == "" || !strings.HasPrefix(in.ContentCipher, "encv1:") {
@@ -591,7 +599,7 @@ func (in *NoteInput) normalizaContenido(encrypted bool) error {
 	// TODOS los tipos, no solo texto y tarea: las exportaciones, la búsqueda y los
 	// avisos tratan `Content` como HTML sea cual sea el tipo, y el tipo se puede cambiar
 	// después. Con una sola regla no hay tipo por el que colar HTML sin sanear.
-	in.Content = SanitizeHTML(in.Content)
+	in.Content = sanear(in.Content)
 	return nil
 }
 

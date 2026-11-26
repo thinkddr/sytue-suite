@@ -709,7 +709,7 @@ func (e *exportador) cabecera(ex store.Exportacion) {
 	e.w.Header().Set("Content-Type", "text/csv; charset=utf-8")
 	_, _ = e.w.Write([]byte("\xef\xbb\xbf"))
 	e.csv = csv.NewWriter(e.w)
-	_ = e.csv.Write(cabeceraExportada(e.campos))
+	_ = e.csv.Write(domain.CabeceraExportada(e.campos))
 }
 
 func (e *exportador) tramo(ex store.Exportacion) error {
@@ -718,7 +718,7 @@ func (e *exportador) tramo(ex store.Exportacion) error {
 	}
 	if e.csv != nil {
 		for _, rg := range ex.Records {
-			if err := e.csv.Write(filaExportada(e.campos, rg, ex.Labels)); err != nil {
+			if err := e.csv.Write(domain.FilaExportada(e.campos, rg, ex.Labels)); err != nil {
 				return err
 			}
 		}
@@ -726,7 +726,7 @@ func (e *exportador) tramo(ex store.Exportacion) error {
 		return e.csv.Error()
 	}
 	for _, rg := range ex.Records {
-		fila, _ := json.Marshal(registroExportado{rg, valoresDeEnlaces(e.campos, rg, ex.Labels)})
+		fila, _ := json.Marshal(domain.RegistroExportado{Registro: rg, LinkValues: domain.ValoresDeEnlaces(e.campos, rg, ex.Labels)})
 		if e.n > 0 {
 			fila = append([]byte{','}, fila...)
 		}
@@ -736,97 +736,4 @@ func (e *exportador) tramo(ex store.Exportacion) error {
 		e.n++
 	}
 	return nil
-}
-
-// registroExportado es un registro en la exportación JSON: además de los ids de sus
-// enlaces (`links`), el texto de cada registro enlazado (`link_values`, en el mismo orden).
-type registroExportado struct {
-	domain.Registro
-	LinkValues map[string][]string `json:"link_values"`
-}
-
-// valoresDeEnlaces da, por campo de enlace, el texto de los registros enlazados.
-func valoresDeEnlaces(campos []domain.Campo, rg domain.Registro, etiquetas map[string]string) map[string][]string {
-	out := map[string][]string{}
-	for _, f := range campos {
-		if f.Kind == domain.TipoRelacion && len(rg.Links[f.ID]) > 0 {
-			out[f.ID] = textosDe(rg.Links[f.ID], etiquetas)
-		}
-	}
-	return out
-}
-
-func textosDe(ids []string, etiquetas map[string]string) []string {
-	vs := make([]string, len(ids))
-	for i, id := range ids {
-		vs[i] = etiquetas[id]
-	}
-	return vs
-}
-
-// cabeceraExportada y filaExportada son la fila de títulos y la de un registro del CSV.
-// Un campo de enlace ocupa DOS columnas: la suya, con el texto de los registros enlazados
-// (lo que una persona quiere leer), y «<nombre> (id)», con sus ids (lo que una máquina
-// necesita para volver a casarlos).
-func cabeceraExportada(campos []domain.Campo) []string {
-	cab := make([]string, 0, len(campos))
-	for _, f := range campos {
-		cab = append(cab, domain.CeldaCSV(f.Name))
-		if f.Kind == domain.TipoRelacion {
-			cab = append(cab, domain.CeldaCSV(f.Name+" (id)"))
-		}
-	}
-	return cab
-}
-
-func filaExportada(campos []domain.Campo, rg domain.Registro, etiquetas map[string]string) []string {
-	fila := make([]string, 0, len(campos))
-	for _, f := range campos {
-		if f.Kind != domain.TipoRelacion {
-			fila = append(fila, celdaExportada(f, rg))
-			continue
-		}
-		// El texto de un registro enlazado lo escribió alguien: pasa por CeldaCSV como
-		// cualquier otro texto. Los ids son UUID y no pueden ser una fórmula.
-		fila = append(fila,
-			domain.CeldaCSV(strings.Join(textosDe(rg.Links[f.ID], etiquetas), "; ")),
-			strings.Join(rg.Links[f.ID], ";"))
-	}
-	return fila
-}
-
-// celdaExportada pasa el valor de un registro a texto de CSV. Solo lo que es texto
-// del usuario pasa por domain.CeldaCSV: un número negativo no es una fórmula.
-func celdaExportada(f domain.Campo, rg domain.Registro) string {
-	if f.Kind == domain.TipoAdjunto {
-		// El nombre de un fichero lo puso quien lo subió: se neutraliza como cualquier texto.
-		return domain.CeldaCSV(nombresDeAdjuntos(rg.Attachments[f.ID]))
-	}
-	raw := rg.Data[f.ID]
-	if len(raw) == 0 {
-		return ""
-	}
-	switch f.Efectivo().Kind {
-	case domain.TipoNumero:
-		var n float64
-		if json.Unmarshal(raw, &n) == nil {
-			return strconv.FormatFloat(n, 'f', -1, 64)
-		}
-	case domain.TipoCasilla:
-		var b bool
-		if json.Unmarshal(raw, &b) == nil {
-			return strconv.FormatBool(b)
-		}
-	case domain.TipoMultiple:
-		var l []string
-		if json.Unmarshal(raw, &l) == nil {
-			return domain.CeldaCSV(strings.Join(l, "; "))
-		}
-	default:
-		var s string
-		if json.Unmarshal(raw, &s) == nil {
-			return domain.CeldaCSV(s)
-		}
-	}
-	return ""
 }

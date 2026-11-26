@@ -13,7 +13,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"git.sytue.eu/sytue/one/services/syerp/internal/domain"
+	domain "git.sytue.eu/sytue/one/apps/nucleo/erp/dominio"
+	"git.sytue.eu/sytue/one/apps/nucleo/erp/obligaciones"
 )
 
 type ProcesoObligacion struct {
@@ -142,30 +143,22 @@ func (s *Store) AvanzarProceso(ctx context.Context, clave, periodo string, fase 
 		if err := tx.QueryRow(ctx, `SELECT fase, referencia FROM procesos_obligaciones WHERE tenant = current_setting('app.tenant',true) AND clave=$1 AND periodo=$2 FOR UPDATE`, clave, periodo).Scan(&out.Fase, &out.Referencia); err != nil {
 			return err
 		}
-		if fase <= out.Fase {
-			return nil
+		nuevo, cambia, err := obligaciones.Avanzar(obligaciones.Proceso(out), fase, referencia, documentos, func(doc string) (bool, error) {
+			var hay bool
+			err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM adjuntos WHERE tenant=current_setting('app.tenant',true) AND modelo='obligacion' AND registro=$1)`,
+				obligaciones.RegistroDocumento(clave, periodo, doc)).Scan(&hay)
+			return hay, err
+		})
+		if errors.Is(err, obligaciones.ErrPaso) {
+			return fmt.Errorf("%s: %w", err.Error(), domain.ErrDatos)
 		}
-		if fase != out.Fase+1 {
-			return fmt.Errorf("completa el paso anterior: %w", domain.ErrDatos)
-		}
-		if fase == 4 {
-			if strings.TrimSpace(referencia) == "" {
-				return fmt.Errorf("indica la referencia del justificante: %w", domain.ErrDatos)
-			}
-			for _, doc := range documentos {
-				var hay bool
-				if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM adjuntos WHERE tenant=current_setting('app.tenant',true) AND modelo='obligacion' AND registro=$1)`, clave+":"+periodo+":"+doc).Scan(&hay); err != nil {
-					return err
-				}
-				if !hay {
-					return fmt.Errorf("guarda el documento %s antes de terminar: %w", doc, domain.ErrDatos)
-				}
-			}
+		if err != nil || !cambia {
+			return err
 		}
 		if _, err := tx.Exec(ctx, `UPDATE procesos_obligaciones SET fase=$3, referencia=$4, actualizado_por=$5, documentos=$6, updated_at=now() WHERE tenant=current_setting('app.tenant',true) AND clave=$1 AND periodo=$2`, clave, periodo, fase, strings.TrimSpace(referencia), por, documentos); err != nil {
 			return err
 		}
-		out = ProcesoObligacion{Fase: fase, Referencia: strings.TrimSpace(referencia)}
+		out = ProcesoObligacion(nuevo)
 		return nil
 	})
 	return out, err

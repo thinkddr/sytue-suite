@@ -370,6 +370,9 @@ func (p *Pantalla) dialogoDeVista(editada *api.BasesView) {
 		f.tipos = []string{api.BasesGrid, api.BasesKanban, api.BasesGallery, api.BasesForm}
 		f.borrador.agrupar = f.selecciones[0].ID
 	}
+	if p.SinFormularios {
+		f.tipos = slices.DeleteFunc(f.tipos, func(t string) bool { return t == api.BasesForm })
+	}
 	titulo, accion := p.t("view.add"), p.t("view.create")
 	if editada != nil {
 		f.borrador, f.tipos = borradorDeVista(*editada, b.Campos), []string{editada.Kind}

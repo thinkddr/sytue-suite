@@ -520,6 +520,13 @@ type Contexto struct {
 	// GuardarEnDrive devuelve los cambios al fichero de Drive del que salió el
 	// documento; nil si no salió de ninguno, y entonces la entrada no se enseña.
 	GuardarEnDrive func()
+	// GuardarFichero y GuardarComo son «Guardar» (también Ctrl/Cmd+S) y «Guardar como…»
+	// del menú Archivo de la edición local: escriben el documento en un fichero del disco
+	// (fichero.go). nil, como en la edición conectada: ni las entradas ni el atajo.
+	GuardarFichero func()
+	GuardarComo    func()
+	// RotuloGuardarFichero y RotuloGuardarComo son sus rótulos, ya traducidos.
+	RotuloGuardarFichero, RotuloGuardarComo string
 	// SinRed apaga lo que necesita el servicio (descargar, compartir, versiones).
 	SinRed bool
 	// Paneles da el cuerpo de un panel del carril que el producto sabe llenar (Docus:

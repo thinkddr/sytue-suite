@@ -18,7 +18,6 @@ import (
 	"fyne.io/fyne/v2/widget"
 
 	"git.sytue.eu/sytue/one/apps/fyne/iconos"
-	"git.sytue.eu/sytue/one/apps/fyne/sesion"
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
@@ -80,7 +79,7 @@ const (
 type buscadorBarra struct {
 	t   *i18n.Translator
 	hub *api.Hub
-	s   *sesion.Suite
+	s   *suiteSesion
 
 	campo   *Entrada
 	panel   *panelBarra
@@ -110,7 +109,7 @@ type buscadorBarra struct {
 	alCambiarFoco func()
 }
 
-func nuevoBuscadorBarra(t *i18n.Translator, s *sesion.Suite) *buscadorBarra {
+func nuevoBuscadorBarra(t *i18n.Translator, s *suiteSesion) *buscadorBarra {
 	b := &buscadorBarra{t: t, s: s, activa: -1}
 	if s != nil {
 		b.hub = s.Hub
@@ -335,7 +334,7 @@ func (b *buscadorBarra) alEscribir(texto string) {
 // el fallo con su reintento, que es lo mismo que enseña la web cuando el Hub no
 // contesta.
 func (b *buscadorBarra) buscar(q string) {
-	var cuenta sesion.Estado
+	var cuenta estadoSesion
 	if b.s != nil {
 		cuenta = b.s.Estado()
 		if !cuenta.Dentro() {

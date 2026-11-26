@@ -11,7 +11,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math"
 	"mime/multipart"
 	"net/http"
 	"net/url"
@@ -23,14 +22,14 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
+	"git.sytue.eu/sytue/one/apps/nucleo/erp/catalogo"
+	"git.sytue.eu/sytue/one/apps/nucleo/erp/ia"
 	"git.sytue.eu/sytue/one/platform/pkg/asistente"
 	"git.sytue.eu/sytue/one/platform/pkg/authn"
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/platform/pkg/log"
 	"git.sytue.eu/sytue/one/platform/pkg/validation"
-	"git.sytue.eu/sytue/one/services/syerp/internal/catalogo"
 	"git.sytue.eu/sytue/one/services/syerp/internal/config"
-	"git.sytue.eu/sytue/one/services/syerp/internal/ia"
 	"git.sytue.eu/sytue/one/services/syerp/internal/permisos"
 	"git.sytue.eu/sytue/one/services/syerp/internal/store"
 )
@@ -367,15 +366,7 @@ func (h *Handlers) fuentesDe(activos []string, idioma string) ([]ia.Fuente, map[
 			anadir(h.fuenteDeModelo(m, idioma))
 		}
 	}
-	anadir(ia.Fuente{Clave: fuenteLibro, Etiqueta: h.cat.Rotulo("fuente.apuntes", idioma), Campos: []ia.Campo{
-		{Clave: "fecha", Tipo: ia.TipoFecha, Etiqueta: h.cat.Rotulo("campo.fecha", idioma)},
-		{Clave: "diario", Tipo: ia.TipoTexto, Etiqueta: h.cat.Rotulo("campo.diario", idioma)},
-		{Clave: "ref", Tipo: ia.TipoTexto, Etiqueta: h.cat.Rotulo("campo.ref", idioma)},
-		{Clave: "concepto", Tipo: ia.TipoTexto, Etiqueta: h.cat.Rotulo("campo.descripcion", idioma)},
-		{Clave: "cuenta", Tipo: ia.TipoTexto, Etiqueta: h.cat.Rotulo("campo.cuenta", idioma)},
-		{Clave: "debe", Tipo: ia.TipoDinero, Etiqueta: h.cat.Rotulo("campo.debe", idioma)},
-		{Clave: "haber", Tipo: ia.TipoDinero, Etiqueta: h.cat.Rotulo("campo.haber", idioma)},
-	}})
+	anadir(ia.FuenteDelLibro(h.cat, idioma))
 	for _, e := range otrasApps {
 		if e.base(h.cfg) == "" {
 			continue
@@ -389,47 +380,12 @@ func (h *Handlers) fuentesDe(activos []string, idioma string) ([]ia.Fuente, map[
 	return out, indice
 }
 
-const fuenteLibro = "apuntes"
+const fuenteLibro = ia.FuenteLibro
 
-// fuenteDeModelo describe un modelo del catálogo como fuente de informes.
+// fuenteDeModelo describe un modelo del catálogo como fuente de informes
+// (ia.FuenteDeModelo, que comparte el ERP de Sytue Office).
 func (h *Handlers) fuenteDeModelo(m *catalogo.Modelo, idioma string) ia.Fuente {
-	v := h.cat.VistaModelo(m, idioma)
-	f := ia.Fuente{Clave: m.Clave, Etiqueta: v.Etiqueta}
-	if v.Numerado {
-		f.Campos = append(f.Campos, ia.Campo{Clave: "ref", Tipo: ia.TipoTexto, Etiqueta: h.cat.Rotulo("campo.ref", idioma)})
-	}
-	for _, c := range v.Campos {
-		campo := ia.Campo{Clave: c.Clave, Tipo: tipoDeInforme(c.Tipo), Etiqueta: c.Etiqueta}
-		for _, o := range c.Opciones {
-			if campo.Valores == nil {
-				campo.Valores = map[string]string{}
-			}
-			campo.Valores[o.Valor] = o.Etiqueta
-		}
-		f.Campos = append(f.Campos, campo)
-	}
-	if len(v.Estados) > 0 {
-		estado := ia.Campo{Clave: "estado", Tipo: ia.TipoTexto, Etiqueta: h.cat.Rotulo("campo.estado", idioma), Valores: map[string]string{}}
-		for _, e := range v.Estados {
-			estado.Valores[e.Valor] = e.Etiqueta
-		}
-		f.Campos = append(f.Campos, estado)
-	}
-	return f
-}
-
-func tipoDeInforme(tipo string) string {
-	switch tipo {
-	case catalogo.TipoEntero, catalogo.TipoDecimal:
-		return ia.TipoNumero
-	case catalogo.TipoDinero:
-		return ia.TipoDinero
-	case catalogo.TipoFecha, catalogo.TipoFechaHora:
-		return ia.TipoFecha
-	case catalogo.TipoBooleano:
-		return ia.TipoBooleano
-	}
-	return ia.TipoTexto
+	return ia.FuenteDeModelo(h.cat, m, idioma)
 }
 
 // leer trae hasta `restantes` filas de una fuente: del store si es del ERP, de su
@@ -493,32 +449,7 @@ func (h *Handlers) filasDeModelo(ctx context.Context, m *catalogo.Modelo, tope i
 }
 
 func filaDe(m *catalogo.Modelo, reg store.Registro, etiquetas map[string]string) ia.Fila {
-	fila := ia.Fila{"ref": reg.Ref, "estado": reg.Estado}
-	for _, c := range m.Campos {
-		v := reg.Data[c.Clave]
-		switch c.Tipo {
-		case catalogo.TipoDinero:
-			if cents, ok := centimos(v); ok {
-				fila[c.Clave] = cents
-			}
-		case catalogo.TipoEntero, catalogo.TipoDecimal:
-			if x, err := strconv.ParseFloat(texto(v), 64); err == nil {
-				fila[c.Clave] = x
-			}
-		case catalogo.TipoBooleano:
-			if b, ok := v.(bool); ok {
-				fila[c.Clave] = b
-			}
-		case catalogo.TipoRelacion:
-			id, _ := v.(string)
-			fila[c.Clave] = legible(etiquetas, id)
-		default:
-			if v != nil {
-				fila[c.Clave] = texto(v)
-			}
-		}
-	}
-	return fila
+	return ia.FilaDe(m, reg.Ref, reg.Estado, reg.Data, etiquetas)
 }
 
 func (h *Handlers) filasDelLibro(ctx context.Context, tope int) ([]ia.Fila, bool, error) {
@@ -913,41 +844,8 @@ func textoDePDF(ctx context.Context, base, token string, pdf []byte) (string, er
 	return texto, nil
 }
 
-type fragmentoPDF struct {
-	Texto string  `json:"texto"`
-	X     float64 `json:"x"`
-	Y     float64 `json:"y"`
-}
+// fragmentoPDF y el orden de lectura son los de apps/nucleo/erp/ia, que comparte el
+// ERP de Sytue Office con su motor PDF local.
+type fragmentoPDF = ia.FragmentoPDF
 
-// lineasDePDF pone los fragmentos de cada página en orden de lectura: de arriba
-// abajo (en PDF la y crece hacia arriba) y, en la misma línea, de izquierda a
-// derecha. Un fragmento a menos de 3 puntos de altura del primero de la línea va
-// en esa línea.
-func lineasDePDF(paginas [][]fragmentoPDF) string {
-	var b strings.Builder
-	for _, fragmentos := range paginas {
-		slices.SortStableFunc(fragmentos, func(a, c fragmentoPDF) int { return cmp.Compare(c.Y, a.Y) })
-		var lineas [][]fragmentoPDF
-		for _, f := range fragmentos {
-			if n := len(lineas); n > 0 && math.Abs(lineas[n-1][0].Y-f.Y) <= 3 {
-				lineas[n-1] = append(lineas[n-1], f)
-			} else {
-				lineas = append(lineas, []fragmentoPDF{f})
-			}
-		}
-		for i, linea := range lineas {
-			slices.SortStableFunc(linea, func(a, c fragmentoPDF) int { return cmp.Compare(a.X, c.X) })
-			if i > 0 {
-				b.WriteByte('\n')
-			}
-			for j, f := range linea {
-				if j > 0 {
-					b.WriteByte(' ')
-				}
-				b.WriteString(strings.TrimSpace(f.Texto))
-			}
-		}
-		b.WriteString("\n\n")
-	}
-	return strings.TrimSpace(b.String())
-}
+func lineasDePDF(paginas [][]fragmentoPDF) string { return ia.TextoDePDF(paginas) }

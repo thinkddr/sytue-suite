@@ -14,12 +14,12 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	domain "git.sytue.eu/sytue/one/apps/nucleo/erp/dominio"
 	"git.sytue.eu/sytue/one/platform/pkg/authn"
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/platform/pkg/hubnotify"
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
 	"git.sytue.eu/sytue/one/platform/pkg/validation"
-	"git.sytue.eu/sytue/one/services/syerp/internal/domain"
 	"git.sytue.eu/sytue/one/services/syerp/internal/permisos"
 	"git.sytue.eu/sytue/one/services/syerp/internal/store"
 )

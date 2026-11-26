@@ -147,7 +147,7 @@ func (a *App) pedirVideo() {
 			a.pintar()
 			if vid.EnDirecto() {
 				a.abrirChat()
-			} else if vid.CommentsEnabled {
+			} else if vid.CommentsEnabled && !a.SinComentarios {
 				a.pedirComentarios(false)
 			}
 			a.empezarDiapositivas()
@@ -169,6 +169,11 @@ func (a *App) prepararVisor(errPlay error) {
 			clave = "processing"
 		}
 		texto := a.v.Traduce("watch."+clave+".title") + ". " + a.v.Traduce("watch."+clave+".description")
+		if a.AvisoVer != nil {
+			if propio := a.AvisoVer(vid); propio != "" {
+				texto = propio
+			}
+		}
 		x.Aviso(texto, clave == "processing" || clave == "uploading")
 		return
 	}
@@ -575,6 +580,10 @@ func (a *App) pantallaVer() fyne.CanvasObject {
 	}
 	if a.puedeCompartir() {
 		d.AlCompartir = a.abrirCompartir
+	}
+	d.SinComentarios = a.SinComentarios
+	if a.MandosVer != nil && vid.ID != "" {
+		d.Mandos = a.MandosVer(vid)
 	}
 	if vid.Owner.Sub != yo || yo == "" {
 		d.AlDenunciar = func() { a.AbrirDenuncia(api.CastNewReport{Kind: api.CastReportVideo, VideoID: vid.ID}, "") }

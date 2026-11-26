@@ -23,11 +23,7 @@ func (r *Repository) originalPreview(ctx context.Context, done func(), id string
 		return nil, err
 	}
 	pngOutput := strings.EqualFold(asset.MediaType, "image/png") || strings.HasSuffix(strings.ToLower(asset.Name), ".png")
-	side, _ := model.VariantePrevia.LadoMayor()
 	return storage.PipeRead(ctx, done, func(ctx context.Context, out io.Writer) error {
-		return photorender.Derivar(ctx, func(ctx context.Context) ([]byte, error) { return r.exportOriginal(ctx, id) }, model.OrientacionDe(asset.Orientation), model.RecetaVacia(), pngOutput, []int{side}, func(_ int, _, _ string, raw []byte) error {
-			_, err := out.Write(raw)
-			return err
-		})
+		return PreviaSinEditar(ctx, out, func(ctx context.Context) ([]byte, error) { return r.exportOriginal(ctx, id) }, model.OrientacionDe(asset.Orientation), pngOutput)
 	}), nil
 }

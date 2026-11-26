@@ -17,7 +17,6 @@ import (
 	"fyne.io/fyne/v2/layout"
 
 	"git.sytue.eu/sytue/one/apps/fyne/iconos"
-	"git.sytue.eu/sytue/one/apps/fyne/sesion"
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
@@ -50,7 +49,7 @@ const (
 type avisosBarra struct {
 	t   *i18n.Translator
 	hub *api.Hub
-	s   *sesion.Suite
+	s   *suiteSesion
 
 	boton  *BotonIcono
 	anillo *canvas.Rectangle
@@ -101,7 +100,7 @@ type avisosBarra struct {
 	alDatos func(producto string)
 }
 
-func nuevoAvisosBarra(t *i18n.Translator, s *sesion.Suite) *avisosBarra {
+func nuevoAvisosBarra(t *i18n.Translator, s *suiteSesion) *avisosBarra {
 	a := &avisosBarra{t: t, s: s, estado: enReposo, anunciados: map[string]bool{}}
 	a.irA = func(producto, u string) { _ = api.AbrirURL(fyne.CurrentApp(), producto, u) }
 	if s != nil {
@@ -269,7 +268,7 @@ func (a *avisosBarra) despertar() {
 }
 
 // sesionCambio enciende o apaga la campana según haya sesión.
-func (a *avisosBarra) sesionCambio(e sesion.Estado) {
+func (a *avisosBarra) sesionCambio(e estadoSesion) {
 	a.mu.Lock()
 	yaEstaba := a.hub != nil
 	a.mu.Unlock()

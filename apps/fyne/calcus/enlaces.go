@@ -24,7 +24,7 @@ import (
 var pistaEnlace = regexp.MustCompile(`(?i)hyperlink|https?:|mailto:`)
 
 // reEsquema es el esquema escrito al principio («https:»). Sin él no hay enlace: un
-// «www.ejemplo.org» o cualquier texto con un punto se queda en texto.
+// «www.example.org» o cualquier texto con un punto se queda en texto.
 var reEsquema = regexp.MustCompile(`^([A-Za-z][A-Za-z0-9+.-]*):`)
 
 // hrefSeguro es el enlace que se puede abrir para un texto, o "" si no es uno permitido:

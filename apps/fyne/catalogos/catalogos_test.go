@@ -62,6 +62,23 @@ var catalogo = map[string][]string{
 	"cmd/diapos":    {"office"},
 	"cmd/calcus":    {"office"},
 	"cmd/certipdf":  {"office"},
+	// Sytue Office, la edición local (PLAN-EDICION-LOCAL §5.14): cada app, el catálogo de
+	// su par conectado. Sus textos PROPIOS (Ajustes, cuentas, nube…) no tienen web: van
+	// en tablas `map[string][2]string` de su paquete, que clavesPropias da de alta.
+	"cmd-local/docus":    {"office"},
+	"cmd-local/calcus":   {"office"},
+	"cmd-local/diapos":   {"office"},
+	"cmd-local/certipdf": {"office"},
+	"cmd-local/mail":     {"mail"},
+	"cmd-local/calendar": {"calendar"},
+	"cmd-local/contacts": {"contacts"},
+	"cmd-local/notes":    {"notes"},
+	"cmd-local/photos":   {"photos"},
+	"cmd-local/rooms":    {"rooms"},
+	"cmd-local/cast":     {"cast"},
+	"cmd-local/bases":    {"bases"},
+	"cmd-local/erp":      {"erp"},
+	"cmd-local/drive":    {"drive"},
 }
 
 // fuenteWeb es dónde está en la web el catálogo de un directorio: el de una app, en
@@ -217,11 +234,12 @@ func TestLasClavesQueElCodigoPideExisten(t *testing.T) {
 		}
 	}
 
+	propias := clavesPropias(t)
 	faltan := map[string]string{}
 	vistas := 0
 	for _, u := range clavesDelArbol(t) {
 		vistas++
-		if delComun[u.clave] {
+		if delComun[u.clave] || propias[filepath.ToSlash(filepath.Dir(u.fichero))][u.clave] {
 			continue
 		}
 		if slices.ContainsFunc(appDe(u.fichero), func(app string) bool { return porApp[app][u.clave] }) {
@@ -260,8 +278,10 @@ type usoDeClave struct{ clave, fichero string }
 var formaDeClave = regexp.MustCompile(`^[a-z][A-Za-z0-9]*(\.[A-Za-z0-9_]+)+$`)
 
 // noSonClaves son las extensiones que la forma de clave no distingue de una: un
-// «en.json» es indistinguible de «grupo.subgrupo» mirando solo el texto.
-var noSonClaves = []string{".json", ".png", ".pdf", ".p12", ".pem", ".svg", ".go", ".ts", ".tsx", ".css", ".xml", ".toml", ".jar", ".eu", ".com", ".org", ".io", ".us", ".example"}
+// «en.json» es indistinguible de «grupo.subgrupo» mirando solo el texto. «.dll» es el de
+// las bibliotecas de Windows que se cargan en Go puro («mfplat.dll», en
+// `video/sistema/mediafoundation`).
+var noSonClaves = []string{".json", ".png", ".pdf", ".p12", ".pem", ".svg", ".go", ".ts", ".tsx", ".css", ".xml", ".toml", ".jar", ".dll", ".eu", ".com", ".org", ".io", ".us", ".example"}
 
 // literalesQueNoSonClaves son identificadores de almacenamiento que tienen la forma
 // de una clave i18n, pero no se pasan al traductor. Mantenerlos fuera evita que el
@@ -470,4 +490,64 @@ func claves(t *testing.T, sub fs.FS, fichero string) map[string]bool {
 		out[k] = true
 	}
 	return out
+}
+
+// clavesPropias son las claves de las tablas de textos PROPIAS de Sytue Office, por
+// directorio: los `map[string][2]string` (español, inglés) de `local/` y `cmd-local/`. Es
+// el «catálogo local» de PLAN-EDICION-LOCAL §5.14, dado de alta aquí en vez de colarlo
+// en `pendientes`: una clave de esas tablas no sale en pantalla tal cual, porque la
+// traduce su propia tabla. Se leen del árbol sintáctico, no de una lista a mano.
+func clavesPropias(t *testing.T) map[string]map[string]bool {
+	t.Helper()
+	out := map[string]map[string]bool{}
+	for _, raiz := range []string{filepath.Join("..", "local"), filepath.Join("..", "cmd-local")} {
+		err := filepath.WalkDir(raiz, func(ruta string, d fs.DirEntry, err error) error {
+			if err != nil || d.IsDir() || !strings.HasSuffix(ruta, ".go") || strings.HasSuffix(ruta, "_test.go") {
+				return err
+			}
+			f, err := parser.ParseFile(token.NewFileSet(), ruta, nil, 0)
+			if err != nil {
+				return err
+			}
+			rel, _ := filepath.Rel("..", filepath.Dir(ruta))
+			dir := filepath.ToSlash(rel)
+			ast.Inspect(f, func(n ast.Node) bool {
+				lit, ok := n.(*ast.CompositeLit)
+				if !ok {
+					return true
+				}
+				m, ok := lit.Type.(*ast.MapType)
+				if !ok || !esIdent(m.Key, "string") {
+					return true
+				}
+				v, ok := m.Value.(*ast.ArrayType)
+				if !ok || v.Len == nil || !esIdent(v.Elt, "string") {
+					return true
+				}
+				for _, e := range lit.Elts {
+					kv, ok := e.(*ast.KeyValueExpr)
+					if !ok {
+						continue
+					}
+					if b, ok := kv.Key.(*ast.BasicLit); ok && b.Kind == token.STRING {
+						if out[dir] == nil {
+							out[dir] = map[string]bool{}
+						}
+						out[dir][strings.Trim(b.Value, "`\"")] = true
+					}
+				}
+				return true
+			})
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	return out
+}
+
+func esIdent(e ast.Expr, nombre string) bool {
+	i, ok := e.(*ast.Ident)
+	return ok && i.Name == nombre
 }

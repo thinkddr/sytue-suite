@@ -6,8 +6,6 @@ package sesion
 import (
 	"context"
 	"errors"
-	"fmt"
-	"io"
 	"log/slog"
 	"net/url"
 	"os"
@@ -17,9 +15,9 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/storage"
 
+	"git.sytue.eu/sytue/one/apps/fyne/anfitrion"
 	"git.sytue.eu/sytue/one/apps/nucleo/ajustes"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
-	"git.sytue.eu/sytue/one/apps/nucleo/ficheros"
 	"git.sytue.eu/sytue/one/apps/nucleo/sistema/escritorio"
 )
 
@@ -229,44 +227,8 @@ func ficheroDeArg(a string) (string, bool) {
 }
 
 // leerLocal trae el contenido de un fichero de la máquina con el mismo tope que tiene el
-// conversor, para no subir cuarenta megas y recibir un 413.
-func leerLocal(crudo string) (string, []byte, error) {
-	uri, err := storage.ParseURI(crudo)
-	if err != nil {
-		return "", nil, err
-	}
-	nombre := uri.Name()
-	if nombre == "" {
-		nombre = filepath.Base(crudo)
-	}
-
-	// Si es un fichero del sistema (file:// o ruta absoluta), usamos la vía segura
-	// del núcleo que maneja security scopes en iOS y lectura limpia sin depender
-	// de punteros nativos efímeros.
-	if uri.Scheme() == "file" || strings.HasPrefix(crudo, "/") {
-		datos, errSeguro := ficheros.LeerLocalSeguro(crudo)
-		if errSeguro == nil && len(datos) > 0 {
-			if len(datos) > api.MaxImportar {
-				return "", nil, fmt.Errorf("sesion: %q pasa de los %d MiB que convierte el servicio", nombre, api.MaxImportar>>20)
-			}
-			return nombre, datos, nil
-		}
-	}
-
-	r, err := storage.Reader(uri)
-	if err != nil {
-		return "", nil, err
-	}
-	defer func() { _ = r.Close() }()
-	datos, err := io.ReadAll(io.LimitReader(r, api.MaxImportar+1))
-	if err != nil {
-		return "", nil, err
-	}
-	if len(datos) > api.MaxImportar {
-		return "", nil, fmt.Errorf("sesion: %q pasa de los %d MiB que convierte el servicio", nombre, api.MaxImportar>>20)
-	}
-	return nombre, datos, nil
-}
+// conversor, para no subir cuarenta megas y recibir un 413. Vive en `anfitrion` (C-04).
+func leerLocal(crudo string) (string, []byte, error) { return anfitrion.LeerLocal(crudo) }
 
 // LeerLocal es leerLocal para quien no convierte el fichero sino que lo sube tal cual:
 // CertiPDF manda el PDF de la máquina a la carpeta «PDF» de Drive, como hace la web.

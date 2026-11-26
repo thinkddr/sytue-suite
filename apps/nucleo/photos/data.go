@@ -23,6 +23,8 @@ func photoView(a model.AssetRow) api.Photo {
 	if a.DriveID == "private:"+a.ID {
 		value.DriveFileID = ""
 	}
+	// Un original externo o un vídeo (FO-09); en las demás, cero, como siempre.
+	value.DurationMs, value.Externo = a.DurationMs, rutaExternaDe(a)
 	if a.Latitude != nil && a.Longitude != nil {
 		value.Location = &api.PhotoPlace{Lat: *a.Latitude, Lon: *a.Longitude}
 	}
@@ -46,6 +48,10 @@ func (r *Repository) assets(ctx context.Context) ([]model.AssetRow, error) {
 		if err != nil || value.Owner != r.scope.Subject {
 			return nil, ErrSource
 		}
+		// Una foto purgada (Purgar) ya no existe para la galería, ni en la papelera.
+		if value.PurgedAt != nil {
+			continue
+		}
 		values = append(values, value)
 	}
 	return values, nil
@@ -56,7 +62,7 @@ func (r *Repository) Photo(ctx context.Context, id string) (api.Photo, error) {
 	if err != nil {
 		return api.Photo{}, err
 	}
-	return photoView(value), nil
+	return conEstado(photoView(value)), nil
 }
 
 func (r *Repository) asset(ctx context.Context, id string) (model.AssetRow, error) {
@@ -82,16 +88,27 @@ type timelineCursor struct {
 }
 
 func (r *Repository) Timeline(ctx context.Context, cursor string, limit int, favorites bool, text string, also ...string) ([]api.Photo, string, error) {
-	after, err := r.decodeTimelineCursor(cursor)
-	if err != nil {
-		return nil, "", err
-	}
-	assets, err := r.assets(ctx)
+	return r.timeline(ctx, cursor, false, limit, favorites, text, also...)
+}
+
+// timeline es Timeline; desdeFecha admite el cursor sintético de TimelineDesde, que no
+// lleva id.
+func (r *Repository) timeline(ctx context.Context, cursor string, desdeFecha bool, limit int, favorites bool, text string, also ...string) ([]api.Photo, string, error) {
+	after, err := r.decodeTimelineCursor(cursor, desdeFecha)
 	if err != nil {
 		return nil, "", err
 	}
 	if limit <= 0 || limit > 200 {
 		limit = 60
+	}
+	if _, local := r.engine.VerifiedContentGeneration(); local && text == "" {
+		// En el almacén local y sin texto que buscar, la página sale de la línea ya
+		// proyectada (linea.go).
+		return r.paginaProyectada(ctx, cursor != "", after, limit, favorites)
+	}
+	assets, err := r.assets(ctx)
+	if err != nil {
+		return nil, "", err
 	}
 	queries := append([]string{text}, also...)
 	values := []api.Photo{}
@@ -108,12 +125,22 @@ func (r *Repository) Timeline(ctx context.Context, cursor string, limit int, fav
 		}
 		values = append(values, view)
 	}
-	slices.SortFunc(values, func(a, b api.Photo) int {
-		if order := b.TakenAt.Compare(a.TakenAt); order != 0 {
-			return order
-		}
-		return strings.Compare(b.ID, a.ID)
-	})
+	slices.SortFunc(values, compararEnLinea)
+	return r.paginaDeLinea(values, limit)
+}
+
+// compararEnLinea es el orden de la línea de tiempo: de la más reciente a la más
+// antigua, y por id a igual fecha.
+func compararEnLinea(a, b api.Photo) int {
+	if order := b.TakenAt.Compare(a.TakenAt); order != 0 {
+		return order
+	}
+	return strings.Compare(b.ID, a.ID)
+}
+
+// paginaDeLinea corta values, ya en orden, en una página de limit con el cursor de la
+// siguiente.
+func (r *Repository) paginaDeLinea(values []api.Photo, limit int) ([]api.Photo, string, error) {
 	next := ""
 	if len(values) > limit {
 		last := values[limit-1]
@@ -121,10 +148,16 @@ func (r *Repository) Timeline(ctx context.Context, cursor string, limit int, fav
 		next = base64.RawURLEncoding.EncodeToString(raw)
 		values = values[:limit]
 	}
-	return values, next, nil
+	return conEstados(values), next, nil
 }
 
-func (r *Repository) decodeTimelineCursor(cursor string) (timelineCursor, error) {
+func (r *Repository) decodeTimelineCursor(cursor string, desdeFecha bool) (timelineCursor, error) {
+	return decodificarCursor(r.scope, cursor, desdeFecha)
+}
+
+// decodificarCursor lee el cursor de una página de la línea de tiempo de scope;
+// desdeFecha admite el de TimelineDesde, sin id.
+func decodificarCursor(scope storage.Scope, cursor string, desdeFecha bool) (timelineCursor, error) {
 	var after timelineCursor
 	if cursor == "" {
 		return after, nil
@@ -133,14 +166,14 @@ func (r *Repository) decodeTimelineCursor(cursor string) (timelineCursor, error)
 		return after, ErrSource
 	}
 	raw, err := base64.RawURLEncoding.Strict().DecodeString(cursor)
-	if err != nil || json.Unmarshal(raw, &after) != nil || after.Scope != r.scope || after.ID == "" || after.TakenAt.IsZero() {
+	if err != nil || json.Unmarshal(raw, &after) != nil || after.Scope != scope || after.ID == "" && !desdeFecha || after.TakenAt.IsZero() {
 		return after, ErrSource
 	}
 	return after, nil
 }
 
 func matchesPhotoText(asset model.AssetRow, queries []string) bool {
-	haystack := buscar.Plegar(asset.Name + " " + asset.Description + " " + strings.Join(asset.Tags, " "))
+	haystack := TextoDeBusqueda(asset.Name, asset.Description, asset.Tags)
 	for _, q := range queries {
 		if q != "" && strings.Contains(haystack, buscar.Plegar(q)) {
 			return true
@@ -175,7 +208,7 @@ func (r *Repository) Papelera(ctx context.Context) ([]api.Photo, error) {
 			values = append(values, photoView(asset))
 		}
 	}
-	return values, nil
+	return conEstados(values), nil
 }
 
 func (r *Repository) mutateAsset(ctx context.Context, operation, id string, input any, trash bool, patch func(map[string]json.RawMessage)) error {
@@ -190,7 +223,7 @@ func (r *Repository) mutateAsset(ctx context.Context, operation, id string, inpu
 		if json.Unmarshal(raw, &row) != nil || json.Unmarshal(raw, &fields) != nil || row.ID != id || row.Owner != r.scope.Subject {
 			return "", "", "", nil, ErrSource
 		}
-		if (row.DeletedAt != nil) != trash {
+		if (row.DeletedAt != nil) != trash || row.PurgedAt != nil {
 			return "", "", "", nil, ErrNotFound
 		}
 		patch(fields)
@@ -211,13 +244,8 @@ func (r *Repository) SetFavorite(ctx context.Context, id string, favorite bool) 
 }
 
 func (r *Repository) SetDescription(ctx context.Context, id, description string, tags []string) error {
-	if len(description) > 500 || len(tags) > 12 {
-		return model.ErrInvalidInput
-	}
-	for _, tag := range tags {
-		if len(tag) > 60 {
-			return model.ErrInvalidInput
-		}
+	if err := DescripcionValida(description, tags); err != nil {
+		return err
 	}
 	return r.mutateAsset(ctx, "description", id, []any{id, description, tags}, false, func(fields map[string]json.RawMessage) {
 		fields["description"], _ = json.Marshal(description)

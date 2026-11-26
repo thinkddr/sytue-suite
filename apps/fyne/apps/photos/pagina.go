@@ -203,6 +203,9 @@ func Nav(v Vista, activa Seccion, alIr func(Seccion)) *fyne.Container {
 	hijos := make([]fyne.CanvasObject, 0, len(clavesNav))
 	for s := range clavesNav {
 		sec := Seccion(s)
+		if v.SinServidor && sec == SecCompartidos {
+			continue
+		}
 		p := NuevaPestanaNav(v.Traduce(clavesNav[s]), iconosNav[s], sec == activa, func() {
 			if alIr != nil {
 				alIr(sec)

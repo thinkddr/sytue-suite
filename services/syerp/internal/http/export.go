@@ -5,7 +5,6 @@ package syerphttp
 
 import (
 	"encoding/csv"
-	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -13,12 +12,10 @@ import (
 
 	"github.com/google/uuid"
 
+	csverp "git.sytue.eu/sytue/one/apps/nucleo/erp/exportar"
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/platform/pkg/log"
-	"git.sytue.eu/sytue/one/platform/pkg/validation"
-	"git.sytue.eu/sytue/one/services/syerp/internal/catalogo"
 	"git.sytue.eu/sytue/one/services/syerp/internal/config"
-	"git.sytue.eu/sytue/one/services/syerp/internal/store"
 )
 
 // filasPorTramo es lo que se le pide al store en cada vuelta del cursor. Es el
@@ -86,8 +83,8 @@ func (h *Handlers) Exportar(w http.ResponseWriter, r *http.Request) {
 
 	idioma := httpx.LanguageFromRequest(r)
 	vista := h.cat.VistaModelo(m, idioma)
-	cols := h.columnas(vista, idioma)
-	valores := rotulosDeValor(vista)
+	cols := csverp.Columnas(h.cat, vista, idioma)
+	valores := csverp.RotulosDeValor(vista)
 	tope := h.cfg.ExportMaxFilas
 	if tope <= 0 {
 		tope = config.ExportMaxFilasDefecto
@@ -116,7 +113,7 @@ func (h *Handlers) Exportar(w http.ResponseWriter, r *http.Request) {
 
 	cw := csv.NewWriter(w)
 	defer cw.Flush()
-	if err := cw.Write(rotulos(cols)); err != nil {
+	if err := cw.Write(csverp.Rotulos(cols)); err != nil {
 		cortado(err)
 		return
 	}
@@ -141,7 +138,7 @@ func (h *Handlers) Exportar(w http.ResponseWriter, r *http.Request) {
 				}
 				return
 			}
-			if err := cw.Write(fila(cols, pag.Registros[i], etiquetas, valores)); err != nil {
+			if err := cw.Write(csverp.Fila(cols, pag.Registros[i].Ref, pag.Registros[i].Estado, pag.Registros[i].Data, etiquetas, valores)); err != nil {
 				cortado(err)
 				return
 			}
@@ -163,197 +160,9 @@ func (h *Handlers) Exportar(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// columna es una columna de la exportación con todo lo suyo ya resuelto: se
-// calcula una vez por descarga y no una vez por fila.
-type columna struct {
-	clave  string
-	tipo   string
-	rotulo string
-}
+// Las celdas las forma apps/nucleo/erp/exportar, que comparte el ERP de Sytue Office.
+// `importe`, `centimos` y `texto` siguen aquí con su nombre porque los usan Facturae y UBL.
 
-// columnas traduce las columnas de la vista de lista al idioma de la petición.
-//
-// Los rótulos salen del MISMO sitio que los de la pantalla (`VistaModelo`), así
-// que el CSV y la interfaz llaman a las cosas igual. "ref" y "estado" no son
-// campos del modelo —son columnas que el catálogo admite aparte—, así que su
-// rótulo viene del diccionario común.
-func (h *Handlers) columnas(v catalogo.ModeloVista, idioma string) []columna {
-	campos := make(map[string]catalogo.CampoVista, len(v.Campos))
-	for _, c := range v.Campos {
-		campos[c.Clave] = c
-	}
-	out := make([]columna, 0, len(v.Lista))
-	for _, clave := range v.Lista {
-		col := columna{clave: clave, rotulo: h.cat.Rotulo("campo."+clave, idioma)}
-		if f, ok := campos[clave]; ok {
-			col.tipo, col.rotulo = f.Tipo, f.Etiqueta
-		}
-		out = append(out, col)
-	}
-	return out
-}
-
-func rotulos(cols []columna) []string {
-	out := make([]string, 0, len(cols))
-	for _, c := range cols {
-		out = append(out, c.rotulo)
-	}
-	return out
-}
-
-// rotulosDeValor recoge los rótulos ya traducidos de las selecciones y de los
-// estados, para que el CSV diga "Ganada" y no "ganada". Un mapa plano basta
-// porque el diccionario del catálogo indexa los valores por sí mismos
-// (`valor.<clave>`) y no por el campo que los usa.
-func rotulosDeValor(v catalogo.ModeloVista) map[string]string {
-	out := map[string]string{}
-	for _, c := range v.Campos {
-		for _, op := range c.Opciones {
-			out[op.Valor] = op.Etiqueta
-		}
-	}
-	for _, e := range v.Estados {
-		out[e.Valor] = e.Etiqueta
-	}
-	return out
-}
-
-// fila convierte un registro en su línea de CSV.
-//
-// Toda celda pasa por `validation.CSVSafe` salvo las que son un número y nada
-// más: lo que va aquí lo escribió alguien en el ERP, y un nombre de cliente que
-// empieza por "=" es una fórmula en cuanto se abre el fichero con Excel o
-// LibreOffice (CWE-1236). Los rótulos no lo necesitan porque salen del catálogo,
-// que va horneado en la imagen.
-func fila(cols []columna, reg store.Registro, etiquetas, valores map[string]string) []string {
-	out := make([]string, 0, len(cols))
-	for _, c := range cols {
-		v := c.valor(reg, etiquetas, valores)
-		if !numerico(v) {
-			v = validation.CSVSafe(v)
-		}
-		out = append(out, v)
-	}
-	return out
-}
-
-// numerico exime a los números del saneado, y es la única excepción.
-//
-// POR QUÉ HACE FALTA: `CSVSafe` protege el "-" inicial, que es un arranque de
-// fórmula legítimo ("-1+cmd|..."), así que un importe negativo saldría como
-// "'-0.05" y la hoja de cálculo lo trataría como TEXTO. Media columna en texto y
-// media en número es una columna que no se puede sumar, y sumar la columna es
-// justo para lo que se exporta la lista de un ERP.
-//
-// POR QUÉ ES SEGURO: se mira el RESULTADO y no el tipo declarado del campo, así
-// que no depende de que lo que hay en `data` case con el catálogo. Y una cadena
-// que `ParseFloat` acepta entera no puede ser una fórmula: no hay fórmula que
-// sea a la vez un literal numérico válido —en cuanto aparece un operador, una
-// referencia o un paréntesis, esto devuelve error y la celda se neutraliza—.
-func numerico(s string) bool {
-	_, err := strconv.ParseFloat(s, 64)
-	return err == nil
-}
-
-// valor saca de un registro lo que va en esta columna, ya legible: el importe en
-// unidades, la relación por su nombre y el estado o la selección con su rótulo.
-func (c columna) valor(reg store.Registro, etiquetas, valores map[string]string) string {
-	switch c.clave {
-	case "ref":
-		return reg.Ref
-	case "estado":
-		return legible(valores, reg.Estado)
-	}
-	v := reg.Data[c.clave]
-	switch c.tipo {
-	case catalogo.TipoDinero:
-		return importe(v)
-	case catalogo.TipoRelacion:
-		id, _ := v.(string)
-		return legible(etiquetas, id)
-	case catalogo.TipoSeleccion:
-		s, _ := v.(string)
-		return legible(valores, s)
-	}
-	return texto(v)
-}
-
-// legible devuelve el nombre traducido cuando se conoce y el valor crudo cuando
-// no: una relación a una fila borrada o un estado sin rótulo salen como están,
-// que se lee mal pero se lee, y es mejor que dejar la celda vacía.
-func legible(nombres map[string]string, valor string) string {
-	if s := nombres[valor]; s != "" {
-		return s
-	}
-	return valor
-}
-
-// texto pinta un valor de `data` tal como vino del jsonb. Los números llegan
-// como float64 —el store deserializa sin `UseNumber`—, así que se formatean sin
-// exponente para que un 20000 no acabe en la celda como 2e+04.
-func texto(v any) string {
-	switch x := v.(type) {
-	case nil:
-		return ""
-	case string:
-		return x
-	case bool:
-		return strconv.FormatBool(x)
-	case float64:
-		return strconv.FormatFloat(x, 'f', -1, 64)
-	case int64:
-		return strconv.FormatInt(x, 10)
-	default:
-		return fmt.Sprint(x)
-	}
-}
-
-// importe pasa los céntimos que guarda el ERP a lo que espera quien abre el
-// fichero: UNIDADES con dos decimales y PUNTO decimal (123456 → "1234.56").
-//
-// Punto y no coma porque el separador del CSV es la coma: con coma decimal,
-// "1234,56" parte la celda en dos en cuanto alguien reabre el fichero. Y porque
-// es la misma forma canónica que lee `conectores.CentimosDeDecimal` al importar,
-// así que lo que sale de aquí puede volver a entrar sin perder un céntimo.
-//
-// La conversión es ENTERA, sin float por el medio, igual que en el resto del
-// servicio: dividir por 100.0 devuelve 1234.5599999999999 para importes
-// perfectamente normales, y ese céntimo aparece meses después sin saber de dónde
-// sale.
-func importe(v any) string {
-	c, ok := centimos(v)
-	if !ok {
-		return ""
-	}
-	// Se divide con signo y se corrige solo la parte decimal: negar `c` fallaría
-	// justo en el mínimo de int64, y -5 céntimos tienen que salir "-0.05" y no
-	// "0.-5".
-	unidades, resto := c/100, c%100
-	if resto < 0 {
-		resto = -resto
-	}
-	signo := ""
-	if c < 0 && unidades == 0 {
-		signo = "-"
-	}
-	return fmt.Sprintf("%s%d.%02d", signo, unidades, resto)
-}
-
-// centimos lee un importe de `data`. Llega como float64 porque el store
-// deserializa el jsonb sin `UseNumber`, y se acepta solo si es entero exacto:
-// `domain` no deja guardar decimales en un campo de dinero, así que un valor con
-// parte fraccionaria es un dato corrupto y sale la celda vacía en vez de un
-// redondeo inventado.
-func centimos(v any) (int64, bool) {
-	switch x := v.(type) {
-	case int64:
-		return x, true
-	case float64:
-		if x != float64(int64(x)) {
-			return 0, false
-		}
-		return int64(x), true
-	default:
-		return 0, false
-	}
-}
+func importe(v any) string         { return csverp.Importe(v) }
+func centimos(v any) (int64, bool) { return csverp.Centimos(v) }
+func texto(v any) string           { return csverp.Texto(v) }

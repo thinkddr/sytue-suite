@@ -5,9 +5,12 @@ package auth
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"testing"
 	"time"
+
+	"git.sytue.eu/sytue/one/apps/nucleo/autorizacion"
 )
 
 func scopedTokens(subject, tenant string) Tokens {
@@ -133,5 +136,26 @@ func TestSincronizarNewIssuerOrClientRetiresPreviousAccess(t *testing.T) {
 				t.Fatal("new issuer/client retained the old access token")
 			}
 		})
+	}
+}
+
+// TestLosTestigosSonLosDeAutorizacion: lo que el cliente `api`, `offline` y las pantallas
+// leen con `nucleo/autorizacion` es lo que emite esta sesión, con los mismos errores.
+func TestLosTestigosSonLosDeAutorizacion(t *testing.T) {
+	if !errors.Is(ErrLoginRequired, autorizacion.ErrLoginRequired) || !errors.Is(ErrAuthorizationChanged, autorizacion.ErrAuthorizationChanged) {
+		t.Fatal("los errores de auth no son los de autorizacion")
+	}
+	session := NewSession(scopedTokens("ada", "first"), nil, nil)
+	ctx := session.WithAuthorizationIntent(context.Background())
+	intent := autorizacion.RequestAuthorizationIntent(ctx)
+	if intent == nil || intent != RequestAuthorizationIntent(ctx) || !intent.Current() {
+		t.Fatal("la intención de la sesión no se lee con autorizacion")
+	}
+	token, scope, err := session.AccessTokenScoped(ctx)
+	if err != nil || autorizacion.RequestAuthorizationScope(WithAuthorizationScope(ctx, scope)) != scope || !intent.Allows(scope, "Bearer "+token) {
+		t.Fatal("el testigo de la sesión no se lee con autorizacion")
+	}
+	if autorizacion.RequestAuthorizationIntent(WithoutAuthorizationIntent(ctx)) != nil {
+		t.Fatal("WithoutAuthorizationIntent no quita la intención que lee autorizacion")
 	}
 }

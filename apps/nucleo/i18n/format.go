@@ -135,7 +135,7 @@ func suenaI(s string) bool {
 
 // FormatCurrency es `formatCurrency` de format.ts —`toLocaleString(tag, { style:
 // 'currency', currency: 'EUR' })`— sobre un importe en CÉNTIMOS enteros, que es como lo
-// guarda SyERP y como viaja por su API (services/syerp/internal/domain).
+// guarda SyERP y como viaja por su API (apps/nucleo/erp/dominio).
 //
 // No pasa por `float64` en ningún punto: la parte entera y los dos decimales salen de
 // dividir el entero, así que no hay un 1234,56 que se convierta en 1234,5599999. Un
@@ -217,7 +217,7 @@ func Separadores(l Locale) (grupo, decimal string) {
 // ParseFixed es la vuelta de FormatFixed: lee lo que alguien TECLEA en un campo de
 // importe y lo devuelve en unidades de 10^-d —con d=2, céntimos—, sin pasar por float.
 // 0,1 + 0,2 no es 0,3 y una factura no puede depender de eso: SyERP guarda el dinero en
-// céntimos enteros justamente por eso (services/syerp/internal/domain).
+// céntimos enteros justamente por eso (apps/nucleo/erp/dominio).
 //
 // Admite el separador decimal del idioma y el otro, porque quien teclea en el bloque
 // numérico de un portátil escribe el que traiga la tecla; los separadores de millar del

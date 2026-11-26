@@ -41,6 +41,9 @@ type DocTemplates struct {
 
 // Templates pide la galería, con nombre y descripción en el idioma `locale`.
 func (d *Docs) Templates(ctx context.Context, locale string) (DocTemplates, error) {
+	if p, ok := d.datos().(DocsTemplatesData); ok {
+		return p.DocumentTemplates(ctx, locale)
+	}
 	return JSON[DocTemplates](ctx, d.c, Request{Path: "/templates", Query: url.Values{"locale": {locale}}})
 }
 
@@ -75,12 +78,18 @@ const IDTemaMarca = "marca"
 
 // Themes pide el catálogo de temas y la marca de la organización.
 func (d *Docs) Themes(ctx context.Context) (DocThemes, error) {
+	if p, ok := d.datos().(DocsThemesData); ok {
+		return p.DocumentThemes(ctx)
+	}
 	return JSON[DocThemes](ctx, d.c, Request{Path: "/themes"})
 }
 
 // SaveBrand guarda una versión NUEVA de la marca (solo quien administra la organización)
 // y devuelve su número; las anteriores se conservan.
 func (d *Docs) SaveBrand(ctx context.Context, m DocBrand) (int, error) {
+	if p, ok := d.datos().(DocsThemesData); ok {
+		return p.SaveDocumentBrand(ctx, m)
+	}
 	m.Version = 0
 	datos, err := json.Marshal(m)
 	if err != nil {
@@ -112,6 +121,9 @@ type DocNuevo struct {
 
 // CreateFromTemplate da de alta un documento con el contenido de una plantilla.
 func (d *Docs) CreateFromTemplate(ctx context.Context, n DocNuevo) (Document, error) {
+	if p, ok := d.datos().(DocsTemplatesData); ok {
+		return p.CreateDocumentFromTemplate(ctx, n)
+	}
 	out, err := PostJSON[docResp](ctx, d.c, "/documents", n)
 	return out.Document, err
 }
@@ -120,6 +132,9 @@ func (d *Docs) CreateFromTemplate(ctx context.Context, n DocNuevo) (Document, er
 // tocar su contenido, y dice si algo cambió (`changed`). El servicio guarda antes una
 // versión «Antes del tema …», así que restaurarla lo deshace.
 func (d *Docs) ApplyTheme(ctx context.Context, id, tema string, versionMarca int) (bool, error) {
+	if p, ok := d.datos().(DocsThemesData); ok {
+		return p.ApplyDocumentTheme(ctx, id, tema, versionMarca)
+	}
 	datos, err := json.Marshal(struct {
 		Theme        string `json:"theme"`
 		BrandVersion int    `json:"brand_version,omitempty"` //nolint:tagliatelle // el cable de la web
@@ -157,6 +172,9 @@ type DocThemePreview struct {
 // PreviewTheme pregunta qué cambiaría aplicar ese tema (`preview:true`): no escribe ni
 // deja punto de restauración.
 func (d *Docs) PreviewTheme(ctx context.Context, id, tema string, versionMarca int) (DocThemePreview, error) {
+	if p, ok := d.datos().(DocsThemesData); ok {
+		return p.PreviewDocumentTheme(ctx, id, tema, versionMarca)
+	}
 	datos, err := json.Marshal(struct {
 		Theme        string `json:"theme"`
 		BrandVersion int    `json:"brand_version,omitempty"` //nolint:tagliatelle // el cable de la web

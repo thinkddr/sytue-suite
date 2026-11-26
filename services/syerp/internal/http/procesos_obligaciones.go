@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"time"
 
+	"git.sytue.eu/sytue/one/apps/nucleo/erp/obligaciones"
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
-	"git.sytue.eu/sytue/one/services/syerp/internal/obligaciones"
 	"git.sytue.eu/sytue/one/services/syerp/internal/permisos"
 )
 

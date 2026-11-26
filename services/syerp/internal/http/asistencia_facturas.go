@@ -10,14 +10,12 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"math"
 	"net/http"
-	"strings"
 
+	"git.sytue.eu/sytue/one/apps/nucleo/erp/catalogo"
+	domain "git.sytue.eu/sytue/one/apps/nucleo/erp/dominio"
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/platform/pkg/validation"
-	"git.sytue.eu/sytue/one/services/syerp/internal/catalogo"
-	"git.sytue.eu/sytue/one/services/syerp/internal/domain"
 	"git.sytue.eu/sytue/one/services/syerp/internal/permisos"
 	"git.sytue.eu/sytue/one/services/syerp/internal/store"
 )
@@ -114,17 +112,8 @@ func (h *Handlers) LeerAsistenciaFactura(w http.ResponseWriter, r *http.Request)
 }
 
 func validarAsistenciaFactura(f facturaRecibida, org store.Organizacion) error {
-	if org.NIF == "" || f.Receptor.NIF == "" || !domain.MismoNIF(org.NIF, f.Receptor.NIF) {
-		return errFacturaIlegible.WithMessage("The invoice must identify your organisation as its recipient. Check both tax identification numbers.")
-	}
-	if !strings.EqualFold(f.Moneda, domain.MonedaPorDefecto) {
-		return errFacturaIlegible.WithMessage("The invoice must explicitly use EUR. Currency conversion is not performed.")
-	}
-	if err := f.comprobar(org, true); err != nil {
+	if err := f.ComprobarAsistencia(org.NIF); err != nil {
 		return errFacturaIlegible.WithMessage(err.Error())
-	}
-	if (f.IVA > 0 && f.Base > math.MaxInt64-f.IVA) || (f.IVA < 0 && f.Base < math.MinInt64-f.IVA) {
-		return errFacturaIlegible.WithMessage("The invoice total exceeds the supported amount.")
 	}
 	return nil
 }
@@ -133,9 +122,7 @@ func (h *Handlers) prepararAsistenciaFactura(ctx context.Context, m, contacto *c
 	out := asistenciaFactura{Etiquetas: map[string]string{}, NumeroOrigen: validation.SanitizeText(f.Numero)}
 	var err error
 	datos := map[string]any{"fecha": f.Fecha, "base": f.Base, "iva": f.IVA, "total": f.Total}
-	emisor := f.Emisor.Nombre
 	if variantes := domain.VariantesNIF(f.Emisor.NIF); len(variantes) > 0 {
-		emisor = variantes[len(variantes)-1]
 		id, err := h.store.BuscarPorNIF(ctx, contacto.Clave, f.Emisor.NIF)
 		if err != nil && !errors.Is(err, store.ErrNoEncontrado) {
 			return out, err
@@ -150,7 +137,7 @@ func (h *Handlers) prepararAsistenciaFactura(ctx context.Context, m, contacto *c
 		}
 	}
 	// La misma identidad de origen que la importación XML: proveedor/número.
-	datos["externo_id"] = emisor + "/" + f.Numero
+	datos["externo_id"] = f.ClaveExterna()
 	if f.Vencimiento != "" {
 		datos["vencimiento"] = f.Vencimiento
 	}
@@ -183,22 +170,7 @@ func (h *Handlers) prepararAsistenciaFactura(ctx context.Context, m, contacto *c
 }
 
 func contactoAsistenciaFactura(m *catalogo.Modelo, p parteFactura) (map[string]any, error) {
-	tipo := "organizacion"
-	if p.Persona {
-		tipo = "persona"
-	}
-	datos := map[string]any{"nombre": primero(p.Nombre, p.NIF), "tipo": tipo}
-	for clave, valor := range map[string]string{
-		"nif": p.NIF, "direccion": p.Direccion, "ciudad": p.Ciudad, "cp": p.CP, "pais": p.Pais,
-	} {
-		if valor != "" {
-			datos[clave] = valor
-		}
-	}
-	if validation.IsEmail(p.Correo) {
-		datos["correo"] = p.Correo
-	}
-	crudo, err := json.Marshal(datos)
+	crudo, err := json.Marshal(p.DatosContacto())
 	if err != nil {
 		return nil, err
 	}

@@ -49,13 +49,16 @@ func (p *PDF) localCompare(ctx context.Context, fields map[string]string, docs .
 	return localPDFResponse("application/json", out), nil
 }
 
-// localVerify es el informe de `/pdf/verify` sin anclas de confianza: el dispositivo
-// no tiene en quién confiar, y la pantalla lo dice (`anclas: false`). Integridad,
-// cambios posteriores y sellos sí se comprueban.
+// localVerify es el informe de `/pdf/verify`. Sin anclas de confianza el dispositivo
+// no tiene en quién confiar, y la pantalla lo dice (`anclas: false`); Sytue Office le
+// pone las que eligió la persona (ConLocal, P-06). Integridad, cambios posteriores y
+// sellos se comprueban siempre.
 func (p *PDF) localVerify(ctx context.Context, fields map[string]string, docs ...PDFFichero) (PDFRespuesta, error) {
+	anchors := p.anclasLocales()
 	return p.localSinglePDFEdit(ctx, fields, func(doc *localpdf.PDFDoc) (PDFRespuesta, error) {
 		out, err := json.Marshal(map[string]any{
-			"firmas": doc.VerificarFirmas(localpdf.OpcionesVerificacion{}), "anclas": false,
+			"firmas": doc.VerificarFirmas(localpdf.OpcionesVerificacion{Anclas: anchors, AnclasSello: anchors}),
+			"anclas": anchors != nil,
 		})
 		return localPDFResponse("application/json", out), err
 	}, docs...)

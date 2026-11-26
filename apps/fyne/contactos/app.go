@@ -99,8 +99,9 @@ type App struct {
 	// «Organización» al entrar; nil, no se toca. Yo es el `sub` de quien mira.
 	Directorio *api.Directorio
 	Yo         func() string
-	// IA es Sytue AI, para el asistente «Rellenar» del formulario; nil, no sale.
-	IA *api.IA
+	// IA es quien rellena la ficha con el asistente «Rellenar» (Sytue AI o la IA de
+	// Sytue Office, `api.Asistente`); nil, no sale.
+	IA api.Asistente
 
 	// red es el monitor de conexión (Conexion); nil, siempre hay red. escrituras son
 	// los flujos que escriben que están abiertos, uno por clase, como los estados
@@ -355,7 +356,7 @@ func (a *App) Atajo(r rune) {
 		return
 	}
 	p := a.Pantalla
-	escribe := p.Activa != nil && !p.SinConexion
+	escribe := p.Activa != nil && p.escribe()
 	switch r {
 	case 'n':
 		if escribe {
@@ -382,7 +383,8 @@ func (a *App) atajoSobre(r rune, o api.Contact, escribe bool) {
 	switch {
 	case r == 'e' && escribe:
 		a.abrirFormulario(&o)
-	case r == 's' && escribe:
+	case r == 's' && p.Activa != nil && !p.SinConexion:
+		// Destacar es de este equipo: también en una libreta de solo lectura.
 		a.destacar(o)
 	case r == 'x' && p.AlMarcar != nil:
 		p.AlMarcar(o.ID)

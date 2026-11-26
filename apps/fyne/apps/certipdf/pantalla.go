@@ -108,9 +108,26 @@ type Pantalla struct {
 	// IA es el cliente del servicio de IA, el del Asistente. Nil: sus consultas dicen
 	// que no se ha podido.
 	IA *api.IA
+	// Asistir es la IA que la persona configuró ella misma en ESTE equipo (la edición
+	// local, apps/fyne/PLAN-EDICION-LOCAL.md P-08). Con ella, el Asistente la usa en vez
+	// de IA y sin la barrera del documento privado: quien decide a quién se envía es la
+	// persona. Nil: como siempre, IA.
+	Asistir func(context.Context, api.PeticionIA) (string, error)
+	// RutaDeReciente es la ruta con que se abre un PDF de la portada. Nil: el de la
+	// carpeta «PDF» de Drive. En local, la ruta del fichero en el disco (P-11).
+	RutaDeReciente func(api.File) string
 	// Almacenes son los certificados del sistema con que se firma en dos pasos
 	// (certificados.DelSistema). Nil: la firma con certificado es solo la de fichero.
 	Almacenes func() []certificados.Almacen
+	// SelloDeTiempo es la autoridad de sellado que elige la persona en la edición local
+	// (P-05). Nil: la decide el servicio, como siempre.
+	SelloDeTiempo *AjusteSello
+	// Anclas son los certificados de confianza que la persona carga de una carpeta en la
+	// edición local (P-06). Nil: los del despliegue, como siempre.
+	Anclas *AjusteAnclas
+	// NotaOCR dice, ya traducido, dónde se reconoce el texto en la edición local (el OCR
+	// del equipo o el modelo de la persona). Nil o "": la nota del servicio.
+	NotaOCR func() string
 
 	// Autor es el nombre de quien anota, que firma lo que pone (`autor` de la web).
 	Autor string

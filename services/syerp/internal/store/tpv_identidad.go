@@ -6,7 +6,7 @@ package store
 import (
 	"fmt"
 
-	"git.sytue.eu/sytue/one/services/syerp/internal/domain"
+	domain "git.sytue.eu/sytue/one/apps/nucleo/erp/dominio"
 )
 
 var identidadTPV = []string{"tpv_operacion", "tpv_huella"}

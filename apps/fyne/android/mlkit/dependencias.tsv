@@ -1,0 +1,69 @@
+# Árbol de com.google.mlkit:genai-prompt para la APK de Sytue Office, sin Gradle.
+# Lo escribe `android-mlkit.py resolver` (la más alta si hay dos versiones, como
+# Gradle) y lo lee `android-mlkit.py bajar`, que comprueba cada suma. Se revisa a mano:
+# las licencias son las que declara cada POM (ver «ML Kit GenAI» en docs/operations.md).
+# grupo:artefacto:versión	tipo	repositorio	sha256	licencia
+androidx.activity:activity:1.6.0	aar	google	7f08723ecabefba616d60c714b0e9a31301bd4d0792fcc7946c1479c57fd2d28	The Apache Software License, Version 2.0
+androidx.annotation:annotation:1.3.0	jar	google	97dc45afefe3a1e421da42b8b6e9f90491477c45fc6178203e3a5e8a05ee8553	The Apache Software License, Version 2.0
+androidx.annotation:annotation-experimental:1.3.0	aar	google	abfd29c8556e5bd0325a9f769ab9e9d154ff4a5515c476cdd5a2a8285b1b19dc	The Apache Software License, Version 2.0
+androidx.appcompat:appcompat:1.6.1	aar	google	7ea5573b93ababd3bd32312451c6ea48a662b03a140dda81aebe75776a20a422	The Apache Software License, Version 2.0
+androidx.appcompat:appcompat-resources:1.6.1	aar	google	db915dbf49357863de1669ff9fdd8e9008d65fe357af6cce9ae63043ad5f6617	The Apache Software License, Version 2.0
+androidx.arch.core:core-common:2.1.0	jar	google	fe1237bf029d063e7f29fe39aeaf73ef74c8b0a3658486fc29d3c54326653889	The Apache Software License, Version 2.0
+androidx.arch.core:core-runtime:2.1.0	aar	google	dd77615bd3dd275afb11b62df25bae46b10b4a117cd37943af45bdcbf8755852	The Apache Software License, Version 2.0
+androidx.collection:collection:1.1.0	jar	google	632a0e5407461de774409352940e292a291037724207a787820c77daf7d33b72	The Apache Software License, Version 2.0
+androidx.concurrent:concurrent-futures:1.0.0	jar	google	5595a40e278a7b39fa78a09490e3d7f3faa95c7b01447148bd38b5ade0605c35	The Apache Software License, Version 2.0
+androidx.core:core:1.9.0	aar	google	8bda3ee3a88887d54f6679fb6b6cd788629f73234ac91c8bbed924e721ec85b8	The Apache Software License, Version 2.0
+androidx.core:core-ktx:1.9.0	aar	google	1542a1df7be908c95fee91b8dbc03fd974f53f11d84a85d881f95a52551c4051	The Apache Software License, Version 2.0
+androidx.cursoradapter:cursoradapter:1.0.0	aar	google	a81c8fe78815fa47df5b749deb52727ad11f9397da58b16017f4eb2c11e28564	The Apache Software License, Version 2.0
+androidx.customview:customview:1.0.0	aar	google	20e5b8f6526a34595a604f56718da81167c0b40a7a94a57daa355663f2594df2	The Apache Software License, Version 2.0
+androidx.drawerlayout:drawerlayout:1.0.0	aar	google	9402442cdc5a43cf62fb14f8cf98c63342d4d9d9b805c8033c6cf7e802749ac1	The Apache Software License, Version 2.0
+androidx.emoji2:emoji2:1.2.0	aar	google	f31a06c150ecb03073f55a6f7b0b74a240a6a8d727c14ce76726d020570dfa8c	The Apache Software License, Version 2.0
+androidx.emoji2:emoji2-views-helper:1.2.0	aar	google	7ffa4d464d9db259fca0cdb50fbd4ab63d6872bcda59468b9f7555504c7d5ac4	The Apache Software License, Version 2.0
+androidx.fragment:fragment:1.3.6	aar	google	12f0831b4f08092d5dda272c1923c11a022ff20ceffed3e801751e21bb8d1c1e	The Apache Software License, Version 2.0
+androidx.interpolator:interpolator:1.0.0	aar	google	33193135a64fe21fa2c35eec6688f1a76e512606c0fc83dc1b689e37add7732a	The Apache Software License, Version 2.0
+androidx.lifecycle:lifecycle-common:2.5.1	jar	google	20ad1520f625cf455e6afd7290988306d3a9886efa993e0860fbabf4bb3f7bda	The Apache Software License, Version 2.0
+androidx.lifecycle:lifecycle-livedata:2.0.0	aar	google	c82609ced8c498f0a701a30fb6771bb7480860daee84d82e0a81ee86edf7ba39	The Apache Software License, Version 2.0
+androidx.lifecycle:lifecycle-livedata-core:2.5.1	aar	google	ee792103ca248bfaf150c45a93871e4cf7e8cebab990e0f62f7de5d4ff2f209f	The Apache Software License, Version 2.0
+androidx.lifecycle:lifecycle-process:2.4.1	aar	google	db649b3efa24e31052145310b002db91da346b3f89c093ec38c3046db45e794e	The Apache Software License, Version 2.0
+androidx.lifecycle:lifecycle-runtime:2.5.1	aar	google	33b0d73dc2f028fceb3599bacabe563c3db6d26f3513d889595863536a4ac8c0	The Apache Software License, Version 2.0
+androidx.lifecycle:lifecycle-viewmodel:2.5.1	aar	google	14a27d5fb8a1436b1b7dec18bebaa66c830cdbbc8e28a81ce5f85b7c33b3ae9d	The Apache Software License, Version 2.0
+androidx.lifecycle:lifecycle-viewmodel-savedstate:2.5.1	aar	google	8481141f97f0e6213dd33fcc89a784c4bd11a6ff7d4779a1cf6a0e9fbdbf24e0	The Apache Software License, Version 2.0
+androidx.loader:loader:1.0.0	aar	google	11f735cb3b55c458d470bed9e25254375b518b4b1bad6926783a7026db0f5025	The Apache Software License, Version 2.0
+androidx.resourceinspection:resourceinspection-annotation:1.0.1	jar	google	8cff870ec6fb31db48a52f4a792335b4bf8de07e03bd37823181526433ccd5cb	The Apache Software License, Version 2.0
+androidx.savedstate:savedstate:1.2.0	aar	google	2de528d6898e95ef020d22d9ffdf9d1f77cbdd93f92d39dfaa5d5c43b0c311c8	The Apache Software License, Version 2.0
+androidx.startup:startup-runtime:1.1.1	aar	google	e0a6329a371262fe4c450372b70fdaf33b769ef6917094723787cfce896b1dd3	The Apache Software License, Version 2.0
+androidx.tracing:tracing:1.0.0	aar	google	07b8b6139665b884a162eccf97891ca50f7f56831233bf25168ae04f7b568612	The Apache Software License, Version 2.0
+androidx.vectordrawable:vectordrawable:1.1.0	aar	google	46fd633ac01b49b7fcabc263bf098c5a8b9e9a69774d234edcca04fb02df8e26	The Apache Software License, Version 2.0
+androidx.vectordrawable:vectordrawable-animated:1.1.0	aar	google	76da2c502371d9c38054df5e2b248d00da87809ed058f3363eae87ce5e2403f8	The Apache Software License, Version 2.0
+androidx.versionedparcelable:versionedparcelable:1.1.1	aar	google	57e8d93260d18d5b9007c9eed3c64ad159de90c8609ebfc74a347cbd514535a4	The Apache Software License, Version 2.0
+androidx.viewpager:viewpager:1.0.0	aar	google	147af4e14a1984010d8f155e5e19d781f03c1d70dfed02a8e0d18428b8fc8682	The Apache Software License, Version 2.0
+com.google.android.datatransport:transport-api:2.2.1	aar	google	e62f73ba1c7f5d15f5d86d8e9a298c42ccd0648e7ce60b9e312f2ecd123b5ed0	The Apache Software License, Version 2.0
+com.google.android.datatransport:transport-backend-cct:2.3.3	aar	google	b22a14d560a590dc875e902424b29a13a02d1faf297b7c39a9007967ffadccbd	The Apache Software License, Version 2.0
+com.google.android.datatransport:transport-runtime:2.2.6	aar	google	d83ad23c134429691161c92476a3c83df236cd1f8badbfd4f00723b4eccd741c	The Apache Software License, Version 2.0
+com.google.android.gms:play-services-base:18.5.0	aar	google	59a5c0c2da12311d75d965ce1f419498536b1a167fb28ff7dfc2dfd9cefa4157	Android Software Development Kit License
+com.google.android.gms:play-services-basement:18.9.0	aar	google	c6ed7236b1b3ce0296b508a5c0a09108fd52d83559d35cad2639505cd04ab255	Android Software Development Kit License
+com.google.android.gms:play-services-tasks:18.2.0	aar	google	7f2aaa8f502068eaf54356ca92aec04271d6e7c416c52c45c0d23440fcbd1654	Android Software Development Kit License
+com.google.code.findbugs:jsr305:3.0.2	jar	central	766ad2a0783f2687962c8ad74ceecc38a28b9f72a2d085ee438b7813e928d0c7	The Apache Software License, Version 2.0
+com.google.errorprone:error_prone_annotations:2.18.0	jar	central	9e6814cb71816988a4fd1b07a993a8f21bb7058d522c162b1de849e19bea54ae	Apache 2.0
+com.google.firebase:firebase-annotations:16.0.0	jar	google	8830f2e8a5e434cbc5e4bd18133073b6e8518a8ce8ec2ce6f3b273c91d9664c2	The Apache Software License, Version 2.0
+com.google.firebase:firebase-components:16.1.0	aar	google	82e91aa5ed186eedaf1f2210f5d241ba6e4456cf0c32949d5cdbe152b0e2e88b	The Apache Software License, Version 2.0
+com.google.firebase:firebase-encoders:16.1.0	jar	google	8f89a74298bbccc2c543385208a2f0c67f603ce67e6ec21cc772e98e688f7cf5	The Apache Software License, Version 2.0
+com.google.firebase:firebase-encoders-json:17.1.0	aar	google	8295c755bcadc87a2aaee5b9e568f27fd138fd45ff1159a8ee747cf4c3a38d85	The Apache Software License, Version 2.0
+com.google.guava:failureaccess:1.0.1	jar	central	a171ee4c734dd2da837e4b16be9df4661afab72a41adaf31eb84dfdaf936ca26	The Apache Software License, Version 2.0
+com.google.guava:guava:32.0.0-jre	jar	central	39f3550b0343d8d19dd4e83bd165b58ea3389d2ddb9f2148e63903f79ecdb114	Apache License, Version 2.0
+com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava	jar	central	b372a037d4230aa57fbeffdef30fd6123f9c0c2db85d0aced00c91b974f33f99	The Apache Software License, Version 2.0
+com.google.j2objc:j2objc-annotations:2.8	jar	central	f02a95fa1a5e95edb3ed859fd0fb7df709d121a35290eff8b74dce2ab7f4d6ed	Apache License, Version 2.0
+com.google.mlkit:common:18.11.0	aar	google	66408a08dbb2465687ff5dd0c8f6410b56549ce3ecf449d9096f3712282131d0	ML Kit Terms of Service
+com.google.mlkit:genai-common:1.0.0-beta5	aar	google	cefcd33b43fb3078f7d10da169316ae146c0a67b28aa6bf5008f10571d646a4c	ML Kit Terms of Service
+com.google.mlkit:genai-prompt:1.0.0-beta5	aar	google	6ce6511bfd9212be1e8d08bf88ed83c41a535b8ce63d38110d49d8bf379292ff	ML Kit Terms of Service
+com.google.mlkit:genai-schema:1.0.0-alpha2	jar	google	5f07f0dbc33aba28eea8cc983fdb35e630cef0671a67426e26f8c42cb4ba210d	Android Software Development Kit License
+javax.inject:javax.inject:1	jar	central	91c77044a50c481636c32d916fd89c9118a72195390452c81065080f957de7ff	The Apache Software License, Version 2.0
+org.checkerframework:checker-qual:3.33.0	jar	central	e316255bbfcd9fe50d165314b85abb2b33cb2a66a93c491db648e498a82c2de1	The MIT License
+org.jetbrains:annotations:23.0.0	jar	central	7b0f19724082cbfcbc66e5abea2b9bc92cf08a1ea11e191933ed43801eb3cd05	The Apache Software License, Version 2.0
+org.jetbrains.kotlin:kotlin-stdlib:2.4.0	jar	central	ccb14ff83fabcb11458b798dbc9824748ccdffeec79c9aba789e6ed1cda86b1c	Apache-2.0
+org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0	jar	central	c2cb206d27017c7d1bf5ff179787397543d13748dbabb0d7237e1585e0b29044	Apache-2.0
+org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0	pom	central	-	Apache-2.0
+org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.11.0	jar	central	d1d75aa01dffbb4d1c520e67e4c4e7f5f6174718e7cb4632412503f2f0e604fa	Apache-2.0
+org.jetbrains.kotlinx:kotlinx-coroutines-guava:1.11.0	jar	central	82d3993130a494d6fab8b64705c8e10a61decd8af3d2e9274cfd8a3a5d80591f	Apache-2.0
+org.jetbrains.kotlinx:kotlinx-coroutines-reactive:1.11.0	jar	central	fe9a650030c413d96f049e88ef92d86a17bbc3a129b9208cfbeaa0e90e60dca7	Apache-2.0
+org.reactivestreams:reactive-streams:1.0.3	jar	central	1dee0481072d19c929b623e155e14d2f6085dc011529a0a0dbefc84cf571d865	CC0

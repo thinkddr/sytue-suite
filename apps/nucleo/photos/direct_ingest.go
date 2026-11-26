@@ -54,7 +54,18 @@ func (r *Repository) uploadIngestOwner() string {
 
 func (request uploadIngestRequest) valid() bool {
 	id, err := uuid.Parse(request.ID)
-	return err == nil && id != uuid.Nil && id.String() == request.ID && storage.ValidDriveName(request.Name) && request.Size > 0 && request.Size <= photorender.MaxOriginal && len(request.ContentType) <= 1024 && !strings.ContainsAny(request.ContentType, "\r\n\x00") && (records.SnapshotRow{Kind: "original", ID: request.ID, Size: request.Size, SHA256: request.SHA256}).Validate() == nil
+	return err == nil && id != uuid.Nil && id.String() == request.ID && storage.ValidDriveName(request.Name) && request.Size > 0 && request.Size <= tamanoMaximo(request.ContentType) && len(request.ContentType) <= 1024 && !strings.ContainsAny(request.ContentType, "\r\n\x00") && (records.SnapshotRow{Kind: "original", ID: request.ID, Size: request.Size, SHA256: request.SHA256}).Validate() == nil
+}
+
+// tamanoMaximo es hasta dónde puede llegar el original importado de un tipo: una foto,
+// lo que la ingesta sabe derivar; un vídeo copiado (ImportarVideo, FO-09), que nunca se
+// descodifica, lo que admite el almacén. ImportarFoto sigue rechazando lo que pasa de
+// MaxOriginal y lo que no es una foto, así que la conectada no cambia.
+func tamanoMaximo(tipo string) int64 {
+	if esVideo(tipo) {
+		return storage.MaxFileBytes
+	}
+	return photorender.MaxOriginal
 }
 
 // ImportarFoto first captures a non-seekable input in the existing encrypted
@@ -142,19 +153,34 @@ func (r *Repository) measurePhotoUpload(ctx context.Context, request uploadInges
 	if err != nil {
 		return model.AssetRow{}, err
 	}
+	return r.filaDeCabecera(request.ID, request.Name, request.ContentType, request.Size, header)
+}
+
+// filaDeCabecera mide una foto por su cabecera (los primeros exif.BytesDeCabecera
+// bytes) y da su fila: tipo, lados, orientación y lo que diga el EXIF. tipoPedido, si
+// no está vacío, tiene que ser el que dice la cabecera.
+func (r *Repository) filaDeCabecera(id, nombre, tipoPedido string, tamano int64, header []byte) (model.AssetRow, error) {
+	return FilaDeCabecera(r.scope, r.formatosExtra, id, nombre, tipoPedido, tamano, header)
+}
+
+// FilaDeCabecera es la fila de una foto de scope medida por su cabecera (ver
+// Repository.ImportarFoto): admite JPEG, PNG y GIF y los formatos de extra
+// (AdmitirFormatos). La comparten las dos fototecas de Sytue Office: la del motor de
+// registros y la de SQLite (`local/fototeca`).
+func FilaDeCabecera(scope storage.Scope, extra map[string]bool, id, nombre, tipoPedido string, tamano int64, header []byte) (model.AssetRow, error) {
 	configuration, format, err := image.DecodeConfig(bytes.NewReader(header))
 	if err != nil || !miniatura.Cabe(configuration) {
 		return model.AssetRow{}, model.ErrInvalidInput
 	}
 	contentType := "image/" + format
-	if format != "jpeg" && format != "png" && format != "gif" {
+	if format != "jpeg" && format != "png" && format != "gif" && !extra[format] {
 		return model.AssetRow{}, model.ErrInvalidInput
 	}
-	if request.ContentType != "" && !strings.EqualFold(strings.Split(request.ContentType, ";")[0], contentType) {
+	if tipoPedido != "" && !strings.EqualFold(strings.Split(tipoPedido, ";")[0], contentType) {
 		return model.AssetRow{}, model.ErrInvalidInput
 	}
 	now := time.Now().UTC()
-	asset := model.AssetRow{ID: request.ID, Tenant: r.scope.Tenant, Owner: r.scope.Subject, DriveID: "private:" + request.ID, Name: request.Name, MediaType: contentType, Bytes: request.Size, Width: configuration.Width, Height: configuration.Height, Orientation: 1, UploadedAt: now, CreatedAt: now, UpdatedAt: now, Tags: []string{}}
+	asset := model.AssetRow{ID: id, Tenant: scope.Tenant, Owner: scope.Subject, DriveID: "private:" + id, Name: nombre, MediaType: contentType, Bytes: tamano, Width: configuration.Width, Height: configuration.Height, Orientation: 1, UploadedAt: now, CreatedAt: now, UpdatedAt: now, Tags: []string{}}
 	if metadata, err := exif.Leer(header); err == nil {
 		asset.Orientation = int(model.OrientacionDe(int(metadata.Orientacion)))
 		asset.TakenAt, asset.Camera, asset.Lens, asset.Latitude, asset.Longitude = metadata.TomadaEn, metadata.Camara, metadata.Objetivo, metadata.Lat, metadata.Lon
@@ -192,6 +218,13 @@ func (r *Repository) ReanudarImportaciones(parent context.Context) ([]api.Photo,
 		}
 		cursor = page.Next
 	}
+	// Y los originales externos y los vídeos copiados (FO-09) que un corte dejó a medias.
+	externos, fallos := r.reanudarExternos(ctx)
+	completed = append(completed, externos...)
+	failures = append(failures, fallos...)
+	videos, fallos := r.reanudarVideos(ctx)
+	completed = append(completed, videos...)
+	failures = append(failures, fallos...)
 	return completed, errors.Join(failures...)
 }
 

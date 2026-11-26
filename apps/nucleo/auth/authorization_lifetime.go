@@ -3,7 +3,11 @@
 
 package auth
 
-import "context"
+import (
+	"context"
+
+	"git.sytue.eu/sytue/one/apps/nucleo/autorizacion"
+)
 
 // WithoutAuthorizationIntent removes only the short action intent. Native
 // application lifetimes call it AFTER capturing a persisted work witness and
@@ -11,5 +15,5 @@ import "context"
 // itself: every request must still acquire and validate its AuthorizationScope.
 // Cancellation, deadlines, ScopeProof and unrelated values remain inherited.
 func WithoutAuthorizationIntent(ctx context.Context) context.Context {
-	return context.WithValue(ctx, authorizationIntentKey{}, (*AuthorizationIntent)(nil))
+	return autorizacion.WithoutAuthorizationIntent(ctx)
 }

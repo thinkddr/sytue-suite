@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
+	"git.sytue.eu/sytue/one/apps/nucleo/office/plantillas"
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/services/docs/internal/domain"
-	"git.sytue.eu/sytue/one/services/docs/internal/plantillas"
 	"git.sytue.eu/sytue/one/services/docs/internal/wopi"
 )
 

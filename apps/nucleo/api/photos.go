@@ -62,7 +62,25 @@ type Photo struct {
 	// caduca la papelera, y entonces no hay fecha que prometer.
 	DeletedAt *time.Time `json:"deletedAt,omitempty"`
 	PurgeAt   *time.Time `json:"purgeAt,omitempty"`
+	// DurationMs es la duración de un vídeo (ContentType «video/…»), en milisegundos;
+	// 0 en una foto. Solo la da la fototeca de Sytue Office (FO-09).
+	DurationMs int64 `json:"durationMs,omitempty"`
+	// Externo es la ruta del original cuando vive FUERA de la fototeca, en una carpeta
+	// del equipo enlazada sin copiarlo (FO-09); vacío, lo de siempre. EstadoExterno dice
+	// si ese fichero ya no está (ExternoFalta) o ya no es el mismo (ExternoCambiado). No
+	// viajan: los pone el repositorio del dispositivo al leer.
+	Externo       string `json:"-"`
+	EstadoExterno string `json:"-"`
 }
+
+// Los estados de un original externo (Photo.EstadoExterno). Vacío: está en su sitio.
+const (
+	ExternoFalta    = "falta"
+	ExternoCambiado = "cambiado"
+)
+
+// EsVideo dice si es un vídeo de la galería.
+func (f Photo) EsVideo() bool { return strings.HasPrefix(f.ContentType, "video/") }
 
 // DiasParaPurga son los días que le quedan en la papelera, redondeados hacia arriba
 // (a 30 h de la purga quedan «2 días», no 1), y 0 si ya le toca: el servicio purga
@@ -100,6 +118,9 @@ func (p *Photos) Timeline(ctx context.Context, cursor string, limite int, soloFa
 // páginas siguientes se piden con Timeline y el cursor que devuelve, como siempre.
 func (p *Photos) TimelineDesde(ctx context.Context, desde string, limite int, soloFavoritas bool) (fotos []Photo, siguiente string, err error) {
 	if p.data != nil {
+		if d, ok := p.data.(PhotosCalendarData); ok {
+			return d.TimelineDesde(ctx, desde, limite, soloFavoritas)
+		}
 		// Saltar a una fecha lo resuelve el índice del servicio, que no tiene la
 		// galería privada.
 		return nil, "", ErrPrivatePhotosOperation
@@ -140,6 +161,9 @@ type TimelineYear struct {
 // saltar a una fecha. Con soloFavoritas, los de «Favoritas».
 func (p *Photos) TimelineYears(ctx context.Context, soloFavoritas bool) ([]TimelineYear, error) {
 	if p.data != nil {
+		if d, ok := p.data.(PhotosCalendarData); ok {
+			return d.TimelineYears(ctx, soloFavoritas)
+		}
 		return nil, ErrPrivatePhotosOperation
 	}
 	q := url.Values{}
@@ -273,6 +297,9 @@ func (p *Photos) SimilarMany(ctx context.Context, ids []string, limite int) ([]P
 
 // Nearby son las hechas cerca de donde se hizo esa.
 func (p *Photos) Nearby(ctx context.Context, id string, limite int) ([]Photo, error) {
+	if d, ok := p.data.(PhotosDiscoveryData); ok {
+		return d.Nearby(ctx, id, limite)
+	}
 	return p.lista(ctx, "/assets/"+url.PathEscape(id)+"/nearby", url.Values{"limit": {strconv.Itoa(limite)}})
 }
 
@@ -305,6 +332,9 @@ type Memory struct {
 
 // Memories son los recuerdos de hoy, del año más reciente al más antiguo.
 func (p *Photos) Memories(ctx context.Context) ([]Memory, error) {
+	if d, ok := p.data.(PhotosCalendarData); ok {
+		return d.Memories(ctx)
+	}
 	r, err := JSON[struct {
 		Memories []Memory `json:"memories"`
 	}](ctx, p.c, Request{Path: "/memories"})
@@ -420,6 +450,9 @@ func (p *Photos) RestaurarTodo(ctx context.Context) (int, error) {
 // han ido, que es lo que se le dice a la persona. El fichero sigue en Sytue Drive: aquí
 // se va el índice, y reindexar esa carpeta la traería de vuelta.
 func (p *Photos) Purgar(ctx context.Context, id string) (int, error) {
+	if d, ok := p.data.(PhotosPurgeData); ok {
+		return d.Purgar(ctx, id)
+	}
 	ruta := "/trash"
 	if id != "" {
 		ruta += "/" + url.PathEscape(id)
@@ -546,6 +579,9 @@ func (p *Photos) RenameAlbum(ctx context.Context, id, titulo string) error {
 // (`ponerPortada` en photosApi.ts): el servicio exige el título en cada cambio, así que
 // va el de ahora. La foto tiene que estar en el álbum; si no, el servicio contesta 400.
 func (p *Photos) PonerPortada(ctx context.Context, id, titulo, foto string) error {
+	if d, ok := p.data.(PhotosAlbumCoverData); ok {
+		return d.PonerPortada(ctx, id, titulo, foto)
+	}
 	return p.mandar(ctx, http.MethodPatch, "/albums/"+url.PathEscape(id),
 		map[string]string{"title": titulo, "coverAssetId": foto})
 }
@@ -663,6 +699,9 @@ func (p *Photos) anonimo() *Client { return New(p.c.base, nil, p.c.http) }
 // momento. El servicio PROPONE y no borra —quien decide es quien mira—, así que esto
 // solo devuelve los grupos.
 func (p *Photos) Duplicates(ctx context.Context, limite int) ([][]Photo, error) {
+	if d, ok := p.data.(PhotosDiscoveryData); ok {
+		return d.Duplicates(ctx, limite)
+	}
 	r, err := JSON[struct {
 		Groups []struct {
 			Items []Photo `json:"items"`

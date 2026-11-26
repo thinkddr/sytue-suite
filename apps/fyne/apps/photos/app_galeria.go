@@ -16,6 +16,7 @@ import (
 
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
+	"git.sytue.eu/sytue/one/apps/nucleo/carrete"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 )
 
@@ -390,6 +391,12 @@ func (a *App) soltado(_ fyne.Position, uris []fyne.URI) {
 // esImagen es `f.type.startsWith('image/')`, con el tipo sacado de la extensión.
 func esImagen(ruta string) bool { return strings.HasPrefix(tipoDe(ruta), "image/") }
 
+// admiteVideo dice si ruta es un vídeo que «Añadir fotos» y soltar meten en la fototeca:
+// solo con ImportarVideo (Sytue Office, FO-09), y los de `carrete.TipoDe`.
+func (a *App) admiteVideo(ruta string) bool {
+	return a.ImportarVideo != nil && carrete.EsVideo(carrete.TipoDe(ruta))
+}
+
 // tipoDe es el tipo de una foto por su extensión. `mime` no sabe de HEIC ni de HEIF
 // donde el sistema no trae su tabla —Android e iOS, que es justo de donde salen, y la
 // copia que deja el selector del teléfono conserva el nombre—, y el navegador sí.
@@ -407,7 +414,7 @@ func tipoDe(ruta string) string {
 func (a *App) subir(rutas []string) {
 	var fotos []string
 	for _, r := range rutas {
-		if esImagen(r) {
+		if esImagen(r) || a.admiteVideo(r) {
 			fotos = append(fotos, r)
 		}
 	}
@@ -433,7 +440,11 @@ func (a *App) subir(rutas []string) {
 				return
 			}
 			e := err
-			if e == nil {
+			switch {
+			case e != nil:
+			case a.admiteVideo(r):
+				e = a.ImportarVideo(vida, r)
+			default:
 				e = a.subirUna(vida, d, r)
 			}
 			res.anotar(filepath.Base(r), e)

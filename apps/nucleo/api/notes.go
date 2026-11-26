@@ -273,6 +273,12 @@ func (n *Notes) ListNotebooks(ctx context.Context) ([]Notebook, error) {
 // DailyNotebook abre el diario del día civil elegido. Carry traslada los pendientes
 // independientes de diarios anteriores; los clientes solo lo piden para hoy.
 func (n *Notes) DailyNotebook(ctx context.Context, date, title string, carry bool) (Notebook, error) {
+	if g, privada, ok := notesGrupo[NotesDailyData](n); privada {
+		if !ok {
+			return Notebook{}, ErrPrivateNotesOperation
+		}
+		return g.DailyNotebook(ctx, date, title, carry)
+	}
 	return PostJSON[Notebook](ctx, n.c, "/daily", map[string]any{
 		"date": date, "title": title, "carry": carry,
 	})
@@ -294,6 +300,12 @@ type Tarea struct {
 
 // ListTasks devuelve las tareas de quien pregunta en todos sus cuadernos, en un estado.
 func (n *Notes) ListTasks(ctx context.Context, estado string) ([]Tarea, error) {
+	if g, privada, ok := notesGrupo[NotesTasksData](n); privada {
+		if !ok {
+			return nil, ErrPrivateNotesOperation
+		}
+		return g.ListTasks(ctx, estado)
+	}
 	r, err := JSON[struct {
 		Tasks []Tarea `json:"tasks"`
 	}](ctx, n.c, Request{Path: "/tasks", Query: url.Values{"state": {estado}}})
@@ -302,6 +314,12 @@ func (n *Notes) ListTasks(ctx context.Context, estado string) ([]Tarea, error) {
 
 // PostponeTask lleva la tarea, con lo que cuelga de ella, al diario de `date`.
 func (n *Notes) PostponeTask(ctx context.Context, id, date, title string) (Notebook, error) {
+	if g, privada, ok := notesGrupo[NotesTasksData](n); privada {
+		if !ok {
+			return Notebook{}, ErrPrivateNotesOperation
+		}
+		return g.PostponeTask(ctx, id, date, title)
+	}
 	return PostJSON[Notebook](ctx, n.c, "/notes/"+url.PathEscape(id)+"/postpone", map[string]any{
 		"date": date, "title": title,
 	})
@@ -320,6 +338,12 @@ type DailyDay struct {
 // DailyRange son los días con notas de [from, to] (incluidos): los puntos de la barra
 // de semana y, con notas, las vistas Semana y Días.
 func (n *Notes) DailyRange(ctx context.Context, from, to string, notas bool) ([]DailyDay, error) {
+	if g, privada, ok := notesGrupo[NotesDailyData](n); privada {
+		if !ok {
+			return nil, ErrPrivateNotesOperation
+		}
+		return g.DailyRange(ctx, from, to, notas)
+	}
 	q := url.Values{"from": {from}, "to": {to}}
 	if notas {
 		q.Set("notes", "1")
@@ -332,6 +356,12 @@ func (n *Notes) DailyRange(ctx context.Context, from, to string, notas bool) ([]
 
 // ThisDay es «Este día»: el mismo día y mes de años anteriores, del más reciente atrás.
 func (n *Notes) ThisDay(ctx context.Context, date string) ([]DailyDay, error) {
+	if g, privada, ok := notesGrupo[NotesDailyData](n); privada {
+		if !ok {
+			return nil, ErrPrivateNotesOperation
+		}
+		return g.ThisDay(ctx, date)
+	}
 	r, err := JSON[struct {
 		Days []DailyDay `json:"days"`
 	}](ctx, n.c, Request{Path: "/daily/this-day", Query: url.Values{"date": {date}}})
@@ -417,6 +447,12 @@ func (n *Notes) DeleteNotebook(ctx context.Context, id string) error {
 // ArchiveNotebook archiva el cuaderno con su rama (true) o la devuelve al árbol
 // (false). Solo su dueño; un diario no se archiva.
 func (n *Notes) ArchiveNotebook(ctx context.Context, id string, archivar bool) error {
+	if g, privada, ok := notesGrupo[NotesMoveData](n); privada {
+		if !ok {
+			return ErrPrivateNotesOperation
+		}
+		return g.ArchiveNotebook(ctx, id, archivar)
+	}
 	metodo := http.MethodPost
 	if !archivar {
 		metodo = http.MethodDelete
@@ -645,12 +681,24 @@ func (n *Notes) RestoreNote(ctx context.Context, id string) error {
 
 // PurgeNote la borra para siempre. No hay vuelta atrás: quien la llame pide confirmación.
 func (n *Notes) PurgeNote(ctx context.Context, id string) error {
+	if g, privada, ok := notesGrupo[NotesMoveData](n); privada {
+		if !ok {
+			return ErrPrivateNotesOperation
+		}
+		return g.PurgeNote(ctx, id)
+	}
 	return n.sinCuerpo(ctx, http.MethodDelete, "/notes/"+url.PathEscape(id)+"/purge", nil)
 }
 
 // MoveNoteToNotebook cambia la nota de cuaderno (con las que tenga agrupadas). El destino
 // decide dónde cae, así que NO se manda posición: mandarla la colocaría encima de otra.
 func (n *Notes) MoveNoteToNotebook(ctx context.Context, id, cuaderno string) error {
+	if g, privada, ok := notesGrupo[NotesMoveData](n); privada {
+		if !ok {
+			return ErrPrivateNotesOperation
+		}
+		return g.MoveNoteToNotebook(ctx, id, cuaderno)
+	}
 	cuerpo, err := json.Marshal(map[string]string{"notebook_id": cuaderno})
 	if err != nil {
 		return err
@@ -672,6 +720,12 @@ type NotePosition struct {
 // MoveNote coloca una nota dentro de su cuaderno: arrastrarla, cambiarla de columna,
 // meterla dentro de otra o sacarla de su grupo.
 func (n *Notes) MoveNote(ctx context.Context, id string, p NotePosition) error {
+	if g, privada, ok := notesGrupo[NotesMoveData](n); privada {
+		if !ok {
+			return ErrPrivateNotesOperation
+		}
+		return g.MoveNote(ctx, id, p)
+	}
 	cuerpo, err := json.Marshal(p)
 	if err != nil {
 		return err
@@ -682,6 +736,12 @@ func (n *Notes) MoveNote(ctx context.Context, id string, p NotePosition) error {
 // SetNoteState marca un estado de etiqueta en una nota; con `estado` vacío lo quita. Los
 // estados de una misma etiqueta son excluyentes: poner uno retira el anterior.
 func (n *Notes) SetNoteState(ctx context.Context, nota, etiqueta, estado string) error {
+	if g, privada, ok := notesGrupo[NotesTagsData](n); privada {
+		if !ok {
+			return ErrPrivateNotesOperation
+		}
+		return g.SetNoteState(ctx, nota, etiqueta, estado)
+	}
 	in := struct {
 		TagID   string  `json:"tag_id"`
 		StateID *string `json:"state_id"`
@@ -764,6 +824,12 @@ type TagInput struct {
 
 // SaveTag crea una etiqueta (`id` vacío) o la sustituye.
 func (n *Notes) SaveTag(ctx context.Context, id string, in TagInput) (Tag, error) {
+	if g, privada, ok := notesGrupo[NotesTagsData](n); privada {
+		if !ok {
+			return Tag{}, ErrPrivateNotesOperation
+		}
+		return g.SaveTag(ctx, id, in)
+	}
 	if id == "" {
 		return PostJSON[Tag](ctx, n.c, "/tags", in)
 	}
@@ -779,6 +845,12 @@ func (n *Notes) SaveTag(ctx context.Context, id string, in TagInput) (Tag, error
 
 // DeleteTag borra una etiqueta, sus estados y sus marcas en todas las notas.
 func (n *Notes) DeleteTag(ctx context.Context, id string) error {
+	if g, privada, ok := notesGrupo[NotesTagsData](n); privada {
+		if !ok {
+			return ErrPrivateNotesOperation
+		}
+		return g.DeleteTag(ctx, id)
+	}
 	return n.sinCuerpo(ctx, http.MethodDelete, "/tags/"+url.PathEscape(id), nil)
 }
 
@@ -864,6 +936,12 @@ const MaxVolcado = 32 << 20
 // Markdown (`.md`, `.zip`) y Evernote (`.enex`), y con él titula el cuaderno y
 // reconoce un Markdown suelto. Puede ir vacío.
 func (n *Notes) PreviewNotebook(ctx context.Context, volcado []byte, nombre string) (VistaPreviaVolcado, error) {
+	if g, privada, ok := notesGrupo[NotesImportData](n); privada {
+		if !ok {
+			return VistaPreviaVolcado{}, ErrPrivateNotesOperation
+		}
+		return g.PreviewNotebook(ctx, volcado, nombre)
+	}
 	if err := validateNotebookBackup(volcado, nombre); err != nil {
 		return VistaPreviaVolcado{}, err
 	}
@@ -877,6 +955,12 @@ func (n *Notes) PreviewNotebook(ctx context.Context, volcado []byte, nombre stri
 // ImportNotebook crea un cuaderno NUEVO a partir de un `.onex`, Markdown o Evernote.
 // No sobrescribe ninguno. `nombre`, como en PreviewNotebook.
 func (n *Notes) ImportNotebook(ctx context.Context, volcado []byte, nombre string) (Importacion, error) {
+	if g, privada, ok := notesGrupo[NotesImportData](n); privada {
+		if !ok {
+			return Importacion{}, ErrPrivateNotesOperation
+		}
+		return g.ImportNotebook(ctx, volcado, nombre)
+	}
 	if err := validateNotebookBackup(volcado, nombre); err != nil {
 		return Importacion{}, err
 	}

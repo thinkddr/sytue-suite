@@ -103,7 +103,11 @@ func (p *Pantalla) abrirVista(el Elemento, sinApp bool, abrir func(context.Conte
 	cuerpo := container.NewStack(container.New(&altoFijo{alto: AltoCargaVersiones},
 		container.NewCenter(ui.NuevaRueda(20, "text", v))))
 	var d *ui.Dialogo
-	descargar := conGlifo(ui.NuevoBoton(p.tr.T("action.download", nil), bajar).Con(ui.Secundario, ui.TallaMD), glifoDescargar, v)
+	rotulo := p.tr.T("action.download", nil)
+	if p.enEquipo() { // en el equipo, el fichero ya está aquí: se abre con su app
+		rotulo = p.textoEquipo("abrirCon")
+	}
+	descargar := conGlifo(ui.NuevoBoton(rotulo, bajar).Con(ui.Secundario, ui.TallaMD), glifoDescargar, v)
 	// Secundario: el acento es para la acción principal, y cerrar no lo es.
 	cerrar := ui.NuevoBoton(p.tr.T("preview.close", nil), func() { d.Cerrar() }).Con(ui.Secundario, ui.TallaMD)
 	d = ui.NuevoDialogo(el.Nombre, cuerpo).Con(ui.DialogoLG, container.New(ui.Fila{Hueco: ui.HuecoPieDialogo}, descargar, cerrar))

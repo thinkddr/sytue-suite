@@ -122,6 +122,18 @@ type Lector struct {
 	// AlAbrirEnlace abre un enlace del cuerpo (`https://…` o `mailto:…`) al pulsarlo.
 	// Nil, los enlaces se pintan pero no se abren.
 	AlAbrirEnlace func(destino string)
+	// El cuerpo con formato (formato_lector.go). Imagen da la imagen de un `src` del
+	// mensaje (remotas: si las suyas se ven); ImagenesVisibles dice si se ven y
+	// AlVerImagenes las enseña (siempre: también las de su remitente). VersionImagenes
+	// cambia al llegar una imagen. Nil: el cuerpo es de texto, como siempre.
+	Imagen           func(m Mensaje, src string, remotas bool) image.Image
+	ImagenesVisibles func(m Mensaje) bool
+	AlVerImagenes    func(m Mensaje, siempre bool)
+	VersionImagenes  int
+	// Invitacion es la invitación de calendario de un mensaje y AlContestar su
+	// Sí/Quizá/No (formato_lector.go). Nil: no hay tarjeta de invitación.
+	Invitacion  func(m Mensaje) (inv *ResumenInvitacion, elegida string, sinAviso bool, enCamino string)
+	AlContestar func(m Mensaje, respuesta string)
 
 	AlResponder  func(Mensaje, Respuesta)
 	AlRedactar   func()

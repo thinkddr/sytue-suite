@@ -113,7 +113,10 @@ type Pantalla struct {
 	// elemento visto al cargar una; cargadas, las carpetas que llegaron bien en esta
 	// sesión —las que la caché del transporte puede servir sin red—, y alLlegar, lo que
 	// marcar cuando llegue su carpeta.
-	raizID   string
+	raizID string
+	// unidad es la unidad de la nube que se mira en Sytue Office (DR-13); vacía, la
+	// carpeta del disco.
+	unidad   UnidadEquipo
 	padres   map[string]string
 	cargadas map[string]bool
 	alLlegar marcaPendiente
@@ -164,9 +167,13 @@ type Pantalla struct {
 	// pone el `main`; sin ellos, el diálogo de compartir ofrece solo el enlace.
 	Directorio *api.Directorio
 	Grupos     func() []string
-	// IA es el cliente de Sytue AI, para «Resumir». Lo pone el `main`; nil, la acción
-	// no se ofrece.
-	IA *api.IA
+	// IA es quien resume, para «Resumir»: el cliente de Sytue AI (`*api.IA`) o, en Sytue
+	// Office, la IA que la persona configuró (`FuncionIA`). Lo pone el `main`; nil, la
+	// acción no se ofrece.
+	IA Asistente
+	// EnEquipo, si no es nil, es Sytue Office: Drive sobre las carpetas del disco, sin
+	// compartir, equipos ni nubes (enequipo.go). nil es la edición conectada.
+	EnEquipo *EnEquipo
 	// pdf es el cliente de PDF para «Combinar PDF» en la barra de selección. Lo pone el
 	// `main` con `ConPDF`; nil, la acción no se ofrece.
 	pdf *api.PDF
@@ -314,6 +321,19 @@ func (p *Pantalla) Objeto() fyne.CanvasObject {
 		vista = container.New(Pila{Elastico: 1}, f, vista)
 	}
 	arm := ui.NuevoArmazon(vista)
+	p.lateral.SoloEquipo = p.enEquipo()
+	if p.enEquipo() {
+		p.montarUnidades()
+		p.papelera.CuerpoPurga = func(e Elemento) string { return strings.ReplaceAll(p.textoEquipo("purga"), "{name}", e.Nombre) }
+		p.papelera.Propio = func(clave string) (string, bool) {
+			propia, ok := PapeleraPropia[clave]
+			if !ok {
+				return "", false
+			}
+			texto := p.textoEquipo(propia)
+			return texto, texto != propia
+		}
+	}
 	arm.Menu = p.lateral.Objeto(v)
 	p.arm = arm
 	// Crear es el «+» flotante, abajo a la derecha y en todos los anchos, como «Redactar»
@@ -561,7 +581,7 @@ func (p *Pantalla) carpetaActual() string {
 	if n := len(p.explor.Ruta); n > 0 {
 		return p.explor.Ruta[n-1].ID
 	}
-	return ""
+	return p.unidad.ID
 }
 
 // Arrancar hace la primera carga: la carpeta raíz y el medidor de almacenamiento.
@@ -586,7 +606,10 @@ func (p *Pantalla) Arrancar(dentro bool) {
 	go p.cargarCarpeta(p.carpetaActual())
 	go p.cargarCuota()
 	go p.cargarFavoritos()
-	p.cargarPie()
+	// En el equipo no hay almacén de la organización, nubes de Sytue ni «Traer mis datos».
+	if !p.enEquipo() {
+		p.cargarPie()
+	}
 }
 
 // cargarPie pide lo del lateral que depende de la sesión: el almacén propio (solo si
@@ -834,6 +857,7 @@ func (p *Pantalla) enganchar() {
 func (p *Pantalla) abrir(el Elemento) {
 	if el.Carpeta && p.explor.EnBusqueda {
 		p.salirDeLaBusqueda()
+		p.unidadPara(el) // en Sytue Office, una carpeta de una nube se mira en su unidad
 		p.explor.Fase = Cargando
 		p.explor.AlPrincipio()
 		p.Repintar()
@@ -843,6 +867,10 @@ func (p *Pantalla) abrir(el Elemento) {
 	if el.Carpeta {
 		p.explor.Ruta = append(p.explor.Ruta, el)
 		go p.cargarCarpeta(el.ID)
+		return
+	}
+	if p.enEquipo() {
+		p.abrirEnEquipo(el)
 		return
 	}
 	if p.abrirEnSuApp(el) {
@@ -1166,7 +1194,7 @@ func (p *Pantalla) mandarAPapelera(sel []Elemento) {
 		p.avisar(ui.AvisoPeligro, p.tr.T("files.batch.trashFailed", nil), motivo(err))
 		return
 	}
-	devolver := conID(sel)
+	devolver := slices.DeleteFunc(conID(sel), p.esRemoto) // lo de una nube, en la papelera del proveedor
 	enHilo(func() { p.avisos.Notificar(p.avisoLoteEnPapelera(lote.Total(), devolver)) })
 	p.cargarCarpeta(p.carpetaActual())
 }
@@ -1260,6 +1288,10 @@ func (p *Pantalla) restaurar(el Elemento) {
 
 // descargar baja un fichero con su progreso y avisa de dónde ha quedado.
 func (p *Pantalla) descargar(el Elemento) {
+	if p.enEquipo() { // en el equipo no se descarga: se copia a otra carpeta (DR-08)
+		enHilo(func() { p.copiarA(el) })
+		return
+	}
 	prog := NuevoProgreso(1)
 	prog.Bajada = true
 	prog.Empezar(0, el.Nombre)
@@ -1410,6 +1442,8 @@ func (p *Pantalla) SubirEntradas(elegidas []Entrada) {
 		return
 	}
 	carpeta := p.carpetaActual()
+	// En una unidad de la nube, un nombre que ya está se pregunta (homonimos.go).
+	preguntar := p.EnUnidad() && p.EnEquipo != nil && p.EnEquipo.Homonimos != nil
 	go func() {
 		var entradas []Entrada
 		var rutas []string
@@ -1421,6 +1455,9 @@ func (p *Pantalla) SubirEntradas(elegidas []Entrada) {
 			}
 		}
 		entradas = append(entradas, EntradasDe(rutas)...)
+		if preguntar {
+			entradas = p.decidirHomonimos(carpeta, entradas)
+		}
 		if len(entradas) == 0 {
 			return
 		}

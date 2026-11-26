@@ -207,6 +207,11 @@ type Visor struct {
 	// AlAnchoFicha recibe el ancho nuevo de la ficha al arrastrar el asa o moverla con
 	// las flechas; `guardar` es el final del gesto. AlAltoFicha, el alto en móvil.
 	AlAnchoFicha, AlAltoFicha func(medida float32, guardar bool)
+
+	// Medio es lo que se enseña EN VEZ de la foto: el reproductor de un vídeo de la
+	// galería (App.Reproductor). Sin zoom, giro, edición ni descarga de imagen, que son
+	// de una foto. nil, la foto, como siempre.
+	Medio fyne.CanvasObject
 }
 
 // PantallaVisor monta el visor. En la web es un `<dialog>` NATIVO a pantalla completa;
@@ -246,6 +251,9 @@ func PantallaVisor(v Vista, d Visor) *fyne.Container {
 	}
 	centro := container.New(zonaVisor{lienzo: lienzo, real: d.TamanyoReal, ventana: v.Ventana, anchoRotulo: anchoRotulo}, zona...)
 	cuerpo := escenario(v, centro, d.TamanyoReal, anterior, siguiente, d.Desplazamiento, d.AlDesplazar)
+	if d.Medio != nil {
+		cuerpo = escenario(v, d.Medio, false, anterior, siguiente, fyne.Position{}, nil)
+	}
 	var ficha, asa fyne.CanvasObject
 	if d.ConFicha {
 		ficha = FichaDelVisor(v, d)
@@ -364,7 +372,11 @@ func mandosVisor(v Vista, d Visor) []fyne.CanvasObject {
 		}
 		hijos = append(hijos, b)
 	}
-	hijos = append(hijos, mandoAlbumes(v, d), mandoDescargar(v, d))
+	album := mandoAlbumes(v, d)
+	if d.Medio != nil {
+		return mandosMedio(v, d, append(hijos, album))
+	}
+	hijos = append(hijos, album, mandoDescargar(v, d))
 	// Una cifrada no pasa por el servidor: ni parecidas, ni describir, ni girar (se
 	// gira en «Editar», que guarda una versión nueva cifrada).
 	if !d.Cifrada {
@@ -417,6 +429,28 @@ func mandosVisor(v Vista, d Visor) []fyne.CanvasObject {
 	for _, h := range hijos {
 		if b, ok := h.(*ui.BotonIcono); ok && b.Pulsado {
 			b.Trazo = "text" // `bg-selected text-text`
+		}
+	}
+	return hijos
+}
+
+// mandosMedio son los mandos de un vídeo (Visor.Medio): los de la foto que no son de su
+// imagen —la ficha, el fondo, los atajos y la papelera—; los del vídeo van en él.
+func mandosMedio(v Vista, d Visor, hijos []fyne.CanvasObject) []fyne.CanvasObject {
+	info := mandoVisor(v, iconos.Informacion, "viewer.info", d.AlFicha)
+	info.Pulsado = d.ConFicha
+	hijos = append(hijos, filete(v), info, mandoFondo(v, d))
+	if d.AlAtajos != nil {
+		hijos = append(hijos, mandoVisor(v, iconos.Teclado, "shortcuts.help", d.AlAtajos))
+	}
+	if d.ConBorrar {
+		b := mandoVisor(v, iconos.Papelera, "viewer.delete", d.AlBorrar)
+		b.FondoEncima, b.TrazoEncima = "bg-subtle", "danger-text"
+		hijos = append(hijos, filete(v), b)
+	}
+	for _, h := range hijos {
+		if b, ok := h.(*ui.BotonIcono); ok && b.Pulsado {
+			b.Trazo = "text"
 		}
 	}
 	return hijos

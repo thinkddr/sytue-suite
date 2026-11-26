@@ -13,8 +13,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"git.sytue.eu/sytue/one/services/syerp/internal/catalogo"
-	"git.sytue.eu/sytue/one/services/syerp/internal/domain"
+	"git.sytue.eu/sytue/one/apps/nucleo/erp/catalogo"
+	domain "git.sytue.eu/sytue/one/apps/nucleo/erp/dominio"
 )
 
 // APROBACIONES CON UMBRAL Y CUATRO OJOS (migración 0095).

@@ -243,12 +243,3 @@ func (h *Handlers) borrarAdjunto(w http.ResponseWriter, r *http.Request) {
 	}
 	h.hecho(w, r, h.Store.BorrarAdjunto(r.Context(), a, rid, aid))
 }
-
-// nombresDeAdjuntos es la celda de un campo de adjuntos en la exportación: sus nombres.
-func nombresDeAdjuntos(adjuntos []domain.Adjunto) string {
-	nombres := make([]string, len(adjuntos))
-	for i, x := range adjuntos {
-		nombres[i] = x.Name
-	}
-	return strings.Join(nombres, "; ")
-}

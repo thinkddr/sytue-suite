@@ -353,7 +353,11 @@ func (f *panelFirmas) vistaDeLoDeclarado() []fyne.CanvasObject {
 		// `role="alert"`: el párrafo se anuncia por su texto (ui.Parrafo es texto accesible).
 		partes = append(partes, ui.NuevoParrafo(f.t("pdf.verify.error"), tema.TextoXS, ui.Normal, "danger-text", v).A(anchoUtil()))
 	}
-	return append(partes, f.pie(f.t("pdf.signatures.disclaimer")))
+	partes = append(partes, f.pie(f.t("pdf.signatures.disclaimer")))
+	if local := f.anclasLocales(true); local != nil {
+		partes = append(partes, container.New(ui.Columna{Hueco: tema.Espacio(1)}, local...))
+	}
+	return partes
 }
 
 // vistaDelInforme es una ficha por firma verificada, la nota de que no hay en quién
@@ -363,6 +367,10 @@ func (f *panelFirmas) vistaDelInforme() []fyne.CanvasObject {
 	partes := make([]fyne.CanvasObject, 0, len(f.informe.Firmas)+2)
 	for _, fi := range f.informe.Firmas {
 		partes = append(partes, nuevoRecuadro(f.ficha(fi)))
+	}
+	if local := f.anclasLocales(false); local != nil {
+		// En la edición local las anclas son de la persona: se dice dónde y cómo cambiarlas.
+		return append(partes, f.pie(f.t("pdf.verify.revocation")), container.New(ui.Columna{Hueco: tema.Espacio(1)}, local...))
 	}
 	if !f.informe.Anclas {
 		partes = append(partes, ui.NuevoParrafo(f.t("pdf.verify.noAnchors"), tema.Texto2XS, ui.Normal, "text-muted", v).A(anchoUtil()))

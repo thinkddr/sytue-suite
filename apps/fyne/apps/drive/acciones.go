@@ -53,7 +53,12 @@ type accionMenu struct {
 // AccionesDe son las acciones del «⋯» de un elemento de «Mi unidad», ya filtradas. Es
 // una función pura del elemento, de la conexión y de si es favorito, para que el
 // guardián compare la lista sin abrir ningún menú.
+//
+//nolint:gocyclo // La lista del «⋯» en el orden de la web, cada entrada con su condición: el guardián la compara entera.
 func (p *Pantalla) AccionesDe(el Elemento, sinRed, favorito bool) []accionMenu {
+	if p.enEquipo() {
+		return p.accionesEnEquipo(el, favorito)
+	}
 	t := func(clave string) string { return p.tr.T(clave, nil) }
 	var out []accionMenu
 	add := func(si bool, a accionMenu) {
@@ -159,6 +164,9 @@ func (p *Pantalla) menuNuevo(disparador fyne.CanvasObject) {
 // la cabecera. «Subir carpeta» va junto a «Carpeta», como en la web, y solo donde hay
 // selector de carpetas: en el móvil `ElegirCarpeta` es nil.
 func (p *Pantalla) elementosNuevo() []fyne.CanvasObject {
+	if p.enEquipo() {
+		return p.elementosNuevoEnEquipo()
+	}
 	t := func(clave string) string { return p.tr.T(clave, nil) }
 	out := []fyne.CanvasObject{
 		ui.NuevoElementoMenu(t("files.upload"), iconos.Subir, p.elegirYSubir),
@@ -457,7 +465,7 @@ func (p *Pantalla) aLaPapelera(el Elemento) {
 		a := ui.NuevoAviso(ui.AvisoExito, p.tr.T("files.delete.done", i18n.Vars{"name": el.Nombre}), "")
 		a.Duracion = ui.DuracionDeshacer
 		// Sin id no hay a qué llamar para restaurar: la papelera trabaja por id.
-		if el.ID != "" {
+		if el.ID != "" && !p.esRemoto(el) { // la papelera de una nube es la del proveedor
 			a.RotuloAccion = p.tr.T("files.delete.undo", nil)
 			a.AlPulsarAccion = func() { go p.deshacerPapelera(el) }
 		}

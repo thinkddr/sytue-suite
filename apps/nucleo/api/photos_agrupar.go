@@ -236,8 +236,9 @@ func idPropuesto(x any) (string, bool) {
 // AgruparFotos es «Organizar con IA»: UNA llamada de texto con lo que Sytue AI ya vio en
 // esas fotos, que devuelve la propuesta de álbumes con los ids de verdad. NO crea nada:
 // eso lo decide quien mira la propuesta. Con menos de dos fotos con algo escrito no se
-// llama a nadie y la propuesta es vacía.
-func AgruparFotos(ctx context.Context, ia *IA, fotos []Photo, idioma string) ([]AlbumPropuesto, error) {
+// llama a nadie y la propuesta es vacía. Vale cualquier Asistente: la IA de la cuenta o,
+// en Sytue Office, la que la persona configuró en Ajustes.
+func AgruparFotos(ctx context.Context, ia Asistente, fotos []Photo, idioma string) ([]AlbumPropuesto, error) {
 	contexto, ids := ContextoAgrupar(fotos[:min(len(fotos), TopeOrganizar)])
 	if len(ids) < MinFotosPorAlbum {
 		return []AlbumPropuesto{}, nil

@@ -211,14 +211,8 @@ func (*Repository) RespondInvitation(context.Context, string, string) (api.Invit
 func (*Repository) SharedWithMe(context.Context) ([]api.Calendar, error) {
 	return nil, records.ErrShared
 }
-func (*Repository) SetPartStat(context.Context, string, string) error   { return ErrPrivateIngress }
 func (*Repository) Share(context.Context, string, string, string) error { return records.ErrShared }
 func (*Repository) RevokeShare(context.Context, string, string) error   { return records.ErrShared }
-func (*Repository) Subscribe(context.Context, api.SubscriptionInput) (api.Calendar, error) {
-	return api.Calendar{}, ErrPrivateSubscriptions
-}
-
-func (*Repository) RefreshSubscription(context.Context, string) error { return ErrPrivateSubscriptions }
 
 func (*Repository) Resources(context.Context, time.Time, time.Time) ([]api.Resource, error) {
 	return nil, records.ErrShared

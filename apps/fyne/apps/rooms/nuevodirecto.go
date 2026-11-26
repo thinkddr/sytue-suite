@@ -4,6 +4,7 @@
 package rooms
 
 import (
+	"cmp"
 	"errors"
 	"image/color"
 	"net/http"
@@ -69,7 +70,14 @@ func ClaveFalloBusqueda(err error) string {
 type Persona struct {
 	ID, Nombre string
 	Externa    bool
+	// NombreSinCuenta es el de la persona cuando Nombre lleva su cuenta detrás (ver
+	// Miembro): de él salen su avatar y el nombre del directo que se abre con ella.
+	// Vacío, Nombre (lo de siempre).
+	NombreSinCuenta string
 }
+
+// NombreDePersona es el nombre de la persona, sin su cuenta detrás: el de su avatar.
+func (p Persona) NombreDePersona() string { return cmp.Or(p.NombreSinCuenta, p.Nombre) }
 
 // NuevoDirecto es el cuerpo del diálogo y su estado.
 type NuevoDirecto struct {
@@ -233,7 +241,7 @@ func (d *NuevoDirecto) construir(v tema.Variante) {
 				rotulo = t.T("people.externalName", i18n.Vars{"name": p.Nombre})
 			}
 			chips = append(chips, NuevoChipQuitable(rotulo, t.T("action.removePerson", i18n.Vars{"name": p.Nombre}),
-				ui.NuevoAvatar(p.Nombre).Con(ui.AvatarXS), func() { d.Conmutar(p) }))
+				ui.NuevoAvatar(p.NombreDePersona()).Con(ui.AvatarXS), func() { d.Conmutar(p) }))
 		}
 		if d.fila == nil {
 			d.fila = &filaEnvuelta{hueco: tema.Espacio(1.5)}
@@ -513,7 +521,7 @@ func (f *FilaPersona) CreateRenderer() fyne.WidgetRenderer {
 	f.casilla = ui.NuevaCaja(color.NRGBA{}, tema.Color("border", v), tema.RadioSM).ConTrazo()
 	f.cuadro = container.New(enCaja{f.casilla}, f.casilla.Objetos()...)
 	f.tic = iconos.Trazo(iconos.Tic, iconos.TallaXXS, "on-primary", v)
-	f.avatar = ui.NuevoAvatar(f.Persona.Nombre).Con(ui.AvatarSM)
+	f.avatar = ui.NuevoAvatar(f.Persona.NombreDePersona()).Con(ui.AvatarSM)
 	f.nombre = ui.Texto(f.Persona.Nombre, tema.TextoBase, ui.Medio, tema.Color("text", v))
 	f.objetos = []fyne.CanvasObject{f.fondo, f.cuadro, f.tic.Objeto(), f.avatar, f.nombre}
 	r := &filaPersonaRenderer{f: f}

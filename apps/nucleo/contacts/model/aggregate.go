@@ -3,6 +3,7 @@ package model
 
 import (
 	"encoding/json"
+	"maps"
 	"slices"
 	"time"
 
@@ -116,11 +117,11 @@ func validateAggregateRelations(entity string, primary relation, all map[string]
 // multi-object delete. Contact purge turns resolved member hints into legal
 // unresolved UIDs while retaining the group's original membership and vCard.
 func (s *Snapshot) WithAggregates(changes []Aggregate) (*Snapshot, error) {
-	rows := make(map[string]Row, len(s.rows))
-	for key, row := range s.rows {
-		row.JSON = slices.Clone(row.JSON)
-		rows[key] = row
-	}
+	// Las filas que se quedan de s comparten sus buffers, que no cambian nunca, y sus
+	// enlaces: solo se descodifican las filas de los cambios (y los miembros que se
+	// normalizan abajo).
+	rows := maps.Clone(s.rows)
+	links := maps.Clone(s.links)
 	seen := map[string]bool{}
 	purged := map[string]bool{}
 	for _, change := range changes {
@@ -132,12 +133,9 @@ func (s *Snapshot) WithAggregates(changes []Aggregate) (*Snapshot, error) {
 			return nil, ErrSnapshot
 		}
 		seen[key] = true
-		owned, err := aggregateOwnedRows(s.scope, rows, aggregateEntity(change.Kind), change.ID)
-		if err != nil {
-			return nil, err
-		}
-		for key := range owned {
+		for key := range aggregateOwnedLinks(links, aggregateEntity(change.Kind), change.ID) {
 			delete(rows, key)
+			delete(links, key)
 		}
 		if change.Purged {
 			purged[change.ID] = true
@@ -149,18 +147,67 @@ func (s *Snapshot) WithAggregates(changes []Aggregate) (*Snapshot, error) {
 				return nil, ErrSnapshot
 			}
 			row.JSON = slices.Clone(row.JSON)
-			rows[key] = row
+			relation, err := decodeRow(s.scope, row)
+			if err != nil {
+				return nil, err
+			}
+			rows[key], links[key] = row, relation.link()
 		}
 	}
-	if err := normalizePurgedMembers(s.scope, rows, purged); err != nil {
+	if err := normalizePurgedMemberLinks(s.scope, rows, links, purged); err != nil {
 		return nil, err
 	}
+	return compose(s.scope, rows, links)
+}
 
-	output := make([]Row, 0, len(rows))
-	for _, row := range rows {
-		output = append(output, row)
+// aggregateOwnedLinks es aggregateOwnedRows sobre los enlaces ya descodificados de
+// las mismas filas.
+func aggregateOwnedLinks(links map[string]link, entity, id string) map[string]bool {
+	owned := map[string]bool{}
+	primary, found := links[rowKey(entity, id)]
+	if !found {
+		return owned
 	}
-	return NewSnapshot(s.scope, output)
+	owned[rowKey(entity, id)] = true
+	if entity == "book" {
+		return owned
+	}
+	owned[rowKey("card", primary.object)] = true
+	for key, row := range links {
+		if row.kind != "email" && row.kind != "phone" && row.kind != "member" {
+			continue
+		}
+		if entity == "contact" && (row.kind == "email" || row.kind == "phone") && row.contact == id || entity == "group" && row.kind == "member" && row.group == id {
+			owned[key] = true
+		}
+	}
+	return owned
+}
+
+// normalizePurgedMemberLinks es normalizePurgedMembers descodificando solo los
+// miembros de un contacto purgado; con su JSON nuevo pierden su enlace.
+func normalizePurgedMemberLinks(scope storage.Scope, rows map[string]Row, links map[string]link, purged map[string]bool) error {
+	if len(purged) == 0 {
+		return nil
+	}
+	for key, value := range links {
+		if value.kind != "member" || !purged[value.contact] {
+			continue
+		}
+		row := rows[key]
+		relation, err := decodeRow(scope, row)
+		if err != nil {
+			return err
+		}
+		relation.raw["contact_id"] = json.RawMessage("null")
+		row.JSON, err = json.Marshal(relation.raw)
+		if err != nil {
+			return err
+		}
+		rows[key] = row
+		delete(links, key)
+	}
+	return nil
 }
 
 func aggregateOwnedRows(scope storage.Scope, rows map[string]Row, entity, id string) (map[string]bool, error) {
@@ -222,16 +269,19 @@ func (s *Snapshot) Edit(kind, id string) (Aggregate, error) {
 	if entity == "" {
 		return Aggregate{}, ErrSnapshot
 	}
-	owned, err := aggregateOwnedRows(s.scope, s.rows, entity, id)
-	if err != nil || len(owned) == 0 {
+	owned := aggregateOwnedLinks(s.links, entity, id)
+	if len(owned) == 0 {
 		return Aggregate{}, ErrSnapshot
 	}
+	// En el orden de Rows, con buffers propios, sin copiar todas las filas.
 	result := Aggregate{Version: 1, Scope: s.scope, Kind: kind, ID: id, Rows: make([]Row, 0, len(owned))}
-	for _, row := range s.Rows() {
-		if owned[rowKey(row.Kind, row.ID)] {
+	for key := range owned {
+		if row, found := s.rows[key]; found {
+			row.JSON = slices.Clone(row.JSON)
 			result.Rows = append(result.Rows, row)
 		}
 	}
+	slices.SortFunc(result.Rows, compareRows)
 	for _, row := range result.Rows {
 		if row.Kind != entity || row.ID != id {
 			continue

@@ -85,6 +85,9 @@ func (p *Pantalla) AbrirIA() {
 	x.AlProponer = func(peticion, para string) { p.proponerInforme(x, pintar, peticion, para) }
 	x.AlGuardar = func() { p.guardarTablero(x, pintar, d) }
 	x.AlExcel = func() { p.excelDelPanel(x, pintar) }
+	if p.ComprobarVIES != nil {
+		x.AlComprobarVIES = func(ref string) { p.comprobarVIESPaso(x, pintar, ref) }
+	}
 	d.Mostrar(p.lienzo)
 }
 
@@ -125,7 +128,7 @@ func (p *Pantalla) prepararPlan(x *PanelIA, pintar func(), peticion string) {
 			if err != nil {
 				x.Fallo = MensajeIA(err, p.tr)
 			} else {
-				x.Plan = &plan
+				x.Plan, x.VIES = &plan, nil
 			}
 			pintar()
 		})

@@ -455,11 +455,22 @@ describe('PqVault: clave de firma registrada en Sytue ID (ADR 0087)', () => {
   ) {
     let rancias = opciones.rancias ?? 0;
     let n = 0;
-    // Un núcleo por apertura: cerrar una bóveda cierra el suyo.
+    // El id de la última clave que el núcleo preparó para registrar: es la que guarda
+    // Sytue ID, como el de verdad (que lo calcula de la parte pública).
+    let inscrita = '';
+    let inscripciones = 0;
+    const idDe = (request: Record<string, unknown>) =>
+      decoder
+        .decode(request.signing_key as Uint8Array)[0]!
+        .repeat(64)
+        .toLowerCase();
+    // Un núcleo por apertura (cerrar una bóveda cierra el suyo) sobre la misma tabla de
+    // identidades: así se puede volver a abrir la bóveda, como en otra pestaña.
+    const base = createMockCore();
     const nuevoNucleo = () => {
-      const base = createMockCore();
       return {
-        ...base,
+        close: () => {},
+        closeAndDrain: () => Promise.resolve(),
         invoke: async <T>(request: Record<string, unknown>): Promise<T> => {
           if (request.operation === 'vault.signing.create') {
             if (opciones.conFirma === false) throw new Error('sin firma');
@@ -468,11 +479,17 @@ describe('PqVault: clave de firma registrada en Sytue ID (ADR 0087)', () => {
               signing_key: encoder.encode(String.fromCharCode(64 + n).repeat(86) + '=='),
             } as T;
           }
+          if (request.operation === 'vault.signing.public') return { key_id: idDe(request) } as T;
           if (request.operation === 'vault.signing.enroll') {
-            const key = decoder.decode(request.signing_key as Uint8Array);
+            const keyID = idDe(request);
+            // Como el núcleo de verdad (`PQVaultKeyStatement`): una clave no se sucede a
+            // sí misma.
+            if (request.previous_key_id === keyID) throw new Error('crypto_rejected');
+            inscrita = keyID;
+            inscripciones++;
             return {
               profile: 'ed25519-mldsa65-v1',
-              key_id: key[0]!.repeat(64).toLowerCase(),
+              key_id: keyID,
               ed25519: new Uint8Array(32),
               mldsa65: new Uint8Array(4),
               proof: new Uint8Array(8),
@@ -503,7 +520,7 @@ describe('PqVault: clave de firma registrada en Sytue ID (ADR 0087)', () => {
       }
       if ((activa?.key_id ?? '') !== body.previous_key_id) return rechazo(409, 'vault_key_stale');
       if (activa) activa.retired_at = 'ayer';
-      registro.push({ generation: registro.length + 1, key_id: 'x'.repeat(64) });
+      registro.push({ generation: registro.length + 1, key_id: inscrita });
       return Response.json({});
     }) as unknown as typeof fetch;
     const abrir = (reset = false) =>
@@ -516,8 +533,34 @@ describe('PqVault: clave de firma registrada en Sytue ID (ADR 0087)', () => {
         bridge: h.bridge,
         createCore: nuevoNucleo,
       });
-    return { h, registro, abrir, sinReautenticar: () => (reciente = false) };
+    return {
+      h,
+      registro,
+      abrir,
+      inscripciones: () => inscripciones,
+      sinReautenticar: () => (reciente = false),
+    };
   }
+
+  // Cada apertura vuelve a mirar la clave en Sytue ID. Con la suya ya activa se pedía
+  // al núcleo la declaración con ella misma como anterior; el núcleo la rechaza y el
+  // correo se quedaba en `prepare/vault.unavailable.signing_failed` al volver a entrar.
+  test('volver a abrir una bóveda ya registrada no la vuelve a registrar ni falla', async () => {
+    const c = conFirma();
+    const primera = await c.abrir();
+    expect(primera.signingKeyStatus).toBe('registered');
+    await primera.closeAndDrain();
+    expect(c.registro).toHaveLength(1);
+    expect(c.inscripciones()).toBe(1);
+    for (let i = 0; i < 2; i++) {
+      const otra = await c.abrir();
+      expect(otra.signingKeyStatus).toBe('registered');
+      expect(otra.signingKeyCheck).toBeUndefined();
+      await otra.closeAndDrain();
+    }
+    expect(c.registro).toHaveLength(1);
+    expect(c.inscripciones()).toBe(1);
+  });
 
   test('una bóveda nueva nace con su clave de firma y la registra', async () => {
     const c = conFirma();

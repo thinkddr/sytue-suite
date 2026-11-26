@@ -43,8 +43,16 @@ func (e *EditorNota) menuInsertar(disparador fyne.CanvasObject) {
 		e.reenfocar()
 		e.aplicarComando(c)
 	}
-	var pintar func()
-	pintar = func() {
+	// Lo que la persona ha desplazado la lista, y se conserva siempre. `pintar` rehace
+	// las filas (al filtrar, con las flechas o al pasar por encima de una) y antes cada
+	// vez volvía a poner la activa abajo del todo. Pasar el ratón por una fila la activa,
+	// y Fyne vuelve a mirar qué fila hay bajo el puntero cada vez que algo se repinta (el
+	// parpadeo del cursor, entre otras cosas), así que la lista volvía sola a su sitio
+	// cada pocos segundos mientras se desplazaba. Ahora solo la mueven las flechas y el
+	// filtro (`revelar`), y solo lo justo para que se vea la activa.
+	var desplazado float32
+	var pintar func(revelar bool)
+	pintar = func(revelar bool) {
 		v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 		visibles = visibles[:0]
 		for _, c := range filtrarComandos(campo.Texto(), e.rotuloComando) {
@@ -60,7 +68,7 @@ func (e *EditorNota) menuInsertar(disparador fyne.CanvasObject) {
 			f.alEncima = func() {
 				if activa != i {
 					activa = i
-					pintar()
+					pintar(false)
 				}
 			}
 			filas = append(filas, f)
@@ -73,22 +81,27 @@ func (e *EditorNota) menuInsertar(disparador fyne.CanvasObject) {
 		d := container.NewVScroll(col)
 		alto := min(col.MinSize().Height, float32(filasMenuCmd)*ui.SueloTactil(max(tema.TextoSM.Linea, cajaDibCmd)+2*pyFilaCmd))
 		d.SetMinSize(fyne.NewSize(anchoMenuSug, alto))
-		if len(visibles) > 0 {
-			d.ScrollToOffset(fyne.NewPos(0, max(0, float32(activa+1)*filas[0].MinSize().Height-alto)))
+		if revelar && len(visibles) > 0 {
+			h := filas[0].MinSize().Height
+			yActiva := float32(activa) * h
+			desplazado = min(max(desplazado, yActiva+h-alto), yActiva)
 		}
+		desplazado = min(max(desplazado, 0), max(col.MinSize().Height-alto, 0))
+		d.Offset = fyne.NewPos(0, desplazado)
+		d.OnScrolled = func(p fyne.Position) { desplazado = p.Y }
 		lista.Objects = []fyne.CanvasObject{d}
 		lista.Refresh()
 		if em != nil {
 			em.Recolocar()
 		}
 	}
-	campo.AlCambiar(func(string) { activa = 0; pintar() })
+	campo.AlCambiar(func(string) { activa = 0; pintar(true) })
 	campo.AlTeclear = func(k *fyne.KeyEvent) bool {
 		switch k.Name {
 		case fyne.KeyDown, fyne.KeyUp:
 			if len(visibles) > 0 {
 				activa = ui.MoverActiva(activa, len(visibles), k.Name)
-				pintar()
+				pintar(true)
 			}
 			return true
 		case fyne.KeyReturn, fyne.KeyEnter:
@@ -106,7 +119,7 @@ func (e *EditorNota) menuInsertar(disparador fyne.CanvasObject) {
 		}
 		return false
 	}
-	pintar()
+	pintar(true)
 	em = ui.MostrarPopover(disparador, container.New(ui.Columna{Hueco: tema.Espacio(2)}, campo, lista))
 	em.Rotulo = e.tr.T("editor.insert", nil)
 	e.insertando = em

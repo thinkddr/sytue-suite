@@ -2460,7 +2460,17 @@ export class SuiteMatrix {
           scope,
           lease: group,
           run,
-          handlers: { 'source.capabilities': sourceAdapter.handlers['source.capabilities']! },
+          handlers: {
+            // mail.capabilities enters through webport.AuthorizedJS, which revalidates
+            // host authority before reading; without it the port rejects the call.
+            'authority.revalidate': async (_raw, ctx) => {
+              ctx.assertOpen();
+              await revalidate(ctx.signal);
+              ctx.assertOpen();
+              return new Uint8Array();
+            },
+            'source.capabilities': sourceAdapter.handlers['source.capabilities']!,
+          },
           cleanup: () => sourceAdapter.close(),
         }),
       );

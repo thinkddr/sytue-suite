@@ -44,7 +44,7 @@ func TestToStoreInputLlevaElCNDelOrganizador(t *testing.T) {
 	in := EventInput{Summary: "Repaso", Organizer: "ana@sytue.eu", OrganizerName: "Ana Pérez"}
 	in.DTStart = time.Date(2026, 11, 26, 9, 0, 0, 0, time.UTC)
 	in.DTEnd = in.DTStart.Add(time.Hour)
-	si, err := (&Service{}).toStoreInput(in)
+	si, err := (&Service{}).toStoreInput(in, 0)
 	if err != nil {
 		t.Fatal(err)
 	}

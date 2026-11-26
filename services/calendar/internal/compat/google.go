@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"git.sytue.eu/sytue/one/services/calendar/internal/caldav"
 	"git.sytue.eu/sytue/one/services/calendar/internal/domain"
 )
 
@@ -523,6 +524,23 @@ func (r GoogleEventRequest) Normalize() (EventFields, error) {
 	}
 	f.Attendees = attendeesToDomain(r.Attendees)
 	return f, nil
+}
+
+// FechasDeLaSerie son las RDATE y EXDATE con las que se guarda la serie `actual` editada
+// por events.update o events.patch con los campos `f`. La emulación no las enseña
+// (`recurrence` lleva solo la RRULE) ni las acepta (normalizeRecurrence), así que el
+// cliente que guarda lo que leyó no las trae: sin esto, editar la serie por aquí las
+// borraba de sus columnas y del recurso iCalendar, y la ocurrencia quitada volvía. Siguen
+// con la serie como en la pantalla: las EXDATE, movidas con su inicio si el cliente la
+// mueve (caldav.MoverConLaSerie); las RDATE, como estaban. Si el cliente le quita la regla
+// que veía, el evento deja de ser una serie y no lleva ninguna.
+func FechasDeLaSerie(actual domain.Event, f EventFields) (rdate, exdate []time.Time) {
+	if actual.RRule != "" && f.RRule == "" {
+		return nil, nil
+	}
+	antes := actual.DTStart.In(domain.EventLocation(actual.TZID, actual.AllDay))
+	ahora := f.Start.In(domain.EventLocation(f.TZID, f.AllDay))
+	return actual.RDate, caldav.MoverConLaSerie(actual.ExDate, antes, ahora)
 }
 
 // normalizeGoogleRange interpreta start/end: `date` (día completo, fin EXCLUSIVO

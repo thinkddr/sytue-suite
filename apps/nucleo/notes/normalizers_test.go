@@ -15,14 +15,14 @@ func TestPrivateNormalizersPreserveCallerOwnedInputsForRetry(t *testing.T) {
 	expected := time.Date(2026, 10, 30, 12, 0, 0, 123456000, time.UTC)
 	in := api.NoteInput{Kind: "text", Title: "  normal title  ", Data: data, ExpectedUpdatedAt: &expected}
 	want := bytes.Clone(data)
-	first, err := normalizeNoteInput(in, false)
+	first, err := normalizeNoteInput(in, false, false)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !bytes.Equal(in.Data, want) || !json.Valid(in.Data) {
 		t.Fatal("normalization overwrote the caller's original JSON")
 	}
-	second, err := normalizeNoteInput(in, false)
+	second, err := normalizeNoteInput(in, false, false)
 	if err != nil || !bytes.Equal(first.Data, second.Data) || first.ExpectedUpdatedAt != &expected || second.ExpectedUpdatedAt != &expected {
 		t.Fatal("normalization changed a retained retry", err)
 	}

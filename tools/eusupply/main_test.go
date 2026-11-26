@@ -413,15 +413,15 @@ func TestElDespertarDeIOSSeInventaria(t *testing.T) {
 }
 
 func TestMailRuntimeProvidersAreInventoried(t *testing.T) {
-	for _, path := range []string{"services/integrations/internal/linkedservices/client.go", "services/integrations/internal/linkedservices/dav.go"} {
+	for _, path := range []string{"apps/nucleo/cuentas/enlazadas/client.go", "apps/nucleo/cuentas/enlazadas/dav.go"} {
 		if !runtimeProviderSource(path) {
 			t.Fatalf("linked provider not scanned: %s", path)
 		}
 	}
-	if runtimeProviderSource("services/integrations/internal/linkedservices/client_test.go") {
+	if runtimeProviderSource("apps/nucleo/cuentas/enlazadas/client_test.go") {
 		t.Fatal("synthetic provider fixtures are not runtime hosts")
 	}
-	for _, path := range []string{"services/integrations/internal/mailbox/cloud.go", "services/integrations/internal/http/handlers_external_mail.go", "services/integrations/db/seeds/templates/gmail-mail.json", "services/integrations/db/seeds/templates/microsoft-mail.json", "services/integrations/db/seeds/templates/yahoo-mail.json"} {
+	for _, path := range []string{"apps/nucleo/cuentas/correo/cloud.go", "apps/nucleo/ia/proveedor/provider.go", "services/integrations/internal/http/handlers_external_mail.go", "services/integrations/db/seeds/templates/gmail-mail.json", "services/integrations/db/seeds/templates/microsoft-mail.json", "services/integrations/db/seeds/templates/yahoo-mail.json"} {
 		if !runtimeProviderSource(path) {
 			t.Fatalf("mail provider not scanned: %s", path)
 		}
@@ -451,5 +451,83 @@ func TestAppleBundlePathsAndExpectedMockRequestsAreNotProviders(t *testing.T) {
 	scanFile(production, `[ "$(cat "$falso/peticiones")" = 'GET https://androidpublisher.googleapis.com/api' ]`, unique)
 	if _, ok := unique["androidpublisher.googleapis.com\t"+production]; !ok {
 		t.Fatal("production endpoint was hidden")
+	}
+}
+
+// Sytue Office (ADR 0083): el código del dispositivo se escanea, y su sitio es su propio
+// registro. Lo que comparte con un servicio no es «del dispositivo»: cuenta como la
+// pasarela, en la línea base.
+func TestElCodigoDelDispositivoSeEscaneaAparte(t *testing.T) {
+	t.Parallel()
+	for _, path := range []string{"apps/nucleo/local/nube/oauth.go", "apps/nucleo/local/asistente/asistente.go", "apps/nucleo/cuentas/dav/descubrir.go", "apps/fyne/local/ajustes.go", "apps/fyne/cmd-local/certipdf/firma.go"} {
+		if !deviceProviderSource(path) || !relevant(path) {
+			t.Errorf("código del dispositivo sin escanear: %s", path)
+		}
+	}
+	for _, path := range []string{"apps/nucleo/local/nube/nube_test.go", "apps/nucleo/cuentas/dav/davprueba/davprueba.go", "apps/nucleo/cuentas/correo/cloud.go", "apps/nucleo/ia/proveedor/provider.go", "services/integrations/internal/http/external_chat_slack.go", "apps/fyne/cmd-local/mail/FyneApp.toml"} {
+		if deviceProviderSource(path) {
+			t.Errorf("%s no es código solo del dispositivo", path)
+		}
+	}
+}
+
+func TestCadaConexionVaEnSuRegistro(t *testing.T) {
+	t.Parallel()
+	disp := observation{Host: "slack.com", Path: "apps/nucleo/local/chat/slack.go"}
+	pasarela := observation{Host: "slack.com", Path: "services/integrations/internal/http/external_chat_slack.go"}
+	clave := func(o observation) string { return o.Host + "\t" + o.Path }
+	device := map[string]bool{clave(disp): true}
+	baseline := map[string]bool{clave(pasarela): true}
+	vistasB, vistasD := map[string]bool{}, map[string]bool{}
+	for _, o := range []observation{disp, pasarela} {
+		if f := blockedFailure(o, baseline, device, vistasB, vistasD); f != "" {
+			t.Errorf("%s: %s", clave(o), f)
+		}
+	}
+	if !vistasD[clave(disp)] || !vistasB[clave(pasarela)] {
+		t.Fatal("cada fila tiene que quedar vista en su registro")
+	}
+	// Sin fila, el dispositivo pide la suya y no la de la deuda.
+	nueva := observation{Host: "graph.microsoft.com", Path: "apps/nucleo/local/agenda/graph.go"}
+	if f := blockedFailure(nueva, baseline, device, vistasB, vistasD); !strings.Contains(f, "conexiones-del-dispositivo.tsv") {
+		t.Errorf("una conexión nueva del dispositivo pide su registro: %q", f)
+	}
+	if f := blockedFailure(observation{Host: "slack.com", Path: "deploy/x.sh"}, baseline, device, vistasB, vistasD); !strings.HasPrefix(f, "nueva dependencia bloqueada") {
+		t.Errorf("fuera de la edición local es deuda nueva: %q", f)
+	}
+	// Y una fila en el registro equivocado se rechaza en los dos sentidos.
+	if mal := misplacedRows(map[string]bool{clave(disp): true}, map[string]bool{clave(pasarela): true}); len(mal) != 2 {
+		t.Fatalf("las dos filas están cambiadas de registro: %v", mal)
+	}
+	if mal := misplacedRows(baseline, device); len(mal) != 0 {
+		t.Fatalf("cada una en su sitio no es un fallo: %v", mal)
+	}
+}
+
+// En Go, `Source:` es un campo y no el `source:` de un YAML: no es docker.io.
+func TestUnCampoDeGoNoEsUnaImagen(t *testing.T) {
+	t.Parallel()
+	vistas := map[string]observation{}
+	scanFile("apps/nucleo/local/almacen/almacen.go", "\t\tSource:  NuevoSinOrigen(dir),\n", vistas)
+	if len(vistas) != 0 {
+		t.Fatalf("un campo de Go tomado por una imagen: %v", vistas)
+	}
+	scanFile("deploy/compose/x.yaml", "    image: postgres:18\n", vistas)
+	if _, ok := vistas["docker.io\tdeploy/compose/x.yaml"]; !ok {
+		t.Fatal("la imagen de un YAML tiene que seguir viéndose")
+	}
+}
+
+// Los nombres que el RFC 2606 aparta para la documentación no son proveedores.
+func TestLosNombresDeDocumentacionNoSonProveedores(t *testing.T) {
+	t.Parallel()
+	vistas := map[string]observation{}
+	scanFile("apps/nucleo/local/chat/matrix.go", "// https://matrix.example.org y https://example.net/x", vistas)
+	if len(vistas) != 0 {
+		t.Fatalf("un nombre de ejemplo inventariado: %v", vistas)
+	}
+	scanFile("apps/nucleo/local/chat/matrix.go", "https://example.org.lejos.eu/x", vistas)
+	if len(vistas) != 1 {
+		t.Fatalf("un host que solo EMPIEZA por un nombre de ejemplo sigue contando: %v", vistas)
 	}
 }

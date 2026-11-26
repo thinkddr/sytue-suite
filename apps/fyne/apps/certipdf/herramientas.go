@@ -244,8 +244,18 @@ func (d *dialogoHerramientas) reconocer(ancho float32) fyne.CanvasObject {
 	partes = append(partes,
 		conRotulo(a.t("pdf.tools.ocr.pages"), d.paginasOCR, notaDialogo(a.t("pdf.tools.ocr.pagesHelp"), ancho)),
 		container.New(alPrincipio{}, d.primario("pdf.tools.ocr.run", func() { a.aplicar(d.cambioOCR()) })),
-		notaDialogo(a.t("pdf.tools.ocr.note"), ancho))
+		notaDialogo(d.notaOCR(), ancho))
 	return seccion(a.t("pdf.tools.ocr"), true, partes...)
+}
+
+// notaOCR es dónde se reconoce: la del servicio o, en la edición local, la del equipo.
+func (d *dialogoHerramientas) notaOCR() string {
+	if f := d.a.p.NotaOCR; f != nil {
+		if n := f(); n != "" {
+			return n
+		}
+	}
+	return d.a.t("pdf.tools.ocr.note")
 }
 
 // cambioOCR es `reconocer-texto`: las páginas vacías NO se mandan, porque el motor

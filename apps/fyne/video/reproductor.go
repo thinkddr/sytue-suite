@@ -41,10 +41,21 @@ import (
 // Adelanto es cuánto se lee por delante de lo que suena.
 const Adelanto = 1500 * time.Millisecond
 
-// Reproductor reproduce un WebM VP9/Opus. El cero no vale: se crea con Nuevo.
+// descodificador es lo común a los de VP9 y VP8 de govpx.
+type descodificador interface {
+	Decode([]byte) error
+	NextFrame() (govpx.Image, bool)
+	Close() error
+}
+
+// Reproductor reproduce un WebM VP9 o VP8 con Opus. El cero no vale: se crea con Nuevo.
 type Reproductor struct {
-	w   *WebM
-	src io.ReadSeeker
+	// fuente da los paquetes: el WebM, o un descodificador del sistema (sistema.go),
+	// que los trae ya descodificados. duracion es la suya; cero si no la dice.
+	fuente   fuentePaquetes
+	duracion time.Duration
+	sistema  Sistema
+	src      io.ReadSeeker
 	// dispositivo es la tarjeta; nil, sin sonido y con el reloj de pared.
 	dispositivo llamada.Dispositivo
 
@@ -55,7 +66,7 @@ type Reproductor struct {
 	AlCambiar func()
 
 	video, audio *Pista
-	vdec         *govpx.VP9Decoder
+	vdec         descodificador
 	adec         *opus.Decoder
 	canalesAudio int
 	preskip      int
@@ -92,6 +103,8 @@ type Reproductor struct {
 	sinTarjeta   bool
 	ultimo       time.Duration
 	hayFotograma bool
+	// imagen es el último fotograma enseñado (UltimoFotograma).
+	imagen image.Image
 }
 
 // Nuevo abre el WebM y prepara los descodificadores. `dispositivo` puede ser nil. Empieza
@@ -100,13 +113,28 @@ type Reproductor struct {
 func Nuevo(src io.ReadSeeker, dispositivo llamada.Dispositivo) (*Reproductor, error) {
 	w, err := Abrir(src)
 	if err != nil {
+		// No es un WebM: si es un fichero y hay un descodificador del sistema que lo
+		// lea, va por él (Sytue Office, CA-08). La edición conectada no registra
+		// ninguno: allí sigue siendo un error.
+		if s, ok := abrirConSistema(src); ok {
+			return NuevoDeSistema(s, dispositivo)
+		}
 		return nil, err
 	}
-	r := &Reproductor{w: w, src: src, dispositivo: dispositivo, pausado: true, volumen: 1, velocidad: 1}
+	// Un WebM cuyo vídeo no saca Go (otro perfil de VP9, AV1…) también va por el sistema,
+	// si lo hay (sistema.go, sinFotogramaEnGo); sin él, como siempre.
+	if sinFotogramaEnGo(w, src) {
+		if s, ok := abrirConSistema(src); ok {
+			return NuevoDeSistema(s, dispositivo)
+		}
+	}
+	r := &Reproductor{fuente: w, duracion: w.Duracion, src: src, dispositivo: dispositivo, pausado: true, volumen: 1, velocidad: 1}
 	r.hay = sync.NewCond(&r.mu)
-	if v := w.Pista(TipoVideo); v != nil && v.Codec == CodecVP9 {
+	if v := w.Pista(TipoVideo); v != nil && (v.Codec == CodecVP9 || v.Codec == CodecVP8) {
 		r.video = v
-		if r.vdec, err = govpx.NewVP9Decoder(govpx.VP9DecoderOptions{Threads: 2}); err != nil {
+		// VP8 también (Sytue Office, CA-07): es lo que traen muchos WebM viejos y lo que
+		// sale de un navegador que graba; govpx descodifica los dos en Go.
+		if r.vdec, err = nuevoDescodificador(v.Codec); err != nil {
 			return nil, err
 		}
 	}
@@ -119,9 +147,17 @@ func Nuevo(src io.ReadSeeker, dispositivo llamada.Dispositivo) (*Reproductor, er
 		}
 	}
 	if r.video == nil && r.audio == nil {
-		return nil, errors.New("video: el fichero no trae VP9 ni Opus")
+		return nil, errors.New("video: el fichero no trae VP9, VP8 ni Opus")
 	}
 	return r, nil
+}
+
+// nuevoDescodificador es el de govpx para ese códec de vídeo (VP8 o VP9).
+func nuevoDescodificador(codec string) (descodificador, error) {
+	if codec == CodecVP8 {
+		return govpx.NewVP8Decoder(govpx.DecoderOptions{ErrorConcealment: true, MaxWidth: 3840, MaxHeight: 2160})
+	}
+	return govpx.NewVP9Decoder(govpx.VP9DecoderOptions{Threads: 2})
 }
 
 // preskipDe es el pre-skip de la cabecera OpusHead: las muestras del principio que el
@@ -140,7 +176,7 @@ func (r *Reproductor) Arrancar() {
 }
 
 // Duracion es la del fichero; cero si no la dice.
-func (r *Reproductor) Duracion() time.Duration { return r.w.Duracion }
+func (r *Reproductor) Duracion() time.Duration { return r.duracion }
 
 // Tamano es el del vídeo; cero sin vídeo.
 func (r *Reproductor) Tamano() (ancho, alto int) {
@@ -283,7 +319,7 @@ func (r *Reproductor) Alternar() {
 // Buscar salta a `t`: al punto de búsqueda anterior y desde ahí descodifica sin
 // enseñar hasta llegar.
 func (r *Reproductor) Buscar(t time.Duration) {
-	if d := r.w.Duracion; d > 0 && t > d {
+	if d := r.duracion; d > 0 && t > d {
 		t = d
 	}
 	t = max(t, 0)
@@ -292,7 +328,7 @@ func (r *Reproductor) Buscar(t time.Duration) {
 		r.lectura.Unlock()
 		return
 	}
-	_, err := r.w.Buscar(t)
+	_, err := r.fuente.Buscar(t)
 	r.lectura.Unlock()
 	r.mu.Lock()
 	r.gen++
@@ -349,6 +385,9 @@ func (r *Reproductor) Cerrar() {
 	r.lectura.Unlock()
 	if cerrar != nil {
 		cerrar()
+	}
+	if r.sistema != nil {
+		_ = r.sistema.Close()
 	}
 	// El descodificador de vídeo lo cierra su rutina al salir: puede estar a medias.
 }
@@ -409,7 +448,7 @@ func (r *Reproductor) bucleLectura() {
 			r.lectura.Unlock()
 			return
 		}
-		p, err := r.w.Siguiente()
+		p, err := r.fuente.Siguiente()
 		r.lectura.Unlock()
 
 		r.mu.Lock()
@@ -431,7 +470,13 @@ func (r *Reproductor) bucleLectura() {
 		case r.video != nil && p.Pista == r.video.Numero:
 			r.cola = append(r.cola, p)
 		case r.audio != nil && p.Pista == r.audio.Numero && r.dispositivo != nil && !r.sinTarjeta:
-			r.encolarAudio(p, pcm)
+			if p.pcm != nil {
+				if p.Tiempo >= r.descartar {
+					r.pcm = append(r.pcm, p.pcm...)
+				}
+			} else {
+				r.encolarAudio(p, pcm)
+			}
 		}
 		r.mu.Unlock()
 		r.hay.Broadcast()
@@ -477,19 +522,28 @@ func (r *Reproductor) bucleVideo() {
 		if p == nil {
 			continue
 		}
-		if err := r.vdec.Decode(p.Datos); err != nil {
+		img := p.imagen
+		if img == nil {
+			if r.vdec == nil {
+				continue
+			}
+			if err := r.vdec.Decode(p.Datos); err != nil {
+				continue
+			}
+			f, ok := r.vdec.NextFrame()
+			if !ok || !ensenar {
+				continue
+			}
+			img = llamada.ImagenI420(f)
+		} else if !ensenar {
 			continue
 		}
-		f, ok := r.vdec.NextFrame()
-		if !ok || !ensenar {
-			continue
-		}
-		img := llamada.ImagenI420(f)
 		r.mu.Lock()
 		vale := gen == r.gen
 		if vale {
 			r.hayFotograma = true
 			r.ultimo = p.Tiempo
+			r.imagen = img
 		}
 		r.mu.Unlock()
 		if vale && r.AlFotograma != nil {
@@ -557,7 +611,7 @@ func (r *Reproductor) acabar() {
 		r.muestras = 0
 		r.pausado = true
 	}
-	if d := r.w.Duracion; d > 0 {
+	if d := r.duracion; d > 0 {
 		r.base = d
 	}
 }

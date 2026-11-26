@@ -95,7 +95,7 @@ func TestPrivatePDFStorageDispatchesWithoutChangingOriginalOrSendingContents(t *
 	if _, err := private.Contenido(t.Context(), PDFFichero{Nombre: "private.pdf", Datos: PDFEnBlanco()}, ""); !errors.Is(err, unavailable) || calls != 0 {
 		t.Fatal("private PDF content ignored revoked authorization", err, calls)
 	}
-	if _, err := private.Motor(t.Context(), "/pdf/ocr", nil, nil, PDFFichero{Nombre: "private.pdf", Datos: PDFEnBlanco()}); !errors.Is(err, ErrPrivatePDFOperation) || calls != 0 {
+	if _, err := private.Motor(t.Context(), "/pdf/signature-requests", nil, nil, PDFFichero{Nombre: "private.pdf", Datos: PDFEnBlanco()}); !errors.Is(err, ErrPrivatePDFOperation) || calls != 0 {
 		t.Fatal("private PDF edit reached the server motor", err, calls)
 	}
 	if _, err := original.Renombrar(t.Context(), "legacy", "legacy"); err != nil || calls != 1 {

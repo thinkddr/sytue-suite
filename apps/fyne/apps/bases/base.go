@@ -113,6 +113,16 @@ func (p *Pantalla) AbrirEnlace(id, tabla, registro string) {
 	p.cargarEstructura()
 }
 
+// AbrirTabla abre la base en una de sus tablas (lo pide el Hub de Sytue Office). Es
+// AbrirEnlace sin registro, que deja la tabla de siempre: aquí se elige esa tabla una sola
+// vez, al llegar la estructura.
+func (p *Pantalla) AbrirTabla(id, tabla string) {
+	p.AbrirEnlace(id, "", "")
+	if p.abierta != nil && tabla != "" {
+		p.abierta.irA.tabla = tabla
+	}
+}
+
 // cargarEstructura pide la base y sus tablas. Quien solo accede a alguna tabla no puede
 // leer la base (404): se queda con las tablas, como en la web.
 func (p *Pantalla) cargarEstructura() {
@@ -162,7 +172,11 @@ func (p *Pantalla) cargarEstructura() {
 // se olvida, para no abrir la ficha de otro registro.
 func (b *Base) tablaInicial() string {
 	if slices.ContainsFunc(b.Tablas, func(t api.BasesTable) bool { return t.ID == b.irA.tabla }) {
-		return b.irA.tabla
+		t := b.irA.tabla
+		if b.irA.registro == "" {
+			b.irA.tabla = "" // solo la tabla (AbrirTabla): una vez, no en cada recarga
+		}
+		return t
 	}
 	b.irA.tabla, b.irA.registro = "", ""
 	if b.tabla() != nil {
@@ -255,16 +269,20 @@ func (p *Pantalla) objetoBase(v tema.Variante) fyne.CanvasObject {
 	titulo.Truncar = true
 	linea := []fyne.CanvasObject{titulo}
 	if puedeEsquema(b.Datos.Role) {
-		compartir := ui.NuevoBoton(p.t("share.open"), p.dialogoCompartir).Con(ui.Secundario, ui.TallaSM)
-		linea = append(linea, compartir, p.menuMas(p.t("actions.more")+" · "+nombre, func() []fyne.CanvasObject {
+		if !p.SinServidor {
+			linea = append(linea, ui.NuevoBoton(p.t("share.open"), p.dialogoCompartir).Con(ui.Secundario, ui.TallaSM))
+		}
+		linea = append(linea, p.menuMas(p.t("actions.more")+" · "+nombre, func() []fyne.CanvasObject {
 			borrar := ui.NuevoElementoMenu(p.t("base.delete"), iconos.Papelera, p.borrarBase)
 			borrar.Peligro = true
 			menu := []fyne.CanvasObject{
 				ui.NuevoElementoMenu(p.t("base.rename"), iconos.Lapiz, p.renombrarBase),
 				ui.NuevoElementoMenu(p.t("base.editDescription"), iconos.Ninguno, p.editarDescripcion),
-				ui.NuevoElementoMenu(p.t("activity.open"), iconos.Reloj, func() { p.abrirActividad() }),
-				ui.NuevoElementoMenu(p.t("table.add"), iconos.Mas, p.nuevaTabla),
 			}
+			if !p.SinServidor || p.ActividadLocal {
+				menu = append(menu, ui.NuevoElementoMenu(p.t("activity.open"), iconos.Reloj, func() { p.abrirActividad() }))
+			}
+			menu = append(menu, ui.NuevoElementoMenu(p.t("table.add"), iconos.Mas, p.nuevaTabla))
 			if p.Elegir != nil {
 				menu = append(menu, ui.NuevoElementoMenu(p.t("import.open"), iconos.Subir, p.importarCSV))
 			}

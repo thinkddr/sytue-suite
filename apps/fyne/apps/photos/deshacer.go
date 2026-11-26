@@ -108,7 +108,7 @@ func (a *App) avisarTirada(t tirada) {
 		return
 	}
 	av := ui.NuevoAviso(ui.AvisoExito, a.v.T.T("gallery.trashed", i18n.Vars{"count": n}),
-		a.v.T.T("gallery.trashedStays", i18n.Vars{"count": n}))
+		a.v.Traduce("gallery.trashedStays", i18n.Vars{"count": n}))
 	av.Duracion = ui.DuracionDeshacer
 	av.RotuloAccion = a.v.Traduce("gallery.undo")
 	av.AlPulsarAccion = func() { a.deshacerTirada(t) }

@@ -23,13 +23,13 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	provider "git.sytue.eu/sytue/one/apps/nucleo/ia/proveedor"
 	"git.sytue.eu/sytue/one/platform/pkg/authn"
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/platform/pkg/log"
 	"git.sytue.eu/sytue/one/platform/pkg/logsafe"
 	"git.sytue.eu/sytue/one/services/ai/internal/config"
 	"git.sytue.eu/sytue/one/services/ai/internal/presupuesto"
-	"git.sytue.eu/sytue/one/services/ai/internal/provider"
 )
 
 // errNotConfigured se devuelve cuando el servicio no tiene proveedor (sin API

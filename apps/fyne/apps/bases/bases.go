@@ -101,6 +101,18 @@ type Pantalla struct {
 	// comentando es el panel de comentarios abierto, si lo hay: un comentario de otra
 	// persona en ese registro lo vuelve a cargar.
 	comentando *panelComentarios
+
+	// SinServidor es la edición local (Sytue Office): una persona y ningún servicio
+	// detrás. No se ofrece compartir ni la actividad, y no se abre el tiempo real, que
+	// sin servidor solo diría «se ha perdido la conexión». Falso, como siempre.
+	SinServidor bool
+	// SinFormularios no ofrece la vista de formulario (sus enlaces públicos piden un
+	// servicio que los reciba): ni al crear una vista ni, en una que ya lo sea, el panel
+	// de enlaces. Falso, como siempre (B-05).
+	SinFormularios bool
+	// ActividadLocal ofrece la actividad de la base aunque no haya servidor: la que
+	// anota el propio dispositivo (B-06). Solo cuenta con SinServidor.
+	ActividadLocal bool
 }
 
 // NuevaPantalla monta la aplicación sobre su ventana. `svc` nil la deja pintarse sin red.

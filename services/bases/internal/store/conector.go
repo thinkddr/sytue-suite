@@ -443,7 +443,7 @@ func etiquetasDeEnlaces(ctx context.Context, tx pgx.Tx, a domain.Actor, campos [
 			}
 			data := map[string]json.RawMessage{}
 			_ = json.Unmarshal(raw, &data)
-			out[id] = etiquetaDe(destino, data, id)
+			out[id] = domain.EtiquetaDe(destino, data, id)
 		}
 		rows.Close()
 		if err := rows.Err(); err != nil {
@@ -451,22 +451,4 @@ func etiquetasDeEnlaces(ctx context.Context, tx pgx.Tx, a domain.Actor, campos [
 		}
 	}
 	return out, nil
-}
-
-// etiquetaDe es el texto con el que se nombra un registro: su primer campo de texto,
-// número, fecha o selección con valor; si no tiene, el principio de su id.
-func etiquetaDe(campos []domain.Campo, data map[string]json.RawMessage, id string) string {
-	for _, c := range campos {
-		if c.Kind == domain.TipoRelacion || c.Kind == domain.TipoCasilla || c.Kind == domain.TipoMultiple {
-			continue
-		}
-		var v any
-		if raw := data[c.ID]; len(raw) > 0 && json.Unmarshal(raw, &v) == nil && v != nil {
-			return fmt.Sprint(v)
-		}
-	}
-	if len(id) > 8 {
-		return id[:8]
-	}
-	return id
 }

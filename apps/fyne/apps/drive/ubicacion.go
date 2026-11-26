@@ -32,6 +32,7 @@ type marcaPendiente struct {
 // abrirCarpetaLejana abre en «Mi unidad» una carpeta de «Recientes» o «Destacados».
 // Se llama en la rutina de la interfaz.
 func (p *Pantalla) abrirCarpetaLejana(el Elemento) {
+	p.unidadPara(el) // una carpeta de una nube se mira dentro de su unidad
 	p.aMiUnidad()
 	p.enSegundoPlano(func() { p.abrirDesdeLejos(el) })
 }
@@ -40,6 +41,7 @@ func (p *Pantalla) abrirCarpetaLejana(el Elemento) {
 // Se llama en la rutina de la interfaz: lo que ya se sabe —su carpeta, si llegó en el
 // listado; la raíz— se lee aquí, y lo que hay que preguntar va aparte.
 func (p *Pantalla) mostrarEnSuCarpeta(el Elemento) {
+	p.unidadPara(el)
 	padre, raiz, actual := p.padreConocido(el), p.raizID, p.carpetaActual()
 	p.aMiUnidad()
 	p.enSegundoPlano(func() { p.ubicar(el, padre, raiz, actual) })

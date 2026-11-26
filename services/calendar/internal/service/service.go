@@ -349,7 +349,7 @@ func (s *Service) CreateEvent(ctx context.Context, in EventInput) (domain.Event,
 			return domain.Event{}, err
 		}
 	}
-	storeIn, err := s.toStoreInput(in)
+	storeIn, err := s.toStoreInput(in, 0)
 	if err != nil {
 		return domain.Event{}, err
 	}
@@ -390,16 +390,27 @@ func (s *Service) UpdateEvent(ctx context.Context, in EventInput) (domain.Event,
 			return domain.Event{}, err
 		}
 	}
-	storeIn, err := s.toStoreInput(in)
+	// Incrementa SEQUENCE para reflejar el cambio a los asistentes (RFC 5546), en la
+	// columna y en el recurso que sincronizan los clientes CalDAV.
+	secuencia := 0
+	if errCur == nil {
+		secuencia = cur.SequenceNo + 1
+	}
+	storeIn, err := s.toStoreInput(in, secuencia)
 	if err != nil {
 		return domain.Event{}, err
 	}
-	// Incrementa SEQUENCE para reflejar el cambio a los asistentes (RFC 5546).
 	if errCur == nil {
-		storeIn.SequenceNo = cur.SequenceNo + 1
+		// Lo que no cambió, escrito como estaba (caldav.ConservarForma): las EXDATE que
+		// siguen en su línea, y la regla que el formulario rehace en otro orden sigue
+		// siendo la misma serie, así que CarryOver le conserva sus excepciones.
+		conservado, err := caldav.ConservarForma(storeIn.ICalData, cur.Data)
+		if err != nil {
+			return domain.Event{}, err
+		}
 		// Esta API no sabe de recordatorios: sin esto, editar por REST un evento se los
 		// quitaba a quien los puso en la web (ver caldav.CarryOver).
-		conservado, err := caldav.CarryOver(storeIn.ICalData, cur.Data, in.Reminders != nil)
+		conservado, err = caldav.CarryOver(conservado, cur.Data, in.Reminders != nil)
 		if err != nil {
 			return domain.Event{}, err
 		}
@@ -1075,8 +1086,9 @@ func (s *Service) replyDeInvitacion(ctx context.Context, inv domain.Invitation) 
 
 // toStoreInput normaliza un EventInput de la API REST a domain.EventInput,
 // generando UID si falta, validando rango y recurrencia, sintetizando el
-// iCalendar canonico y derivando recurrence_end.
-func (s *Service) toStoreInput(in EventInput) (domain.EventInput, error) {
+// iCalendar canonico y derivando recurrence_end. `secuencia` es su SEQUENCE (0 al
+// crearlo; la siguiente a la guardada al editarlo).
+func (s *Service) toStoreInput(in EventInput, secuencia int) (domain.EventInput, error) {
 	if in.DTStart.IsZero() || in.DTEnd.IsZero() {
 		return domain.EventInput{}, domain.ErrInvalidEvent
 	}
@@ -1109,6 +1121,7 @@ func (s *Service) toStoreInput(in EventInput) (domain.EventInput, error) {
 		RDate:          in.RDate,
 		ExDate:         in.ExDate,
 		Attendees:      in.Attendees,
+		SequenceNo:     secuencia,
 	}
 	if in.RRule != "" {
 		rule, err := domain.ParseRRule(in.RRule)
@@ -1123,13 +1136,19 @@ func (s *Service) toStoreInput(in EventInput) (domain.EventInput, error) {
 		si.RecurrenceEnd = end
 	}
 
-	// Sintetiza el iCalendar canonico para servirlo por CalDAV.
+	// Sintetiza el iCalendar canonico para servirlo por CalDAV. Con las RDATE y EXDATE de
+	// la serie, las mismas que van a sus columnas: sin ellas, la ocurrencia quitada que
+	// la expansión del servicio ocultaba volvía en los clientes CalDAV que sincronizan el
+	// recurso. Y con su SEQUENCE, la de la columna: sin ella, el cliente que la compara
+	// veía la versión 0 y podía no tomar la edición por nueva, y lo que reescribe el
+	// recurso tal como está (amend-recurrence, un PUT de CalDAV) devolvía la columna a 0.
 	ev := domain.Event{
 		UID: si.UID, Summary: si.Summary, Description: si.Description, Location: si.Location,
 		Organizer: si.Organizer, OrganizerName: si.OrganizerName, DTStart: si.DTStart, DTEnd: si.DTEnd, TZID: si.TZID,
 		AllDay: si.AllDay, Status: orStatus(si.Status), Classification: orClass(si.Classification),
 		Transparency: orTransp(si.Transparency), Color: si.Color, ConferenceURL: si.ConferenceURL,
-		RRule: si.RRule, Attendees: si.Attendees,
+		RRule: si.RRule, RDate: si.RDate, ExDate: si.ExDate, Attendees: si.Attendees,
+		SequenceNo: si.SequenceNo,
 	}
 	data, err := caldav.EncodeEvent(ev, "")
 	if err != nil {

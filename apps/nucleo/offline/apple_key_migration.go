@@ -1,13 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 Daniel Delgado Ramos
-//go:build !js
+//go:build !js && !edicionlocal
 
 package offline
 
 import (
-	"context"
 	"errors"
-	"os"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/auth"
 )
@@ -15,13 +13,6 @@ import (
 // A system reader can claim only the cache whose immutable marker was read from
 // this already-open root. The existing codec authenticates every sealed record
 // before the OS atomically moves the key; no plaintext fallback or new key.
-type boundCacheSecrets struct {
-	CacheSecrets
-	root    *os.Root
-	cacheID string
-	ctx     context.Context
-}
-
 func (s boundCacheSecrets) Read(name string) ([]byte, error) {
 	raw, err := s.CacheSecrets.Read(name)
 	if !errors.Is(err, auth.ErrSecretoLegadoCompartido) {

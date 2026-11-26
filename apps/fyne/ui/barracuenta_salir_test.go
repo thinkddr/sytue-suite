@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 Daniel Delgado Ramos
 
+//go:build !edicionlocal
+
 package ui
 
 import (
@@ -99,10 +101,6 @@ func TestCerrarSesionAvisaDeLoQueNotepadsNoHaSubido(t *testing.T) {
 		t.Errorf("tras cerrar sesión quedan %d cosas de Notepads en el disco", n)
 	}
 }
-
-type transporteFunc func(*http.Request) (*http.Response, error)
-
-func (f transporteFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
 
 // TestCerrarSesionSubeLoPendienteYApagaDescartarMientrasSube: elegir «Subir y cerrar
 // sesión» envía el borrador antes de salir y, mientras sube, apaga también «Descartar y

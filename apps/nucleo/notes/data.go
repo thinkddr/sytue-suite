@@ -349,8 +349,14 @@ func (r *Repository) markNote(ctx context.Context, id string, trash bool) error 
 		}
 		defer clear(old)
 		var note api.Note
-		if json.Unmarshal(old, &note) != nil {
+		var purga struct {
+			PurgedAt *time.Time `json:"purged_at"`
+		}
+		if json.Unmarshal(old, &note) != nil || json.Unmarshal(old, &purga) != nil {
 			return "", "", "", nil, ErrSource
+		}
+		if purga.PurgedAt != nil {
+			return "", "", "", nil, ErrNotFound
 		}
 		if _, err := r.GetNotebook(ctx, note.NotebookID); err != nil {
 			return "", "", "", nil, err
@@ -411,6 +417,7 @@ func (r *Repository) ListTrash(parent context.Context, limit int) ([]api.Trashed
 		var note api.Note
 		var borrado struct {
 			DeletedAt *time.Time `json:"deleted_at"`
+			PurgedAt  *time.Time `json:"purged_at"`
 		}
 		err = json.Unmarshal(raw, &note)
 		if err == nil {
@@ -419,6 +426,9 @@ func (r *Repository) ListTrash(parent context.Context, limit int) ([]api.Trashed
 		clear(raw)
 		if err != nil {
 			return nil, ErrSource
+		}
+		if borrado.PurgedAt != nil {
+			continue // borrada para siempre (PurgeNote)
 		}
 		item := api.TrashedNote{Note: note, DeletedAt: note.UpdatedAt}
 		if borrado.DeletedAt != nil {
@@ -651,7 +661,7 @@ func (r *Repository) prepareNote(ctx context.Context, id, notebook string, in ap
 	if err := checkNoteInput(nb, in); err != nil {
 		return "", "", "", nil, err
 	}
-	in, err = normalizeNoteInput(in, nb.Encrypted)
+	in, err = normalizeNoteInput(in, nb.Encrypted, r.local)
 	if err != nil {
 		return "", "", "", nil, err
 	}

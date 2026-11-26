@@ -172,14 +172,35 @@ type AtomicCatalogSnapshot struct {
 	History []ObjectVersion
 	Heads   []ObjectVersion
 	Batches map[string]Reference
+
+	// plain tiene la versión descodificada de cada entrada ObjectKind suelta de
+	// Entries, para LoadAtomicCatalogFrom. No se modifica nunca.
+	plain map[Reference]ObjectVersion
 }
 
 func LoadAtomicCatalog(ctx context.Context, reader AtomicCatalogReader, scope Scope) (AtomicCatalogSnapshot, error) {
-	binding, entries, err := loadCatalogEntries(ctx, reader, scope)
+	return LoadAtomicCatalogFrom(ctx, reader, scope, AtomicCatalogSnapshot{})
+}
+
+// LoadAtomicCatalogFrom es LoadAtomicCatalog reutilizando lo que ya hizo previous, un
+// resultado anterior de cualquiera de las dos para el mismo alcance: una entrada de
+// índice que es exactamente el mismo registro en la misma referencia no se valida ni se
+// descodifica otra vez, porque las dos cosas dependen solo de la entrada y del alcance.
+// Las demás entradas, los lotes y el grafo entero se comprueban como siempre, así que
+// el resultado es el mismo. previous solo se lee; uno vacío no reutiliza nada.
+func LoadAtomicCatalogFrom(ctx context.Context, reader AtomicCatalogReader, scope Scope, previous AtomicCatalogSnapshot) (AtomicCatalogSnapshot, error) {
+	var same func(RecordEntry) bool
+	if previous.Binding.Scope == scope && len(previous.Entries) > 0 {
+		same = func(entry RecordEntry) bool {
+			prior, found := previous.Entries[entry.Reference]
+			return found && sameRecordEntry(prior, entry)
+		}
+	}
+	binding, entries, known, err := loadCatalogEntriesKnown(ctx, reader, scope, same)
 	if err != nil {
 		return AtomicCatalogSnapshot{}, err
 	}
-	snapshot, err := projectAtomicCatalog(ctx, reader, binding, entries)
+	snapshot, err := projectAtomicCatalog(ctx, reader, binding, entries, known, previous.plain)
 	if err != nil {
 		return AtomicCatalogSnapshot{}, err
 	}
@@ -202,9 +223,13 @@ type atomicPreparedEntry struct {
 	entry   RecordEntry
 }
 
-func projectAtomicCatalog(ctx context.Context, reader AtomicCatalogReader, binding Binding, entries map[Reference]RecordEntry) (AtomicCatalogSnapshot, error) {
-	snapshot := AtomicCatalogSnapshot{Binding: binding, Entries: entries, Pages: map[Reference]RecordEntry{}, Batches: map[string]Reference{}}
-	visible := []RecordEntry{}
+// projectAtomicCatalog proyecta entries; known son las idénticas a una entrada de una
+// carga anterior, cuyas versiones ObjectKind sueltas son previousPlain.
+func projectAtomicCatalog(ctx context.Context, reader AtomicCatalogReader, binding Binding, entries map[Reference]RecordEntry, known map[Reference]bool, previousPlain map[Reference]ObjectVersion) (AtomicCatalogSnapshot, error) {
+	snapshot := AtomicCatalogSnapshot{Binding: binding, Entries: entries, Pages: map[Reference]RecordEntry{}, Batches: map[string]Reference{}, plain: map[Reference]ObjectVersion{}}
+	// Las versiones sueltas ya descodificadas: CatalogHistory sobre estas entradas las
+	// volvería a descodificar en las mismas versiones.
+	visible := []ObjectVersion{}
 	prepared := map[Reference]atomicPreparedEntry{}
 	ordinals := map[string]map[uint64]Reference{}
 	objects := map[string]map[string]bool{}
@@ -218,16 +243,20 @@ func projectAtomicCatalog(ctx context.Context, reader AtomicCatalogReader, bindi
 			return AtomicCatalogSnapshot{}, ErrRecord
 		}
 		events[ref.EventID] = true
+		version, plain, err := plainVersion(entry, binding.Scope, previousPlain, known[ref])
+		if err != nil {
+			return AtomicCatalogSnapshot{}, err
+		}
+		if plain {
+			snapshot.plain[ref] = version
+			visible = append(visible, version)
+			continue
+		}
 		kind, err := atomicKind(entry, binding.Scope)
 		if err != nil {
 			return AtomicCatalogSnapshot{}, err
 		}
 		switch kind {
-		case ObjectKind:
-			if _, err := DecodeObject(entry, binding.Scope); err != nil {
-				return AtomicCatalogSnapshot{}, err
-			}
-			visible = append(visible, entry)
 		case ObjectPreparedKind:
 			if err := recordPreparedCatalogEntry(entry, binding.Scope, ref, ordinals, objects, prepared); err != nil {
 				return AtomicCatalogSnapshot{}, err
@@ -251,6 +280,7 @@ func projectAtomicCatalog(ctx context.Context, reader AtomicCatalogReader, bindi
 		rootRefs = append(rootRefs, ref)
 	}
 	slices.SortFunc(rootRefs, compareReferences)
+	batched := []RecordEntry{}
 	for _, ref := range rootRefs {
 		root := roots[ref]
 		if root.Count != uint64(len(ordinals[root.BatchID])) {
@@ -260,18 +290,58 @@ func projectAtomicCatalog(ctx context.Context, reader AtomicCatalogReader, bindi
 		if err != nil {
 			return AtomicCatalogSnapshot{}, err
 		}
-		visible = append(visible, members...)
+		batched = append(batched, members...)
 	}
-	history, err := CatalogHistory(binding.Scope, visible)
-	if err != nil {
-		return AtomicCatalogSnapshot{}, err
-	}
-	heads, err := CatalogHeads(binding.Scope, visible)
+	history, heads, err := atomicHistory(binding.Scope, visible, batched)
 	if err != nil {
 		return AtomicCatalogSnapshot{}, err
 	}
 	snapshot.History, snapshot.Heads = history, heads
 	return snapshot, nil
+}
+
+// plainVersion es la versión de entry si es un objeto suelto (ObjectKind): la de
+// previousPlain si known (es la misma entrada que ya lo era), o la que da
+// descodificarla. false si es de otro tipo, que se mira aparte.
+func plainVersion(entry RecordEntry, scope Scope, previousPlain map[Reference]ObjectVersion, known bool) (ObjectVersion, bool, error) {
+	if prior, found := previousPlain[entry.Reference]; found && known {
+		return cloneAcceptedObjectVersion(prior), true, nil
+	}
+	kind, err := atomicKind(entry, scope)
+	if err != nil || kind != ObjectKind {
+		return ObjectVersion{}, false, err
+	}
+	version, err := DecodeObject(entry, scope)
+	if err != nil {
+		return ObjectVersion{}, false, err
+	}
+	return version, true, nil
+}
+
+// atomicHistory son CatalogHistory y CatalogHeads sobre las entradas sueltas, ya
+// descodificadas en visible, y los miembros de los lotes, que se descodifican aquí como
+// lo harían. Las cabezas salen de la misma historia (es determinista) con sus propios
+// buffers, como antes.
+func atomicHistory(scope Scope, visible []ObjectVersion, batched []RecordEntry) ([]ObjectVersion, []ObjectVersion, error) {
+	if !scope.Valid() {
+		return nil, nil, ErrRecord
+	}
+	for _, entry := range batched {
+		version, err := DecodeObject(entry, scope)
+		if err != nil {
+			return nil, nil, err
+		}
+		visible = append(visible, version)
+	}
+	history, err := historyOf(visible)
+	if err != nil {
+		return nil, nil, err
+	}
+	heads := headsOf(history)
+	for i := range heads {
+		heads[i] = cloneAcceptedObjectVersion(heads[i])
+	}
+	return history, heads, nil
 }
 
 func recordPreparedCatalogEntry(entry RecordEntry, scope Scope, ref Reference, ordinals map[string]map[uint64]Reference, objects map[string]map[string]bool, prepared map[Reference]atomicPreparedEntry) error {

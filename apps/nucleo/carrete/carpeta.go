@@ -39,11 +39,6 @@ var (
 	raices = carpetasGaleria
 )
 
-// ProfundidadMaxima es hasta dónde se baja en cada carpeta: lo bastante para
-// «Imágenes/2024/Vacaciones/Día 3» y no tanto como para recorrer un disco entero
-// enlazado ahí por error.
-const ProfundidadMaxima = 8
-
 func disponible() bool {
 	d, err := raiz()
 	return err == nil && d != ""

@@ -16,13 +16,13 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"git.sytue.eu/sytue/one/apps/nucleo/erp/catalogo"
+	"git.sytue.eu/sytue/one/apps/nucleo/erp/obligaciones"
 	"git.sytue.eu/sytue/one/platform/pkg/keycrypto"
 	"git.sytue.eu/sytue/one/platform/pkg/pgtest"
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
 	"git.sytue.eu/sytue/one/services/syerp/db"
-	"git.sytue.eu/sytue/one/services/syerp/internal/catalogo"
 	"git.sytue.eu/sytue/one/services/syerp/internal/config"
-	"git.sytue.eu/sytue/one/services/syerp/internal/obligaciones"
 	"git.sytue.eu/sytue/one/services/syerp/internal/store"
 )
 

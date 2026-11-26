@@ -4,6 +4,7 @@
 package syerphttp
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -11,10 +12,10 @@ import (
 	"strings"
 	"time"
 
+	"git.sytue.eu/sytue/one/apps/nucleo/erp/obligaciones"
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
 	"git.sytue.eu/sytue/one/platform/pkg/validation"
-	"git.sytue.eu/sytue/one/services/syerp/internal/obligaciones"
 	"git.sytue.eu/sytue/one/services/syerp/internal/store"
 )
 
@@ -172,20 +173,7 @@ func (h *Handlers) vistas(inst []obligaciones.Instancia, idioma string, pendient
 			ConceptoRotulo: h.cat.Rotulo("obligacion."+i.Concepto, idioma),
 			AmbitoRotulo:   h.cat.Rotulo("ambito."+i.Ambito, idioma),
 		}
-		if desde, hasta, ok := obligaciones.RangoDePeriodo(i.Periodo); ok && pendientes != nil {
-			for _, prep := range i.Preparacion {
-				n := 0
-				for mes, cuantos := range pendientes[prep] {
-					if mes >= desde.Format("2006-01") && mes <= hasta.Format("2006-01") {
-						n += cuantos
-					}
-				}
-				if v.Pendientes == nil {
-					v.Pendientes = map[string]int{}
-				}
-				v.Pendientes[prep] = n
-			}
-		}
+		v.Pendientes = obligaciones.PendientesDe(i, pendientes)
 		out = append(out, v)
 	}
 	return out
@@ -267,24 +255,7 @@ func (h *Handlers) ObligacionesICS(w http.ResponseWriter, r *http.Request) {
 		tenant = t.Slug
 	}
 	rotulo := func(clave string) string { return h.cat.Rotulo(clave, idioma) }
-	eventos := []obligaciones.Evento{{
-		UID:         tenant + "-revision-semanal@erp.sytue.eu",
-		Fecha:       proximoLunes(time.Now().UTC()),
-		Resumen:     rotulo("aviso.revision_semanal"),
-		Descripcion: rotulo("aviso.revision_semanal_pasos"),
-		Repetir:     "FREQ=WEEKLY;BYDAY=MO",
-	}}
-	for _, i := range h.vistas(inst, idioma, nil) {
-		eventos = append(eventos, obligaciones.Evento{
-			UID:         fmt.Sprintf("%s-%s-%s@erp.sytue.eu", tenant, i.Clave, i.Periodo),
-			Fecha:       i.Recomendada,
-			Resumen:     i.Nombre + " · " + obligaciones.EtiquetaPeriodo(i.Periodo),
-			Descripcion: descripcionICS(i, rotulo),
-			URL:         i.Portal.URL,
-			Categoria:   i.AmbitoRotulo,
-			AvisoDias:   7,
-		})
-	}
+	eventos := obligaciones.EventosICS(inst, tenant, rotulo, time.Now())
 	nombre := "ERP · " + o.Nombre
 	cuerpo := obligaciones.ICS(nombre, eventos, time.Now())
 	w.Header().Set("Content-Type", "text/calendar; charset=utf-8")
@@ -293,35 +264,6 @@ func (h *Handlers) ObligacionesICS(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(cuerpo)
-}
-
-// descripcionICS es lo que se lee al abrir el evento: qué es, las fechas que
-// cuentan, qué hay que tener y dónde se presenta.
-func descripcionICS(i instanciaVista, rotulo func(string) string) string {
-	var b strings.Builder
-	b.WriteString(i.ConceptoRotulo + " · " + i.AmbitoRotulo)
-	b.WriteString("\n" + rotulo("aviso.tu_fecha") + ": " + i.Recomendada.Format(time.DateOnly))
-	if i.LimiteDomiciliacion != nil {
-		b.WriteString("\n" + rotulo("aviso.limite_domiciliacion") + ": " + i.LimiteDomiciliacion.Format(time.DateOnly))
-	}
-	b.WriteString("\n" + rotulo("aviso.limite_legal") + ": " + i.Limite.Format(time.DateOnly))
-	if g := i.Guia; g != nil {
-		b.WriteString("\n\n" + g.Que)
-		for _, n := range g.Necesitas {
-			b.WriteString("\n• " + n)
-		}
-	}
-	b.WriteString("\n\n" + i.Portal.Nombre + ": " + i.Portal.URL)
-	if i.Sancion != nil && i.Sancion.Nota != "" {
-		b.WriteString("\n" + i.Sancion.Nota)
-	}
-	return b.String()
-}
-
-// proximoLunes es el lunes de esta semana si hoy es lunes, o el siguiente.
-func proximoLunes(t time.Time) time.Time {
-	d := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC)
-	return d.AddDate(0, 0, (8-int(d.Weekday()))%7)
 }
 
 // ObligacionCalculo saca del libro la cifra de una obligación en un periodo:
@@ -350,62 +292,17 @@ func (h *Handlers) ObligacionCalculo(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, r, httpx.ErrUnprocessable.Wrap(err).WithMessage(err.Error()))
 		return
 	}
-	// Acumulado (el 130): el resultado desde el 1 de enero al cierre de cada
-	// periodo del año hasta este, para restar lo que ya se pagó en los anteriores.
-	cierres := []time.Time{hasta}
-	if ob.Calculo.Acumulado {
-		cierres = cierres[:0]
-		// El día 0 de un mes es el último del anterior: 31 de marzo, 30 de junio…
-		for q := 1; !time.Date(desde.Year(), time.Month(3*q+1), 0, 0, 0, 0, 0, time.UTC).After(hasta); q++ {
-			cierres = append(cierres, time.Date(desde.Year(), time.Month(3*q+1), 0, 0, 0, 0, 0, time.UTC))
+	res, err := ob.Calculo.Calcular(r.Context(), clave, periodo, desde, hasta, func(ctx context.Context, desde, hasta time.Time) ([]obligaciones.Saldo, error) {
+		saldos, err := h.store.BalanceEntre(ctx, desde, hasta)
+		out := make([]obligaciones.Saldo, 0, len(saldos))
+		for _, x := range saldos {
+			out = append(out, obligaciones.Saldo{Cuenta: x.Cuenta, Debe: x.Debe, Haber: x.Haber})
 		}
-		desde = time.Date(desde.Year(), 1, 1, 0, 0, 0, 0, time.UTC)
-	}
-	var haber, debe int64
-	acumulados := make([]int64, 0, len(cierres))
-	asentado := false
-	for _, cierre := range cierres {
-		saldos, err := h.store.BalanceEntre(r.Context(), desde, cierre)
-		if err != nil {
-			httpx.Fail(w, r, err)
-			return
-		}
-		// Saldo acreedor de las cuentas «haber» menos saldo deudor de las «debe»:
-		// para el IVA, 477 (repercutido) menos 472 (soportado). Sobre ingresos y
-		// gastos (7 y 6) es el resultado del periodo.
-		haber, debe = 0, 0
-		for _, s := range saldos {
-			if tienePrefijo(s.Cuenta, ob.Calculo.Haber) {
-				haber += s.Haber - s.Debe
-			}
-			if tienePrefijo(s.Cuenta, ob.Calculo.Debe) {
-				debe += s.Debe - s.Haber
-			}
-		}
-		acumulados = append(acumulados, haber-debe)
-		asentado = len(saldos) > 0
-	}
-	resultado := haber - debe
-	switch {
-	case ob.Calculo.Acumulado:
-		resultado = obligaciones.PagoFraccionado(acumulados, ob.Calculo.Porcentaje)
-	case ob.Calculo.Tipo == "porcentaje_resultado":
-		resultado = int64(float64(resultado) * ob.Calculo.Porcentaje / 100)
-	}
-	httpx.JSON(w, r, http.StatusOK, map[string]any{
-		"clave": clave, "periodo": periodo,
-		"desde": desde.Format("2006-01-02"), "hasta": hasta.Format("2006-01-02"),
-		"tipo": ob.Calculo.Tipo, "porcentaje": ob.Calculo.Porcentaje,
-		"haber_centimos": haber, "debe_centimos": debe, "resultado_centimos": resultado,
-		"asentado": asentado,
+		return out, err
 	})
-}
-
-func tienePrefijo(cuenta string, prefijos []string) bool {
-	for _, p := range prefijos {
-		if strings.HasPrefix(cuenta, p) {
-			return true
-		}
+	if err != nil {
+		httpx.Fail(w, r, err)
+		return
 	}
-	return false
+	httpx.JSON(w, r, http.StatusOK, res)
 }

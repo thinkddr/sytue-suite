@@ -111,6 +111,7 @@ var (
 func main() {
 	inventoryPath := flag.String("inventory", "compliance/supply-chain/providers.tsv", "provider inventory")
 	baselinePath := flag.String("baseline", "compliance/supply-chain/blocked-baseline.tsv", "known blocked observations")
+	devicePath := flag.String("device", "compliance/supply-chain/conexiones-del-dispositivo.tsv", "conexiones del dispositivo de la persona en Sytue Office (ADR 0083)")
 	printObserved := flag.Bool("print", false, "print all observations as TSV")
 	flag.Parse()
 
@@ -122,14 +123,19 @@ func main() {
 	if err != nil {
 		fatal(err)
 	}
+	device, err := readBaseline(*devicePath)
+	if err != nil {
+		fatal(err)
+	}
 	observed, err := scanTrackedFiles()
 	if err != nil {
 		fatal(err)
 	}
 
 	now := time.Now().UTC()
-	var failures []string
+	failures := misplacedRows(baseline, device)
 	seenBaseline := make(map[string]bool)
+	seenDevice := make(map[string]bool)
 	for _, obs := range observed {
 		if *printObserved {
 			fmt.Printf("%s\t%s\n", obs.Host, obs.Path)
@@ -142,14 +148,11 @@ func main() {
 		if err := validateEvidence(p, now); err != nil {
 			failures = append(failures, fmt.Sprintf("%s: %v", p.Pattern, err))
 		}
-		key := obs.Host + "\t" + obs.Path
 		switch p.Status {
 		case approved, temporary, identifier, pinnedArtifact:
 		case blocked:
-			if !baseline[key] {
-				failures = append(failures, "nueva dependencia bloqueada: "+key)
-			} else {
-				seenBaseline[key] = true
+			if failure := blockedFailure(obs, baseline, device, seenBaseline, seenDevice); failure != "" {
+				failures = append(failures, failure)
 			}
 		default:
 			failures = append(failures, fmt.Sprintf("estado inválido %q para %s", p.Status, p.Pattern))
@@ -158,6 +161,11 @@ func main() {
 	for key := range baseline {
 		if !seenBaseline[key] {
 			failures = append(failures, "baseline obsoleto (elimínalo al cerrar la dependencia): "+key)
+		}
+	}
+	for key := range device {
+		if !seenDevice[key] {
+			failures = append(failures, "conexión del dispositivo obsoleta (ya no está en el código; quita la fila): "+key)
 		}
 	}
 	if len(failures) > 0 {
@@ -215,6 +223,43 @@ func readBaseline(path string) (map[string]bool, error) {
 		result[text] = true
 	}
 	return result, nil
+}
+
+// blockedFailure decide una referencia a un proveedor `blocked`. Vale si la recoge su
+// registro: la línea base (la pasarela y el resto de la suite, deuda que debe
+// desaparecer) o, para el código del dispositivo de Sytue Office, el de las conexiones
+// que la persona eligió. "" es que vale.
+func blockedFailure(obs observation, baseline, device, seenBaseline, seenDevice map[string]bool) string {
+	key := obs.Host + "\t" + obs.Path
+	switch {
+	case device[key]:
+		seenDevice[key] = true
+	case baseline[key]:
+		seenBaseline[key] = true
+	case deviceProviderSource(obs.Path):
+		return "nueva conexión del dispositivo sin registrar en conexiones-del-dispositivo.tsv: " + key
+	default:
+		return "nueva dependencia bloqueada: " + key
+	}
+	return ""
+}
+
+// misplacedRows: cada fila en su registro. Una conexión del dispositivo que apunta fuera
+// del código de Sytue Office sería una lista blanca general con otro nombre; una fila de
+// la línea base sobre ese código lo contaría como deuda de la pasarela, que no es.
+func misplacedRows(baseline, device map[string]bool) []string {
+	var failures []string
+	for key := range device {
+		if _, path, _ := strings.Cut(key, "\t"); !deviceProviderSource(path) {
+			failures = append(failures, "conexión del dispositivo fuera del código de Sytue Office (va en la línea base): "+key)
+		}
+	}
+	for key := range baseline {
+		if _, path, _ := strings.Cut(key, "\t"); deviceProviderSource(path) {
+			failures = append(failures, "código del dispositivo de Sytue Office en la línea base (va en conexiones-del-dispositivo.tsv): "+key)
+		}
+	}
+	return failures
 }
 
 func validateEvidence(p provider, now time.Time) error {
@@ -300,7 +345,14 @@ func scanFile(path, text string, unique map[string]observation) {
 			addObservation(unique, strings.ToLower(match[1]), path)
 		}
 	}
-	for _, re := range []*regexp.Regexp{fromImage, yamlImage} {
+	// Las imágenes son de Dockerfile, Compose, Helm y workflows. En Go, `Source: x` es el
+	// campo de una estructura, y leerlo como `source:` de YAML inventariaba docker.io en
+	// código que no trae ninguna imagen.
+	imagenes := []*regexp.Regexp{fromImage, yamlImage}
+	if strings.HasSuffix(path, ".go") {
+		imagenes = nil
+	}
+	for _, re := range imagenes {
 		for _, match := range re.FindAllStringSubmatch(text, -1) {
 			addObservation(unique, imageHost(match[1]), path)
 			addObservation(unique, componentHost(match[1]), path)
@@ -327,10 +379,17 @@ func supplyManifest(base string) bool {
 }
 
 // runtimeProviderSource enumera las integraciones que conectan con proveedores
-// externos en caliente. Sus URL también pasan por el inventario de suministro.
+// externos en caliente. Sus URL también pasan por el inventario de suministro. Los
+// clientes de cuentas enlazadas viven en el núcleo desde S-01, y el de buzones externos
+// desde M-01 (antes `services/integrations/internal/mailbox/cloud.go`): el servicio de
+// integraciones los importa de allí. Los proveedores de IA (la tabla cerrada `BaseURLs`
+// del BYOK del servicio de IA, que Sytue Office usa también) viven en el núcleo desde
+// que se movieron de `services/ai/internal/provider`.
 func runtimeProviderSource(path string) bool {
-	if strings.HasPrefix(path, "services/integrations/internal/linkedservices/") && strings.HasSuffix(path, ".go") && !strings.HasSuffix(path, "_test.go") {
-		return true
+	for _, prefix := range []string{"apps/nucleo/cuentas/enlazadas/", "apps/nucleo/cuentas/correo/", "apps/nucleo/ia/proveedor/"} {
+		if strings.HasPrefix(path, prefix) && strings.HasSuffix(path, ".go") && !strings.HasSuffix(path, "_test.go") {
+			return true
+		}
 	}
 	if strings.HasPrefix(path, "services/integrations/internal/http/external_chat_") && strings.HasSuffix(path, ".go") && !strings.HasSuffix(path, "_test.go") {
 		return true
@@ -340,8 +399,7 @@ func runtimeProviderSource(path string) bool {
 		return true
 	}
 	switch path {
-	case "services/integrations/internal/mailbox/cloud.go",
-		"services/integrations/internal/http/handlers_external_mail.go",
+	case "services/integrations/internal/http/handlers_external_mail.go",
 		"services/integrations/db/seeds/templates/gmail-mail.json",
 		"services/integrations/db/seeds/templates/microsoft-mail.json",
 		"services/integrations/db/seeds/templates/yahoo-mail.json",
@@ -365,10 +423,32 @@ func runtimeProviderSource(path string) bool {
 	}
 }
 
+// deviceProviderSource es el código de SYTUE OFFICE, la edición local de las apps
+// nativas (ADR 0083), que conecta EL DISPOSITIVO de la persona con un proveedor que ella
+// eligió y configuró (su correo, su calendario, su nube, su chat, su IA): la cáscara, sus
+// apps y los paquetes del núcleo que solo usa ella. Es otro flujo que el de la pasarela
+// —no pasa por ningún servidor de Sytue, las credenciales están en el llavero del
+// dispositivo y lo que sale es lo de la persona hacia quien ella eligió—, así que sus
+// referencias bloqueadas van a su propio registro (`conexiones-del-dispositivo.tsv`), no
+// a la línea base de deuda. Un fichero que comparta con un servicio (`cuentas/correo`,
+// `cuentas/enlazadas`, `ia/proveedor`) NO es de aquí: lo usa también la pasarela y cuenta
+// como ella. `cuentas/dav/davprueba` es el servidor DAV de mentira de las pruebas.
+func deviceProviderSource(path string) bool {
+	if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") || strings.HasPrefix(path, "apps/nucleo/cuentas/dav/davprueba/") {
+		return false
+	}
+	for _, prefix := range []string{"apps/nucleo/local/", "apps/nucleo/cuentas/dav/", "apps/fyne/local/", "apps/fyne/cmd-local/"} {
+		if strings.HasPrefix(path, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
 func relevant(path string) bool {
 	base := filepath.Base(path)
 	ext := strings.ToLower(filepath.Ext(path))
-	if gifCatalogSource(path, ext) || runtimeProviderSource(path) {
+	if gifCatalogSource(path, ext) || runtimeProviderSource(path) || deviceProviderSource(path) {
 		return true
 	}
 	// Lo que NO es nuestro no se escanea, y esto no es laxitud: es la diferencia
@@ -483,8 +563,11 @@ func componentHost(image string) string {
 // detrás una empresa con sede, licencia ni evidencia que inventariar, así que
 // exigirle una ficha en `providers.tsv` obligaría a inventarse un proveedor
 // falso — y un inventario de cumplimiento con entradas ficticias deja de servir
-// para lo único que sirve, que es responder quién trata el dato.
-var reservados = []string{".localhost", ".test", ".internal", ".invalid", ".example"}
+// para lo único que sirve, que es responder quién trata el dato. Van también los
+// subdominios de los tres nombres que el RFC 2606 (§3) aparta para la documentación
+// —`matrix.example.org` es el texto de ejemplo de un campo de Rooms—, que addObservation
+// descarta además pelados.
+var reservados = []string{".localhost", ".test", ".internal", ".invalid", ".example", ".example.com", ".example.net", ".example.org"}
 
 // ¿Es «host» un nombre de máquina de verdad?
 //
@@ -510,7 +593,7 @@ func esNombreDeMaquina(host string) bool {
 }
 
 func addObservation(dst map[string]observation, host, path string) {
-	if host == "" || host == "example.com" || host == "go.mod" || host == "metrics.cockpit" {
+	if host == "" || host == "example.com" || host == "example.net" || host == "example.org" || host == "go.mod" || host == "metrics.cockpit" {
 		return
 	}
 	if !esNombreDeMaquina(host) {

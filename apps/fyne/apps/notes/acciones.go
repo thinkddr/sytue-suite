@@ -19,7 +19,7 @@ import (
 	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
-	"git.sytue.eu/sytue/one/apps/nucleo/auth"
+	"git.sytue.eu/sytue/one/apps/nucleo/autorizacion"
 	"git.sytue.eu/sytue/one/apps/nucleo/ficheros"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 )
@@ -345,8 +345,8 @@ func (p *Pantalla) editarConEntradaConfirmada(ctx context.Context, id string, pa
 	)
 	//nolint:contextcheck // Rendering installs future actions that use the retained presenter lifetime.
 	p.enHiloEsperar(func() {
-		if ctx.Err() != nil || (auth.RequestAuthorizationIntent(ctx) != nil && !p.suiteSigueVigente(ctx)) {
-			fallo = auth.ErrAuthorizationChanged
+		if ctx.Err() != nil || (autorizacion.RequestAuthorizationIntent(ctx) != nil && !p.suiteSigueVigente(ctx)) {
+			fallo = autorizacion.ErrAuthorizationChanged
 			return
 		}
 		var ok bool
@@ -385,7 +385,7 @@ func (p *Pantalla) editarConEntradaConfirmada(ctx context.Context, id string, pa
 	actualizada, otra, err := p.guardarSobreVersionConfirmada(ctx, n, in, acknowledge)
 	//nolint:contextcheck // Rendering installs future actions that use the retained presenter lifetime.
 	p.enHilo(func() {
-		if (auth.RequestAuthorizationIntent(ctx) != nil && !p.suiteVidaVigente(ctx)) || p.activo.ID != c || !p.cryptoVigente(epoch, generacion) {
+		if (autorizacion.RequestAuthorizationIntent(ctx) != nil && !p.suiteVidaVigente(ctx)) || p.activo.ID != c || !p.cryptoVigente(epoch, generacion) {
 			return
 		}
 		if otra != nil {
@@ -735,6 +735,8 @@ func (p *Pantalla) sacar(n Nota) error {
 // «Compartir en Rooms» va entre «Exportar» e «Información», como en NoteCard.tsx y
 // NoteTree.tsx, si hay con qué (suite.go); «Información» va justo antes de «Qué apunta
 // aquí», como en las dos de la web.
+//
+//nolint:gocyclo // Las entradas del menú en el orden de NoteCard.tsx y NoteTree.tsx, cada una con su condición.
 func (p *Pantalla) menuNota(n Nota, enArbol bool) *ui.Menu {
 	t := p.tr.T
 	var el []fyne.CanvasObject
@@ -774,11 +776,20 @@ func (p *Pantalla) menuNota(n Nota, enArbol bool) *ui.Menu {
 	// con Calendar a mano.
 	if p.permiteEnviarContenidoExterno(p.activo.ID, n) && p.puedeEscribir() && p.Suite != nil && p.Suite.Calendar != nil {
 		entrada("event.create", func() { p.crearEvento(n) })
+	} else if p.CrearEventoFuera != nil && p.permiteEnviarContenidoExterno(p.activo.ID, n) {
+		entrada("event.create", func() { p.crearEventoFuera(n) })
 	}
 	if !p.activo.Cifrado {
 		entrada("note.export", func() { p.dialogoExportarNota(n) })
 	}
 	p.entradasDeTarea(n, enArbol, func(clave string, f func()) { entrada(clave, f) })
+	// «Volver a cargar la imagen» (Sytue Office, imagen_url.go): la de una dirección que
+	// ya está dentro, por si ha cambiado en su sitio. Mientras baja, no se repite.
+	if p.puedeRecargarImagen(n) {
+		e := ui.NuevoElementoMenu(textoImagenURL(p.tr.Locale(), "recargar"), iconos.Ninguno, func() { p.recargarImagenRemota(n) })
+		e.Inerte = p.bajandoImagen[n.ID]
+		el = append(el, e)
+	}
 	if p.puedeCompartirNota(n) {
 		entrada("sharePeople.open", func() { p.compartirNota(n) })
 	}

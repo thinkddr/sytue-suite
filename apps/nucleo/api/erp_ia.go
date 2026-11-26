@@ -19,7 +19,7 @@ import (
 // hay DOS llamadas por cosa —proponer y ejecutar—, como en la web: la propuesta tarda
 // del orden de diez segundos y la persona ve qué va a salir antes de guardar nada.
 //
-// Las formas son las de `services/syerp/internal/ia` y las ata
+// Las formas son las de `apps/nucleo/erp/ia` y las ata
 // `TestERPIAHablaElIdiomaDelServicio` leyendo el código del servicio.
 
 // ERPParaTablero y ERPParaExcel son el `para` de un informe: qué se va a hacer con él.

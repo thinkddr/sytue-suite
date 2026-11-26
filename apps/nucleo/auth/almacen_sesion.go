@@ -109,7 +109,7 @@ func (a *AlmacenSesion) Guardar(t Tokens) (err error) {
 	if !a.pertenece(t) {
 		return ErrSesionAjena
 	}
-	identidad := (IdentitySnapshot{a.emisor, a.cliente, t.Subject, organizacionDe(t)}).IdentidadDrive()
+	identidad := (IdentitySnapshot{Issuer: a.emisor, Client: a.cliente, Subject: t.Subject, Organization: organizacionDe(t)}).IdentidadDrive()
 	if err := a.prepararAccesoTrabajo(t); err != nil {
 		return err
 	}
@@ -221,7 +221,7 @@ func (a *AlmacenSesion) Migrar(ctx context.Context, permitirSinEmisor bool) erro
 }
 
 func (a *AlmacenSesion) prepararAccesoTrabajo(t Tokens) error {
-	identidadTrabajo := (IdentitySnapshot{a.emisor, a.cliente, t.Subject, organizacionDe(t)}).IdentidadSesion()
+	identidadTrabajo := (IdentitySnapshot{Issuer: a.emisor, Client: a.cliente, Subject: t.Subject, Organization: organizacionDe(t)}).IdentidadSesion()
 	previousWork, err := ajustes.LeerAccesoSesion(a.cuenta)
 	if err != nil && !errors.Is(err, os.ErrNotExist) && t.Refresh != "" {
 		return errors.Join(ErrSesionNoDisponible, err)

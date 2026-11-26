@@ -12,10 +12,10 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"git.sytue.eu/sytue/one/apps/nucleo/office/plantillas"
 	"git.sytue.eu/sytue/one/platform/pkg/authn"
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/services/docs/internal/domain"
-	"git.sytue.eu/sytue/one/services/docs/internal/plantillas"
 )
 
 // plantillasOrgStore es lo que la biblioteca de plantillas de la organización necesita

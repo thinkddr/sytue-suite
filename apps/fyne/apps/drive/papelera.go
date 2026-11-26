@@ -52,7 +52,13 @@ type VistaPapelera struct {
 	AlEliminar   func(Elemento)
 	AlReintentar func()
 	// AlVaciar es «Vaciar papelera», de la cabecera: lo pide quien lo confirma.
-	AlVaciar    func()
+	AlVaciar func()
+	// CuerpoPurga, si no es nil, es el texto de «eliminar definitivamente» (Sytue Office:
+	// se borra del equipo, no de un servidor). nil, el del catálogo.
+	CuerpoPurga func(Elemento) string
+	// Propio, si no es nil, da el texto que sustituye al de una clave del catálogo (Sytue
+	// Office: la papelera del equipo no es la de un servidor); false, el del catálogo.
+	Propio      func(clave string) (string, bool)
 	desplazable *container.Scroll
 }
 
@@ -62,6 +68,11 @@ func NuevaVistaPapelera(tr *i18n.Translator) *VistaPapelera {
 }
 
 func (p *VistaPapelera) t(clave string, vars ...i18n.Vars) string {
+	if p.Propio != nil {
+		if texto, ok := p.Propio(clave); ok {
+			return texto
+		}
+	}
 	var v i18n.Vars
 	if len(vars) > 0 {
 		v = vars[0]
@@ -353,7 +364,11 @@ func (p *VistaPapelera) ConfirmacionPurga(v tema.Variante, e Elemento, alCancela
 	if e.Carpeta {
 		clave = "trash.purgeBodyFolder"
 	}
-	cuerpo := parrafo(v, p.t(clave, i18n.Vars{"name": e.Nombre}))
+	texto := p.t(clave, i18n.Vars{"name": e.Nombre})
+	if p.CuerpoPurga != nil {
+		texto = p.CuerpoPurga(e)
+	}
+	cuerpo := parrafo(v, texto)
 	d := ui.Confirmacion(p.t("trash.purgeTitle"), p.tr.T("ui.cancel", nil), p.t("trash.purge"),
 		true, cuerpo, alCancelar, alPurgar)
 	d.RotuloCerrar = p.tr.T("ui.close", nil)

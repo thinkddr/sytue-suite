@@ -114,6 +114,19 @@ type Pantalla struct {
 	// rutas elegidas en el hilo de la interfaz. nil: no hay selector (el móvil, un Linux
 	// sin zenity ni kdialog) y no se ofrece ni subir ni importar.
 	ElegirFicheros func(listo func(rutas []string))
+	// OcultarSinVerbo oculta los gestos cuyo verbo el servicio no concede, en vez de
+	// ofrecerlos y dejar que conteste que no (Sytue Office: «Llevar al libro» sin
+	// `asentar`). Falso, lo de siempre.
+	OcultarSinVerbo bool
+	// Salida son el PDF de la factura y su envío por correo (enviar_factura.go). Su valor
+	// cero es lo de siempre: la ficha no los ofrece.
+	Salida SalidaFactura
+	// ComprobarVIES pregunta a VIES, el servicio de la Comisión Europea, por un NIF-IVA
+	// (con el país del contacto para el que no lleve prefijo) y devuelve lo que contesta
+	// o un FalloVIES (vies.go). Con él, la ficha de un contacto y los contactos nuevos del
+	// plan de Sytue AI ofrecen «Comprobar en VIES»; solo se llama al pulsarlo. Nil, no se
+	// ofrece: lo de siempre.
+	ComprobarVIES func(ctx context.Context, nif, pais string) (ComprobacionVIES, error)
 	// verifactu es el estado de VERI*FACTU de la tarjeta de las facturas de cliente;
 	// nil, no se sabe (y no se pinta).
 	verifactu   *api.ERPEstadoVerifactu
@@ -134,6 +147,8 @@ type Pantalla struct {
 	PoliticaURL string
 	// panelIA es el panel de Sytue AI abierto por última vez (para los guardianes).
 	panelIA *PanelIA
+	// envio es el diálogo de enviar la factura abierto por última vez (ídem).
+	envio *EnviarFactura
 	// scrollMain es el desplazador de `main`: se lleva lo vertical de lo que se desplaza
 	// de lado dentro de él.
 	scrollMain *container.Scroll

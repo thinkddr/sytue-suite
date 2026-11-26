@@ -173,15 +173,15 @@ func TestComprobarFacturaRecibida(t *testing.T) {
 	}
 	f := facturas[0]
 	org := store.Organizacion{Nombre: "Acme Ibérica SL", NIF: "B-12345678"}
-	if err := f.comprobar(org, true); err != nil {
+	if err := f.Comprobar(org.NIF); err != nil {
 		t.Fatalf("la factura es de la organización: %v", err)
 	}
-	if err := f.comprobar(store.Organizacion{NIF: "B87654321"}, true); err == nil || !strings.Contains(err.Error(), "no de esta organización") {
+	if err := f.Comprobar("B87654321"); err == nil || !strings.Contains(err.Error(), "no de esta organización") {
 		t.Errorf("a nombre de otro: %v", err)
 	}
 	enDolares := f
 	enDolares.Moneda = "USD"
-	if err := enDolares.comprobar(org, true); err == nil {
+	if err := enDolares.Comprobar(org.NIF); err == nil {
 		t.Error("una factura en dólares no puede entrar como euros")
 	}
 }
@@ -195,7 +195,7 @@ func TestFacturaeIdaYVuelta(t *testing.T) {
 	cliente := store.Registro{ID: "c1", Etiqueta: "Client Français SARL", Data: map[string]any{
 		"nif": "12345678901", "direccion": "1 rue de Rivoli", "cp": "75001", "ciudad": "Paris", "pais": "FR", "tipo": "organizacion",
 	}}
-	doc, err := facturaeDe(org, false, reg, "base", "iva", cliente)
+	doc, err := facturaeDe(org, reg, cliente)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -229,12 +229,12 @@ func TestFacturaeIdaYVuelta(t *testing.T) {
 	// Lo que Facturae no admite se dice antes de descargar, con nombre y apellidos.
 	sinDireccion := cliente
 	sinDireccion.Data = map[string]any{"nif": "FR12345678901", "pais": "FR"}
-	if _, err := facturaeDe(org, false, reg, "base", "iva", sinDireccion); err == nil || !strings.Contains(err.Error(), "dirección de Client Français SARL") {
+	if _, err := facturaeDe(org, reg, sinDireccion); err == nil || !strings.Contains(err.Error(), "dirección de Client Français SARL") {
 		t.Errorf("sin dirección: %v", err)
 	}
 	orgSinCP := org
 	orgSinCP.CP = "280"
-	if _, err := facturaeDe(orgSinCP, false, reg, "base", "iva", cliente); err == nil || !strings.Contains(err.Error(), "código postal") {
+	if _, err := facturaeDe(orgSinCP, reg, cliente); err == nil || !strings.Contains(err.Error(), "código postal") {
 		t.Errorf("CP español inválido: %v", err)
 	}
 }

@@ -62,6 +62,11 @@ func (s *escrituras) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case "GET /api/v1/events/e1":
 		_, _ = io.WriteString(w, `{"id":"e1","uid":"u1","summary":"Comité","reminders":[10,45]}`)
 		return
+	case "GET /api/v1/events/s1":
+		// El maestro de la serie, con SU inicio: en /instances cada ocurrencia trae el
+		// suyo, como en el servicio de verdad (`domain.ExpandEvents`).
+		_, _ = io.WriteString(w, `{"id":"s1","uid":"us","summary":"Diario","rrule":"FREQ=WEEKLY;COUNT=10","dtstart":"2026-09-01T07:00:00Z","dtend":"2026-09-01T07:30:00Z"}`)
+		return
 	case "GET /api/v1/resources":
 		// r1 libre y r2 ocupada de 09:30 a 10:30 del 22.
 		_, _ = io.WriteString(w, `{"resources":[
@@ -72,7 +77,7 @@ func (s *escrituras) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case "GET /api/v1/calendars/mio/instances":
 		_, _ = io.WriteString(w, `{"instances":[
 			{"event":{"id":"e1","uid":"u1","summary":"Comité","location":"Sala 2","dtstart":"2026-09-10T08:00:00Z","dtend":"2026-09-10T09:00:00Z","attendees":[{"email":"yo@sytue.eu","partstat":"NEEDS-ACTION"}]},"start":"2026-09-10T08:00:00Z","end":"2026-09-10T09:00:00Z"},
-			{"event":{"id":"s1","uid":"us","summary":"Diario","rrule":"FREQ=WEEKLY;COUNT=10","dtstart":"2026-09-01T07:00:00Z","dtend":"2026-09-01T07:30:00Z"},"start":"2026-09-15T07:00:00Z","end":"2026-09-15T07:30:00Z"}]}`)
+			{"event":{"id":"s1","uid":"us","summary":"Diario","rrule":"FREQ=WEEKLY;COUNT=10","dtstart":"2026-09-15T07:00:00Z","dtend":"2026-09-15T07:30:00Z"},"start":"2026-09-15T07:00:00Z","end":"2026-09-15T07:30:00Z"}]}`)
 		return
 	}
 	var c map[string]any
@@ -601,7 +606,7 @@ func TestLosRecordatoriosSeLeenSeEditanYViajan(t *testing.T) {
 		t.Fatalf("el alta tiene que mandar la lista vacía: %v", in.Reminders)
 	}
 
-	// La serie no trae recordatorios en su respuesta (el falso contesta `{}`): no se
+	// La serie no trae recordatorios en su respuesta (el falso no los manda): no se
 	// sabe cuáles tiene, así que ni se pinta el bloque ni viajan.
 	es := a.P.EdicionDe(ocurrenciaDe(t, a, "s1"))
 	fs := a.P.nuevoFormulario(es, a.destinos(), a.accionesFormulario(es))
@@ -925,9 +930,15 @@ type conReglaCruda struct {
 }
 
 func (s conReglaCruda) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if r.Method+" "+r.URL.Path == "GET /api/v1/calendars/mio/instances" {
+	switch r.Method + " " + r.URL.Path {
+	case "GET /api/v1/calendars/mio/instances":
+		// Cada ocurrencia con SU inicio, como en el servicio de verdad.
 		_, _ = io.WriteString(w, `{"instances":[
-			{"event":{"id":"b1","uid":"ub","summary":"Pilates","rrule":"`+s.regla+`","dtstart":"2026-09-14T17:00:00Z","dtend":"2026-09-14T18:00:00Z"},"start":"2026-09-16T17:00:00Z","end":"2026-09-16T18:00:00Z"}]}`)
+			{"event":{"id":"b1","uid":"ub","summary":"Pilates","rrule":"`+s.regla+`","dtstart":"2026-09-16T17:00:00Z","dtend":"2026-09-16T18:00:00Z"},"start":"2026-09-16T17:00:00Z","end":"2026-09-16T18:00:00Z"}]}`)
+		return
+	case "GET /api/v1/events/b1":
+		// El maestro, con el inicio de la serie y sin recordatorios.
+		_, _ = io.WriteString(w, `{"id":"b1","uid":"ub","summary":"Pilates","rrule":"`+s.regla+`","dtstart":"2026-09-14T17:00:00Z","dtend":"2026-09-14T18:00:00Z"}`)
 		return
 	}
 	s.escrituras.ServeHTTP(w, r)
@@ -1007,12 +1018,13 @@ func TestLaReglaPersonalizadaSeConservaAlEditar(t *testing.T) {
 		if len(ofrecidas) != 3 {
 			t.Errorf("sin COUNT se ofrecen los tres alcances y salen %v", ofrecidas)
 		}
-		// El primero es el GET de los recordatorios, que el falso no conoce y apunta.
+		// Los GET del maestro (los recordatorios y el inicio de la serie) los contesta el
+		// falso y no se apuntan: la única escritura es el PUT.
 		hechas, cuerpos := s.apuntadas()
-		if len(hechas) != 2 || hechas[1] != "PUT /api/v1/events/b1" {
+		if len(hechas) != 1 || hechas[0] != "PUT /api/v1/events/b1" {
 			t.Fatalf("guardar hizo %v", hechas)
 		}
-		c := cuerpos[1]
+		c := cuerpos[0]
 		if c["summary"] != "Pilates avanzado" {
 			t.Errorf("el título del PUT es %v", c["summary"])
 		}

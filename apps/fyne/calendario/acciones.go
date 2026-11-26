@@ -233,6 +233,8 @@ func (a *App) abrirFormulario(e Edicion) {
 }
 
 // accionesFormulario es lo que el formulario de `e` pide al servicio.
+//
+//nolint:gocognit,gocyclo // Cada acción del formulario es opcional y depende de lo enchufado (salas, cuenta, invitar): un solo sitio que las rellena.
 func (a *App) accionesFormulario(e Edicion) AccionesFormulario {
 	acc := AccionesFormulario{
 		Guardar:  a.guardar,
@@ -262,6 +264,45 @@ func (a *App) accionesFormulario(e Edicion) AccionesFormulario {
 				a.enUI(func() { listo(l, err) })
 			})
 		}
+	}
+	if inv := a.P.invitarLocal(); inv != nil {
+		// Sin personas, en los calendarios de una cuenta (invitarlocal.go).
+		if inv.Sugerir != nil {
+			acc.Sugerir = func(q string, listo func([]SugerenciaInvitado)) {
+				a.lanzar(func(vida context.Context) {
+					ctx, parar := context.WithTimeout(vida, plazo)
+					defer parar()
+					l, err := inv.Sugerir(ctx, q, MaxSugerenciasInvitado+len(e.Invitados))
+					if err != nil {
+						l = nil // sin libreta se sigue escribiendo a mano
+					}
+					a.enUI(func() { listo(l) })
+				})
+			}
+		}
+		if inv.Ocupacion != nil && !a.P.SinConexion {
+			acc.Ocupacion = func(cal string, correos []string, desde, hasta time.Time, listo func(map[string][]api.Hueco, error)) {
+				a.lanzar(func(vida context.Context) {
+					ctx, parar := context.WithTimeout(vida, plazo)
+					defer parar()
+					m, err := inv.Ocupacion(ctx, cal, correos, desde, hasta)
+					a.enUI(func() { listo(m, err) })
+				})
+			}
+		}
+	}
+	if r := a.P.reunionLocal(); r != nil && r.Crear != nil && !a.P.SinConexion {
+		// Sytue Office: crear la reunión con la cuenta que la cree (reunionlocal.go).
+		acc.Reunion = func(cal, titulo string, inicio, fin time.Time, listo func(string, error)) {
+			a.lanzar(func(vida context.Context) {
+				ctx, parar := context.WithTimeout(vida, plazo)
+				defer parar()
+				enlace, err := r.Crear(ctx, cal, titulo, inicio, fin)
+				a.enUI(func() { listo(enlace, err) })
+			})
+		}
+	}
+	if a.Cal != nil && !a.P.SinConexion && !a.P.SinPersonas {
 		acc.Recursos = func(desde, hasta time.Time, listo func([]api.Resource, error)) {
 			a.lanzar(func(vida context.Context) {
 				ctx, parar := context.WithTimeout(vida, plazo)

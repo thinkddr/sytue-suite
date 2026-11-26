@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Daniel Delgado Ramos
+#
+# SYTUE CAST de Sytue Office, la edición local (apps/fyne/PLAN-EDICION-LOCAL.md §6.10):
+# visor y conversor de vídeos del equipo, sin cuenta, sin cifrado y sin servidor.
+# Identificador, esquema y carpeta de datos son distintos de los de la edición conectada,
+# así que las dos conviven (R-CONVIVE).
+#
+# No pide cámara, micrófono ni imagen dentro de imagen del sistema: no hay directo ni
+# emisión. Para los formatos que no son WebM usa el ffmpeg del equipo, si lo hay (D-27).
+Website = "https://sytue.eu"
+
+[Details]
+  Name = "Sytue Cast Office"
+  ID = "eu.sytue.office.cast"
+  Icon = "Icon.png"
+  Version = "0.1.0"
+  Build = 1
+
+[Development]
+  esquema = "sytueoffice-cast"
+  bundle = "office"
+  extensiones = "webm,mkv,mp4,m4v,mov,avi"
+  ficheros = "si"

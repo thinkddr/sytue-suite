@@ -433,7 +433,7 @@ func (a *App) datosPapelera() Papelera {
 				func() { a.purgar(f.ID) })
 		},
 		AlVaciar: func() {
-			a.confirmar(a.v.Traduce("trash.empty"), a.v.T.T("trash.emptyConfirm", i18n.Vars{"count": len(a.pap.fotos)}),
+			a.confirmar(a.v.Traduce("trash.empty"), a.v.Traduce("trash.emptyConfirm", i18n.Vars{"count": len(a.pap.fotos)}),
 				a.v.Traduce("trash.empty"), func() { a.purgar("") })
 		},
 	}

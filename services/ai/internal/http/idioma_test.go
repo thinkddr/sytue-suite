@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
+	provider "git.sytue.eu/sytue/one/apps/nucleo/ia/proveedor"
 	"git.sytue.eu/sytue/one/platform/pkg/authn"
-	"git.sytue.eu/sytue/one/services/ai/internal/provider"
 )
 
 // sistemaVisto guarda el system prompt con el que se llamó al proveedor.

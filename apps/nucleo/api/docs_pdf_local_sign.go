@@ -46,7 +46,7 @@ func validCertSigningFiles(files map[string][]byte) bool {
 
 // localSign never sends the document, signing material, or password to the
 // former server motor. Parts are borrowed from the caller, not cleared here.
-// Timestamping and the separate system-certificate protocol remain unsupported.
+// The time stamp is requested only from the authority the person chose (P-05).
 func (p *PDF) localSign(ctx context.Context, fields map[string]string, parts []PDFParte, docs ...PDFFichero) (PDFRespuesta, error) {
 	op := strings.TrimSpace(fields["op"])
 	if op == "" {
@@ -96,6 +96,17 @@ func (p *PDF) localSign(ctx context.Context, fields map[string]string, parts []P
 		Fecha: options.Fecha, Pagina: options.Pagina, Rect: options.Rect, Trazos: options.Trazos, Bloquear: options.Bloquear,
 		CertificadoPEM: files["certificado"], ClavePEM: files["clave_priv"], PKCS12: files["pkcs12"], ClaveDelPKCS12: fields["clave_p12"],
 	}
+	// El sello, si la persona eligió autoridad (P-05). Como en el servicio, con un fichero
+	// de certificado una autoridad caída no tumba la firma: sale sin sello y se dice en
+	// X-Sytue-Sello.
+	sellado := false
+	if sello := p.selloLocal(); sello.URL != "" && fields["sin_sello"] != "1" {
+		opts.Sello = func(resumen []byte) ([]byte, error) {
+			token, err := localpdf.PedirSello(ctx, resumen, sello)
+			sellado = err == nil && len(token) > 0
+			return token, err
+		}
+	}
 	return p.localSinglePDFEdit(ctx, fields, func(doc *localpdf.PDFDoc) (PDFRespuesta, error) {
 		out, err := localpdf.FirmarIncrementalPDF(doc, opts)
 		appended := err == nil
@@ -104,7 +115,7 @@ func (p *PDF) localSign(ctx context.Context, fields map[string]string, parts []P
 		}
 		response := localPDFResponse("application/pdf", out)
 		response.Cabecera.Set("X-Sytue-Firma-Anexada", strconv.FormatBool(appended))
-		response.Cabecera.Set("X-Sytue-Sello", "no")
+		response.Cabecera.Set("X-Sytue-Sello", map[bool]string{true: "si", false: "no"}[sellado])
 		return response, err
 	}, docs...)
 }

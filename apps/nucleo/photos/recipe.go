@@ -37,6 +37,9 @@ type recipeOrigin struct {
 	// Retained es el original de una foto ingestada en este dispositivo: un
 	// fichero retenido enlazado desde la fila media, sin entrada de catálogo.
 	Retained *records.RetainedFile `json:"retained,omitempty"`
+	// Externo es el original de una foto enlazada desde una carpeta del equipo (FO-09):
+	// su ruta, y el descriptor (tamaño y huella) con el que se comprueba al leerlo.
+	Externo string `json:"external,omitempty"`
 }
 
 type recipeRenditions struct {

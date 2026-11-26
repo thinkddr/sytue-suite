@@ -16,7 +16,6 @@ import (
 	"fyne.io/fyne/v2/widget"
 
 	"git.sytue.eu/sytue/one/apps/fyne/iconos"
-	"git.sytue.eu/sytue/one/apps/fyne/sesion"
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 	"git.sytue.eu/sytue/one/apps/nucleo/tokens"
@@ -226,7 +225,7 @@ type BarraSuite struct {
 	cuenta   *cuentaBarra
 
 	t *i18n.Translator
-	s *sesion.Suite
+	s *suiteSesion
 	// sinSesionPropia: la app pinta ella misma lo que ve quien no ha entrado (ver
 	// ConSinSesionPropia) y Montar no pone la página «Iniciar sesión».
 	sinSesionPropia bool
@@ -289,7 +288,7 @@ var (
 // `p` es el producto de la app, que pone su marca y su nombre a la izquierda: el
 // `currentApp` de la web (Docus es `iconos.Docs`, Calcus `iconos.Sheets`, Diapos
 // `iconos.Slides`, CertiPDF `iconos.PDF` y el Hub, que es el portal, `iconos.One`).
-func NuevaBarraSuite(t *i18n.Translator, s *sesion.Suite, p iconos.Producto) *BarraSuite {
+func NuevaBarraSuite(t *i18n.Translator, s *suiteSesion, p iconos.Producto) *BarraSuite {
 	// Los textos de la barra salen SOLO del catálogo común, en el idioma de la app: en
 	// la web la monta `SytueShell` con su propio `I18nProvider`. Con el traductor de la
 	// app ganaban las claves que la app redefine, y el buscador de la SUITE decía
@@ -553,7 +552,7 @@ func (b *BarraSuite) montarSinSesion(poner func(fyne.CanvasObject), contenido fy
 	if !dentro {
 		poner(pagina)
 	}
-	b.s.AlCambiar(func(e sesion.Estado) {
+	b.s.AlCambiar(func(e estadoSesion) {
 		if e.Dentro() == dentro {
 			return
 		}

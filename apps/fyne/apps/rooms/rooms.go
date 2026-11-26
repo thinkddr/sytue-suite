@@ -143,6 +143,9 @@ type Canal struct {
 	Presencia ui.Presencia
 	EstadoPar string
 	Personas  int
+	// SinPresencia es que el servicio no reparte presencia (Sytue Office): sin una
+	// sabida, la línea de debajo no dice «Sin conexión», que sería mentira.
+	SinPresencia bool
 }
 
 // Categoria es una categoría personalizada del carril.

@@ -15,7 +15,7 @@ import (
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
-	"git.sytue.eu/sytue/one/apps/nucleo/auth"
+	"git.sytue.eu/sytue/one/apps/nucleo/autorizacion"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 )
 
@@ -35,11 +35,11 @@ func (v *Vista) ConConexiones(w fyne.Window, gateway *api.Integraciones, autoriz
 	return v
 }
 
-func puedeConectar(r auth.Reclamos) bool {
+func puedeConectar(r autorizacion.Reclamos) bool {
 	return r.Sub != "" && r.Tenant != "" && (r.EsCuentaPersonal() || slices.Contains(r.Roles, "owner") || slices.Contains(r.Roles, "admin"))
 }
 
-func (v *Vista) cargarAccesosConexiones(ctx context.Context, r auth.Reclamos) {
+func (v *Vista) cargarAccesosConexiones(ctx context.Context, r autorizacion.Reclamos) {
 	permitido := puedeConectar(r)
 	externo := false
 	if permitido && v.almacen != nil {

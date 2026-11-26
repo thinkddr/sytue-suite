@@ -61,3 +61,22 @@ func (c *Calendars) WithPrivateData(data CalendarData) (*Calendars, error) {
 	}
 	return &Calendars{c: privateDataClient(c.c, ErrPrivateCalendarOperation), data: data}, nil
 }
+
+// CalendarUIDData contesta a una invitación por el UID del evento (ResponderPorUID).
+// Una fachada privada sin él sigue fallando cerrada.
+type CalendarUIDData interface {
+	ResponderPorUID(ctx context.Context, uid, partstat string) error
+}
+
+// CalendarSerieData parte una serie por una ocurrencia (DividirSerie) en un solo paso:
+// crea el evento nuevo con lo que contestaron los invitados mientras tanto y recorta la
+// serie. Una fachada sin él lo hace como siempre, CreateEvent y AmendRecurrence.
+type CalendarSerieData interface {
+	DividirSerie(ctx context.Context, calendario, uid string, ocurrencia time.Time, recorte string, in EventInput) (Event, error)
+}
+
+// CalendarFiltroData es la búsqueda de eventos con calendario y tramo
+// (SearchEventsFiltrada). Una fachada privada sin él sigue fallando cerrada.
+type CalendarFiltroData interface {
+	SearchEventsFiltrada(ctx context.Context, texto string, f FiltroBusqueda, limite int, cursor string) (Busqueda, error)
+}

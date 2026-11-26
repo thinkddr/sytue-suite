@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 Daniel Delgado Ramos
 
+//go:build !edicionlocal
+
 package ui
 
 import (
@@ -13,7 +15,6 @@ import (
 
 	"fyne.io/fyne/v2"
 
-	"git.sytue.eu/sytue/one/apps/fyne/sesion"
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/nucleo/ajustes"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
@@ -117,14 +118,14 @@ func TestLasAparienciasTraducidasCabenEnElMenuDeCuenta(t *testing.T) {
 				t.Fatal(err)
 			}
 			c := nuevaCuentaBarra(tr, nil)
-			s := c.apariencia(sesion.Estado{Tema: "traslucido"})
+			s := c.apariencia(estadoSesion{Tema: "traslucido"})
 			const clave = "account.appearance.translucent"
 			if s.Elegida != 1 || s.Opciones[1] == "" || s.Opciones[1] == clave {
 				t.Fatalf("falta la apariencia translúcida traducida: %q", s.Opciones[1])
 			}
 			// `w-68` = 272, y la banda con su `px-2.5` no pasa de ahí en ningún idioma: lo
 			// que no cabe en una línea baja a la siguiente, no ensancha el menú.
-			if ancho := c.preferencias(sesion.Estado{Tema: "traslucido", ConOrganizacion: true}).MinSize().Width; ancho != 272 {
+			if ancho := c.preferencias(estadoSesion{Tema: "traslucido", ConOrganizacion: true}).MinSize().Width; ancho != 272 {
 				t.Errorf("la banda mide %v y tiene que caber en los 272 px del menú", ancho)
 			}
 			// Y en los dos idiomas en que se midió, las cuatro apariencias van en UNA línea,
@@ -176,7 +177,7 @@ func TestElSelectorDeCuentaGuardaElColorDeLaSuite(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		s := nuevaCuentaBarra(tr, nil).color(sesion.Estado{Color: "app"})
+		s := nuevaCuentaBarra(tr, nil).color(estadoSesion{Color: "app"})
 		if s.Elegida != 2 || s.Opciones[2] == "" || s.Opciones[2] == "account.color.app" {
 			t.Errorf("%s: falta «el de cada app» traducido: %q", locale, s.Opciones[2])
 		}
@@ -233,7 +234,7 @@ func TestElMenuDeCuentaEsElDeAccountMenuTsx(t *testing.T) {
 	// Pintado: el rótulo a la izquierda y el grupo a la derecha de SU fila, y el idioma en
 	// una sola línea con su desplegable a la derecha.
 	c := nuevaCuentaBarra(traductorPrueba(t), nil)
-	fila := c.fila("account.forma", c.forma(sesion.Estado{ConOrganizacion: true})).(*fyne.Container)
+	fila := c.fila("account.forma", c.forma(estadoSesion{ConOrganizacion: true})).(*fyne.Container)
 	fila.Resize(fila.MinSize())
 	fila.Layout.Layout(fila.Objects, fila.Size())
 	rotulo, grupo := fila.Objects[0], fila.Objects[1]
@@ -242,7 +243,7 @@ func TestElMenuDeCuentaEsElDeAccountMenuTsx(t *testing.T) {
 	}
 	// El color, con «Organización» y sus muestras, no cabe en una línea: su grupo baja y
 	// reparte las opciones en dos filas, sin pasar del ancho.
-	delColor := c.fila("account.color", c.color(sesion.Estado{ConOrganizacion: true})).(*fyne.Container)
+	delColor := c.fila("account.color", c.color(estadoSesion{ConOrganizacion: true})).(*fyne.Container)
 	if g := delColor.Objects[1].MinSize(); g.Width > anchoPreferenciasCuenta || g.Height <= AltoSegmento+2*RellenoSegmentado {
 		t.Errorf("el grupo del color mide %v: tiene que envolver dentro de %v", g, anchoPreferenciasCuenta)
 	}
@@ -278,7 +279,7 @@ func TestElSegmentadoDelMenuDiceCualEstaElegida(t *testing.T) {
 			tema.Elegir(variante)
 			v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 			c := nuevaCuentaBarra(traductorPrueba(t), nil)
-			g := c.fila("account.forma", c.forma(sesion.Estado{ConOrganizacion: true})).(*fyne.Container).Objects[1].(*Segmentado)
+			g := c.fila("account.forma", c.forma(estadoSesion{ConOrganizacion: true})).(*fyne.Container).Objects[1].(*Segmentado)
 			g.Resize(g.MinSize())
 			g.Move(fyne.NewPos(margen, margen))
 			menu := tema.Color("menu-surface", v)

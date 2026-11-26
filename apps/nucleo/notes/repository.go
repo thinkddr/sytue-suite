@@ -33,16 +33,30 @@ type (
 type Repository struct {
 	engine *records.Repository
 	cfg    Config
+	// local es la edición local (NewLocal).
+	local bool
+	// relaciones es lo que checkNoteRelations ya leyó de cada nota (relations.go).
+	relaciones relacionesLeidas
 }
 
 var _ api.NotesData = (*Repository)(nil)
 
-func New(cfg Config) (*Repository, error) {
-	configuration, err := recordsConfiguration(cfg)
+func New(cfg Config) (*Repository, error) { return nuevo(cfg, false) }
+
+// NewLocal abre el repositorio de Sytue Office, la edición local sin servidor (§6.5 del
+// plan): el mismo que New y además, porque las notas solo existen en este equipo y no las
+// pinta el navegador de nadie más, admite notas de IMAGEN que no apuntan fuera, con la
+// imagen dentro de la nota (un adjunto en `data.attachments` y sin `data.url`, N-06), y
+// enlaces a ficheros de este equipo en el cuerpo (`file:///…`, N-07). Un almacén con esas
+// notas se abre con NewLocal.
+func NewLocal(cfg Config) (*Repository, error) { return nuevo(cfg, true) }
+
+func nuevo(cfg Config, local bool) (*Repository, error) {
+	configuration, err := recordsConfiguration(cfg, local)
 	if err != nil {
 		return nil, err
 	}
-	r := &Repository{cfg: configuration}
+	r := &Repository{cfg: configuration, local: local}
 	engine, err := records.New(configuration)
 	if err != nil {
 		return nil, err
@@ -53,11 +67,11 @@ func New(cfg Config) (*Repository, error) {
 
 // Both identity paths use the same domain validation. Callers cannot opt out
 // of private ownership, relationships or the attachment-content boundary.
-func recordsConfiguration(cfg Config) (Config, error) {
+func recordsConfiguration(cfg Config, local bool) (Config, error) {
 	if !cfg.Scope.Valid() || cfg.Scope.Product != "notes" {
 		return cfg, ErrSource
 	}
-	validator := &Repository{cfg: cfg}
+	validator := &Repository{cfg: cfg, local: local}
 	cfg.Product = "notes"
 	cfg.EntityKind = entityKind
 	cfg.ReceiptKind = receiptKind
@@ -71,6 +85,13 @@ func recordsConfiguration(cfg Config) (Config, error) {
 func (r *Repository) PrivateStorageScope() storage.Scope   { return r.cfg.Scope }
 func (r *Repository) Close()                               { r.engine.Close() }
 func (r *Repository) Initialize(ctx context.Context) error { return r.engine.Initialize(ctx) }
+
+// RefreshPrivateData vuelve a leer el catálogo del almacén: tras compactarlo con el
+// repositorio abierto (Sytue Office), para que no recuerde versiones que ya no están.
+func (r *Repository) RefreshPrivateData(ctx context.Context) error {
+	return r.engine.RefreshPrivateData(ctx)
+}
+
 func (r *Repository) ImportLegacySnapshot(ctx context.Context) error {
 	return r.engine.ImportLegacySnapshot(ctx)
 }

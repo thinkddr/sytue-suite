@@ -30,7 +30,7 @@ import (
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
-	"git.sytue.eu/sytue/one/apps/nucleo/auth"
+	"git.sytue.eu/sytue/one/apps/nucleo/autorizacion"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 )
 
@@ -132,12 +132,24 @@ type App struct {
 	// Elegir abre el selector de ficheros del sistema y devuelve lo elegido. nil: no
 	// hay selector, y «Añadir fotos» solo admite soltar.
 	Elegir func() ([]string, error)
+	// ImportarVideo mete en la fototeca un VÍDEO elegido con «Añadir fotos» o soltado en
+	// la ventana (Sytue Office: copiado, con su duración y su póster, FO-09); con él,
+	// «Añadir fotos» y soltar admiten además los vídeos de `carrete.TipoDe`. nil, como en
+	// la conectada: solo imágenes.
+	ImportarVideo func(ctx context.Context, ruta string) error
 	// AbrirApp abre otra app de la suite por su esquema (con la web de respaldo): la
 	// vuelta del editor a la carpeta de Drive de la que se vino.
 	AbrirApp func(producto, ruta string)
-	// IA es el cliente de Sytue AI: describir, preguntar, ampliar una búsqueda y editar.
-	// nil: se dice lo mismo que dice la web cuando no está configurada.
-	IA *api.IA
+	// IA es el cliente de Sytue AI (`*api.IA`) o, en Sytue Office, la IA que la persona
+	// configuró: describir, preguntar, ampliar una búsqueda y editar. nil: se dice lo
+	// mismo que dice la web cuando no está configurada.
+	IA api.Asistente
+	// ExportarFototeca es «Exportar la fototeca» en la barra de la galería: Rotulo y qué
+	// hace al pulsarlo. nil, como en la conectada: no se ofrece.
+	ExportarFototeca *AccionExtra
+	// ImportarFototeca es «Importar» en la barra de la galería (Sytue Office: del carrete,
+	// de una carpeta, carpetas vigiladas; FO-04 y FO-09). nil, como en la conectada.
+	ImportarFototeca *AccionExtra
 	// Directorio traduce el correo que se escribe al compartir un álbum al `sub` con que
 	// se guarda, y de vuelta para decir quién lo compartió. nil: no se ofrece compartir
 	// con personas, y quien comparte conmigo sale como «alguien de tu organización».
@@ -161,6 +173,15 @@ type App struct {
 	// SeguirEnFondo pide al sistema tiempo para acabar una subida al pasar a segundo plano
 	// (sistema.SeguirEnFondo). nil: no hace falta.
 	SeguirEnFondo func(nombre string) (terminar func())
+
+	// Reproductor monta, para el visor, el reproductor de un VÍDEO de la galería
+	// (api.Photo.EsVideo) en vez de su póster: el objeto y con qué pararlo al pasar a
+	// otra o cerrar el visor (Sytue Office, FO-09). nil, como en la conectada: un vídeo
+	// se enseña como una foto.
+	Reproductor func(api.Photo) (fyne.CanvasObject, func())
+	// AvisoDeFoto es lo que el visor dice por su cuenta de una foto (Sytue Office: que su
+	// original enlazado ya no está, FO-09); "" o nil, nada.
+	AvisoDeFoto func(api.Photo) string
 
 	// NoEncontrado enseña la página «no encontrada» de la suite y dice si había quién.
 	// Es lo que contesta la web a un enlace `/p/` que no existe (un 404). nil, o si
@@ -636,7 +657,7 @@ func estadoDeFallo(err error) Estado {
 	// Un 401 es la sesión, no el permiso: el cliente ya ha renovado y reintentado, así
 	// que el servicio no acepta a esta persona y lo que toca es volver a entrar. Antes
 	// salía «No tienes acceso» (el 403) y la persona buscaba un permiso que tenía.
-	case errors.Is(err, auth.ErrLoginRequired), errors.As(err, &e) && e.Status == 401:
+	case errors.Is(err, autorizacion.ErrLoginRequired), errors.As(err, &e) && e.Status == 401:
 		return SinSesion
 	case errors.As(err, &e) && e.Status == 403:
 		return SinPermiso
@@ -752,6 +773,8 @@ func (a *App) datosGaleria() (Vista, Galeria) {
 	if a.HayCopia() {
 		d.AlCopia = a.abrirCopia
 	}
+	d.Exportar = a.ExportarFototeca
+	d.Importar = a.ImportarFototeca
 	if a.ofreceGaleria() {
 		d.Lote.ClaveSistema, _ = a.DestinoGaleria.claves()
 	} else {

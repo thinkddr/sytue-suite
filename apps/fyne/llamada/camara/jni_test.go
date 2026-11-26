@@ -25,10 +25,17 @@ func TestLasFirmasJNICoincidenConElJava(t *testing.T) {
 		// La pantalla encendida de Cast: vive en `sesion`, pero es la misma trampa.
 		"../../sesion/encendida_android.go":      "Encendida",
 		"../../sesion/atras_android.go":          "Atras",
-		"../../sesion/teclado_android.go":        "Teclado",
+		"../../anfitrion/teclado_android.go":     "Teclado", // movido de `sesion` (C-04)
 		"../../sesion/imagenenimagen_android.go": "ImagenEnImagen",
 		// La galería del teléfono de Photos (copia de seguridad), en el núcleo.
 		"../../../nucleo/carrete/carrete_android.go": "Carrete",
+		// La IA del sistema de Sytue Office (Gemini Nano por ML Kit) y su «Guardar como…».
+		"../../../nucleo/local/asistente/sistema_android.go": "IASistema",
+		"../../../nucleo/ficheros/movil_guardar_android.go":  "GuardarDocumento",
+		// El vídeo del sistema de Sytue Office: MediaCodec para el reproductor y la
+		// miniatura de MediaMetadataRetriever, la misma clase.
+		"../../video/sistema/mediacodec_android.go":            "VideoSistema",
+		"../../../nucleo/local/videoteca/miniatura_android.go": "VideoSistema",
 	} {
 		g, err := os.ReadFile(goF)
 		if err != nil {

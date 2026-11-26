@@ -23,7 +23,6 @@ import (
 	"fyne.io/fyne/v2/container"
 
 	"git.sytue.eu/sytue/one/apps/fyne/iconos"
-	"git.sytue.eu/sytue/one/apps/fyne/sesion"
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/nucleo/ajustes"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
@@ -88,14 +87,14 @@ var presencias = []struct {
 // cuentaBarra es el avatar de la barra y su menú.
 type cuentaBarra struct {
 	t *i18n.Translator
-	s *sesion.Suite
+	s *suiteSesion
 
 	boton *botonAvatar
 	menu  *Menu
 
 	mu       sync.Mutex
 	cerrando bool // protege una sola retirada compartida y su resultado de UI
-	estado   sesion.Estado
+	estado   estadoSesion
 	ficha    api.Profile // el nombre y el correo, que el estado transversal no lleva
 	// foto es el avatar elegido en Sytue ID, ya decodificado, y versionFoto su
 	// `avatar_version`, que es el ETag de los bytes: con la misma no se vuelve a bajar.
@@ -107,7 +106,7 @@ type cuentaBarra struct {
 	cuenta *api.Account
 }
 
-func nuevaCuentaBarra(t *i18n.Translator, s *sesion.Suite) *cuentaBarra {
+func nuevaCuentaBarra(t *i18n.Translator, s *suiteSesion) *cuentaBarra {
 	c := &cuentaBarra{t: t, s: s}
 	c.boton = nuevoBotonAvatar("", t.T("account.menu", nil), c.abrir)
 	c.menu = NuevoMenu()
@@ -156,7 +155,7 @@ func (c *cuentaBarra) alVolver() {
 
 // cambio es lo que hay que repintar cuando algo transversal se mueve: aquí o en otra
 // de las doce aplicaciones.
-func (c *cuentaBarra) cambio(e sesion.Estado) {
+func (c *cuentaBarra) cambio(e estadoSesion) {
 	c.mu.Lock()
 	entraba := c.estado.Dentro()
 	c.estado = e
@@ -379,7 +378,7 @@ func (s sangria) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 // (`api.Profile.ActiveOrg`, el claim `tenant` del token). Hasta el 2026-09-22 se
 // deducía del dominio del correo, que acierta solo cuando los dos coinciden: con un
 // `ada@gmail.com` invitada a `acme` decía «Organización: gmail.com».
-func (c *cuentaBarra) cabecera(nombre, correo, org string, foto image.Image, e sesion.Estado) fyne.CanvasObject {
+func (c *cuentaBarra) cabecera(nombre, correo, org string, foto image.Image, e estadoSesion) fyne.CanvasObject {
 	if nombre == "" {
 		// Sin sesión el menú lo dice con todas las letras en vez de enseñar una ficha
 		// vacía: hoy ninguna aplicación nativa arranca con sesión.
@@ -416,7 +415,7 @@ func (c *cuentaBarra) versal(clave string) fyne.CanvasObject {
 // preferencias es la banda de apariencia, color, forma e idioma: los ajustes de la
 // PERSONA, que son transversales a todas las aplicaciones de la suite. Cada uno es una
 // fila con su rótulo a la izquierda y su control a la derecha (AccountMenu.tsx).
-func (c *cuentaBarra) preferencias(e sesion.Estado) fyne.CanvasObject {
+func (c *cuentaBarra) preferencias(e estadoSesion) fyne.CanvasObject {
 	columna := container.New(Columna{Hueco: HuecoPreferencias},
 		c.fila("account.appearance", c.apariencia(e)),
 		// El color es un eje aparte del modo (ADR 0071), y la forma, el tercero.
@@ -434,7 +433,7 @@ func (c *cuentaBarra) preferencias(e sesion.Estado) fyne.CanvasObject {
 // Apple. Solo en iOS con SYTUE_DESPERTAR_APPLE y un widget que publicar
 // (Suite.DespertarDisponible), y con sesión; nil si no. Es de las quince, como el tema:
 // lo que se elige aquí vale en las otras. No va en la web: ahí no hay widgets.
-func (c *cuentaBarra) despertar(e sesion.Estado) fyne.CanvasObject {
+func (c *cuentaBarra) despertar(e estadoSesion) fyne.CanvasObject {
 	if c.s == nil || !e.Dentro() || !c.s.DespertarDisponible() {
 		return nil
 	}
@@ -508,14 +507,14 @@ var (
 
 // forma es el grupo de la forma de la suite y color, el de su color. Cambian AL
 // MOMENTO, aquí y en las otras apps abiertas, por los ajustes compartidos.
-func (c *cuentaBarra) forma(e sesion.Estado) *Segmentado {
+func (c *cuentaBarra) forma(e estadoSesion) *Segmentado {
 	return c.grupoDeEje("forma", formasAjuste, e.FormaPropia, e.Forma, e.ConOrganizacion,
 		func(a *ajustes.Ajustes, valor string) { a.Forma = valor })
 }
 
 // El color lleva su muestra (`themeColorSwatch`): la de «Organización» es la del color
 // de la organización, que es lo que se va a ver al elegirla.
-func (c *cuentaBarra) color(e sesion.Estado) *Segmentado {
+func (c *cuentaBarra) color(e estadoSesion) *Segmentado {
 	s := c.grupoDeEje("color", coloresAjuste, e.ColorPropio, e.Color, e.ConOrganizacion,
 		func(a *ajustes.Ajustes, valor string) { a.Color = valor })
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
@@ -584,7 +583,7 @@ var anchoPreferenciasCuenta float32 = AnchoCuenta - 2*MargenPreferencias
 
 // apariencia es el grupo de las cuatro apariencias. Cambia el tema AL MOMENTO —aquí y en
 // las otras aplicaciones abiertas, que se enteran en menos de dos segundos—.
-func (c *cuentaBarra) apariencia(e sesion.Estado) *Segmentado {
+func (c *cuentaBarra) apariencia(e estadoSesion) *Segmentado {
 	rotulos := make([]string, 0, len(temasAjuste))
 	for _, m := range temasAjuste {
 		rotulos = append(rotulos, c.t.T("account.appearance."+m.clave, nil))
@@ -608,7 +607,7 @@ func (c *cuentaBarra) apariencia(e sesion.Estado) *Segmentado {
 // como las filas de encima (`LanguageSelect.tsx`: `flex items-center justify-between
 // gap-3`, y el control en `w-40 max-w-[60%]`). Con el rótulo arriba eran 24 px más en un
 // menú que no cabía a 1280×800.
-func (c *cuentaBarra) idioma(e sesion.Estado) fyne.CanvasObject {
+func (c *cuentaBarra) idioma(e estadoSesion) fyne.CanvasObject {
 	rotulos := make([]string, 0, 1+len(i18n.Locales))
 	rotulos = append(rotulos, c.t.T("account.appearance.system", nil))
 	for _, l := range i18n.Locales {
@@ -662,7 +661,7 @@ func (c *cuentaBarra) miCuenta() fyne.CanvasObject {
 // Ninguna de las dos las hace esta barra: la sesión es transversal, así que entrar y
 // salir es de las trece y lo resuelve `apps/fyne/sesion`. Salir cierra en todas en
 // menos de dos segundos.
-func (c *cuentaBarra) entrarOSalir(e sesion.Estado) fyne.CanvasObject {
+func (c *cuentaBarra) entrarOSalir(e estadoSesion) fyne.CanvasObject {
 	if !e.Dentro() {
 		// El glifo es el de «Mi cuenta» porque el catálogo de iconos es CERRADO y no
 		// tiene uno de entrar; el rótulo sí es el suyo (`account.signIn`, escrita en la
@@ -720,7 +719,7 @@ func (c *cuentaBarra) salir(pendientes int) {
 // porque Salir lo borra del disco (NAT-08, «avisar y luego borrar», 2026-10-16). Se
 // elige subirlo, descartarlo o no salir. Si al subir queda algo (sin red, rechazado,
 // diario sin origen o de otra organización), se vuelve a preguntar con lo que quede.
-func (c *cuentaBarra) salirAutorizado(pendientes int, captured sesion.AutorizacionSalida) {
+func (c *cuentaBarra) salirAutorizado(pendientes int, captured autorizacionSalida) {
 	if captured.Vigente() != nil {
 		return
 	}
@@ -764,7 +763,7 @@ func (c *cuentaBarra) salirAutorizado(pendientes int, captured sesion.Autorizaci
 // cerrarSesion conserva el aviso hasta que la persona lo cierre o reintente. No
 // muestra rutas ni errores del llavero: el motivo operativo queda en el registro.
 type intentoCierre struct {
-	autorizacion sesion.AutorizacionSalida
+	autorizacion autorizacionSalida
 	descartar    bool
 }
 
@@ -772,7 +771,7 @@ func (c *cuentaBarra) cerrarSesion(descartar ...bool) {
 	c.cerrarSesionAutorizada(nil, len(descartar) > 0 && descartar[0])
 }
 
-func (c *cuentaBarra) cerrarSesionAutorizada(captured *sesion.AutorizacionSalida, discard bool) {
+func (c *cuentaBarra) cerrarSesionAutorizada(captured *autorizacionSalida, discard bool) {
 	c.mu.Lock()
 	if c.cerrando {
 		c.mu.Unlock()
@@ -780,7 +779,7 @@ func (c *cuentaBarra) cerrarSesionAutorizada(captured *sesion.AutorizacionSalida
 	}
 	c.cerrando = true
 	c.mu.Unlock()
-	var authorization sesion.AutorizacionSalida
+	var authorization autorizacionSalida
 	var captureErr error
 	if captured != nil {
 		authorization = *captured

@@ -379,6 +379,9 @@ func alCanalDeLaBarra(s *container.Scroll) {
 	}
 	if s.Content != nil {
 		s.Content = container.New(cuerpoEnElCanal{der: canalonMenu}, s.Content)
+		// Sin esto, un desplazable ya pintado sigue enseñando el contenido de antes cuando
+		// la app le cambia el cuerpo (Mail se quedaba en «No hay carpetas»).
+		s.Refresh()
 	}
 }
 

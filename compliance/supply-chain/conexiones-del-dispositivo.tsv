@@ -1,0 +1,43 @@
+# Conexiones que abre EL DISPOSITIVO de la persona en Sytue Office, la edición local
+# de las apps nativas (ADR 0083, docs/decisions.md#0083), hacia un proveedor fuera de
+# la UE que ELLA eligió y configuró: su correo, su calendario y sus contactos, su nube,
+# su espacio de Slack, su Teams, su Google Chat y Meet. Formato: host<TAB>ruta, como
+# blocked-baseline.tsv.
+#
+# No es deuda de la suite ni una lista blanca general. Ningún servidor de Sytue está en
+# medio, los datos son de la persona y van a quien ella eligió, y las credenciales
+# están en el llavero de su dispositivo. Recién instalada y sin configurar nada, la app
+# no abre ninguna de estas conexiones: el portero de red (apps/nucleo/local/red) solo
+# deja salir lo que sale de la configuración. La gobernanza de cada proveedor sigue
+# siendo la de su fila de providers.tsv (blocked: entidad fuera de la UE).
+#
+# El gate (tools/eusupply) exige que cada fila siga en el código (si no, sobra) y que
+# su ruta sea código del dispositivo de la edición (deviceProviderSource): un fichero
+# que comparte con un servicio va a la línea base. Detalle en el README, sección C.
+accounts.google.com	apps/nucleo/local/nube/oauth.go
+graph.microsoft.com	apps/nucleo/local/agenda/graph.go
+graph.microsoft.com	apps/nucleo/local/nube/onedrive.go
+login.microsoftonline.com	apps/nucleo/local/nube/oauth.go
+oauth2.googleapis.com	apps/nucleo/local/nube/oauth.go
+people.googleapis.com	apps/nucleo/local/agenda/google.go
+www.googleapis.com	apps/nucleo/local/agenda/google.go
+www.googleapis.com	apps/nucleo/local/agenda/oauth.go
+www.googleapis.com	apps/nucleo/local/nube/google.go
+www.googleapis.com	apps/nucleo/local/nube/oauth.go
+slack.com	apps/nucleo/local/chat/slack.go
+graph.microsoft.com	apps/nucleo/local/chat/teams.go
+chat.googleapis.com	apps/nucleo/local/chat/google.go
+meet.googleapis.com	apps/nucleo/local/chat/google.go
+openidconnect.googleapis.com	apps/nucleo/local/chat/google.go
+people.googleapis.com	apps/nucleo/local/chat/google.go
+www.googleapis.com	apps/nucleo/local/chat/oauth.go
+login.yahoo.com	apps/nucleo/local/correo/cuentas.go
+caldav.calendar.yahoo.com	apps/nucleo/cuentas/dav/descubrir.go
+carddav.address.yahoo.com	apps/nucleo/cuentas/dav/descubrir.go
+caldav.icloud.com	apps/nucleo/cuentas/dav/descubrir.go
+contacts.icloud.com	apps/nucleo/cuentas/dav/descubrir.go
+caldav.fastmail.com	apps/nucleo/cuentas/dav/dav.go
+caldav.fastmail.com	apps/nucleo/cuentas/dav/descubrir.go
+carddav.fastmail.com	apps/nucleo/cuentas/dav/descubrir.go
+ec.europa.eu	apps/nucleo/local/erp/vies.go
+generativelanguage.googleapis.com	apps/nucleo/local/asistente/asistente.go

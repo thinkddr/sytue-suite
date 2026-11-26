@@ -127,6 +127,10 @@ type Galeria struct {
 	// dispositivo no tiene galería del sistema y no se ofrece. Copiando la marca en curso.
 	AlCopia  func()
 	Copiando bool
+	// Exportar es una acción más de la barra, de fantasma tras la copia; nil, no hay.
+	Exportar *AccionExtra
+	// Importar es otra acción de la barra, de fantasma delante de Exportar; nil, no hay.
+	Importar *AccionExtra
 	// Ampliar ofrece «Buscar también con otras palabras»: solo cuando la búsqueda literal
 	// no encontró NADA, y Ampliando lo inertiza mientras Sytue AI contesta.
 	Ampliar, Ampliando bool
@@ -336,6 +340,20 @@ func accionesBarra(v Vista, d Galeria, campo fyne.CanvasObject, hayFotos bool) [
 	if d.AlCopia != nil {
 		derecha = append(derecha, botonCopia(v, d))
 	}
+	if d.Importar != nil && d.Importar.Al != nil {
+		b := ui.NuevoBoton(d.Importar.Rotulo, d.Importar.Al).Con(ui.Fantasma, ui.TallaMD).ConIcono(iconos.Subir, 0)
+		if v.Ventana < ui.CorteSM {
+			b.Rotulo, b.Texto = b.Texto, ""
+		}
+		derecha = append(derecha, b)
+	}
+	if d.Exportar != nil && d.Exportar.Al != nil {
+		b := ui.NuevoBoton(d.Exportar.Rotulo, d.Exportar.Al).Con(ui.Fantasma, ui.TallaMD).ConIcono(iconos.Descargar, 0)
+		if v.Ventana < ui.CorteSM {
+			b.Rotulo, b.Texto = b.Texto, ""
+		}
+		derecha = append(derecha, b)
+	}
 	return derecha
 }
 
@@ -369,6 +387,13 @@ func botonAnyadir(v Vista, d Galeria) *ui.Boton {
 	b := ui.NuevoBoton(v.Traduce("gallery.add"), d.AlAnyadir).Con(ui.Primario, ui.TallaMD).ConIcono(iconos.Mas, 0)
 	b.Inerte = d.Subiendo
 	return b
+}
+
+// AccionExtra es un mando que pone quien monta la app y la pantalla no conoce: su
+// rótulo ya traducido y qué hace.
+type AccionExtra struct {
+	Rotulo string
+	Al     func()
 }
 
 // botonCopia es la nube de la copia de seguridad: de fantasma, como «Seleccionar», y
@@ -821,8 +846,12 @@ func PantallaAlbumes(v Vista, d Albumes) *fyne.Container {
 			Obj: ParrafoEn(d.Error, tema.TextoSM, ui.Normal, "danger-text", v.Variante), Margen: SeparacionBloque,
 		})
 	}
-	// La sección `mb-6`: su cabecera con `mb-2`, y debajo lo que haya.
+	// La sección `mb-6`: su cabecera con `mb-2`, y debajo lo que haya. Sin servidor no
+	// hay sugerencias: los montones los calcula el servicio con vectores de imagen.
 	seccion := []ui.Bloque{{Obj: sugerencias, Margen: tema.Espacio(2)}}
+	if v.SinServidor {
+		seccion = nil
+	}
 	if d.ExcluidaLoteIA {
 		seccion = append(seccion, ui.Bloque{
 			Obj:    ParrafoEn(v.Traduce("aiBatch.excludedHint"), tema.TextoXS, ui.Normal, "text-muted", v.Variante),
@@ -837,8 +866,10 @@ func PantallaAlbumes(v Vista, d Albumes) *fyne.Container {
 	for _, m := range d.Montones {
 		seccion = append(seccion, ui.Bloque{Obj: filaMonton(v, m, d), Margen: tema.Espacio(3)})
 	}
-	seccion[len(seccion)-1].Margen = 0
-	bloques = append(bloques, ui.Bloque{Obj: ui.PilaBloques(seccion...), Margen: SeparacionSeccion})
+	if len(seccion) > 0 {
+		seccion[len(seccion)-1].Margen = 0
+		bloques = append(bloques, ui.Bloque{Obj: ui.PilaBloques(seccion...), Margen: SeparacionSeccion})
+	}
 
 	vacio := EstadoVacio(v, "albums.empty.title", "albums.empty.description", nil)
 	if cuerpo := CuerpoConEsqueleto(v, vacio, func() *ui.BloquesEsqueleto {
@@ -947,9 +978,11 @@ func PantallaAlbum(v Vista, d AlbumAbierto) *fyne.Container {
 		mandos = append(mandos, ui.NuevoBoton(v.Traduce("sharePeople.open"), d.AlCompartirConPersonas).
 			Con(ui.Primario, ui.TallaSM).ConIcono(iconoCompartirConPersonas, 0))
 	}
-	mandos = append(mandos,
-		ui.NuevoBoton(v.Traduce(compartirO(d.Album)), d.AlCompartir).Con(ui.Fantasma, ui.TallaSM).ConIcono(iconos.Enlace, 0))
-	if d.Album.Shared {
+	if !v.SinServidor {
+		mandos = append(mandos,
+			ui.NuevoBoton(v.Traduce(compartirO(d.Album)), d.AlCompartir).Con(ui.Fantasma, ui.TallaSM).ConIcono(iconos.Enlace, 0))
+	}
+	if d.Album.Shared && !v.SinServidor {
 		mandos = append(mandos, ui.NuevoBoton(v.Traduce("album.unshare"), d.AlDejarDeCompartir).Con(ui.Fantasma, ui.TallaSM))
 	}
 	if d.AlRenombrar != nil {

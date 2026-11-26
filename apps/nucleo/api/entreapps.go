@@ -28,6 +28,22 @@ type Redactar struct {
 	// Drive son ids de ficheros de Drive que van ADJUNTOS POR REFERENCIA: viaja el
 	// enlace, no los bytes, así que adjuntar 2 GB cuesta lo mismo que un PDF.
 	Drive []string
+	// Adjuntos van DENTRO del correo, con sus bytes: los que otra app de Sytue Office de
+	// este equipo deja para que Mail los adjunte (el PDF de una factura del ERP), que el
+	// enlace nombra por un identificador de un solo uso y nunca por su ruta
+	// (`nucleo/local/correo.ParaEnviar`). LeerRedactar no los lee: en la suite no hay.
+	Adjuntos []AdjuntoRedactar
+	// SinAdjuntar son los adjuntos que el enlace pedía y no se pudieron recoger (no
+	// existen, ya se recogieron, o no son un fichero de los que se dejan): el redactor
+	// lo dice en vez de abrirse como si nada.
+	SinAdjuntar int
+}
+
+// AdjuntoRedactar es un fichero de Redactar.Adjuntos: su nombre, su tipo MIME y su
+// contenido.
+type AdjuntoRedactar struct {
+	Nombre, Tipo string
+	Datos        []byte
 }
 
 // RutaRedactar es la página de Mail que abre el redactor así (`attach-drive-to-mail` del

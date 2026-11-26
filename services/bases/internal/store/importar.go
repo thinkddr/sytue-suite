@@ -74,7 +74,7 @@ type Exportacion struct {
 	Fields  []domain.Campo
 	Records []domain.Registro
 	// Labels nombra cada registro enlazado desde este tramo por su campo principal
-	// (etiquetaDe: el primero con valor), por id de registro.
+	// (domain.EtiquetaDe: el primero con valor), por id de registro.
 	Labels map[string]string
 }
 

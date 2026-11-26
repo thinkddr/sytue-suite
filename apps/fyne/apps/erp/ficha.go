@@ -105,6 +105,10 @@ type Ficha struct {
 	// EnPapelera: se abrió desde la papelera y lo que toca es restaurar. Facturae: la
 	// organización es española. SoloLectura: sin escritura en el módulo.
 	EnPapelera, Facturae, SoloLectura bool
+	// SinAsentar oculta «Llevar al libro»: el servicio no ha concedido el verbo `asentar`
+	// y la pantalla pide ocultar lo que no tiene camino (OcultarSinVerbo). Su valor cero
+	// es el de siempre: el botón está y manda el servicio.
+	SinAsentar bool
 	// Movil es la ventana por debajo de `md`: el panel va a pantalla completa.
 	Movil bool
 
@@ -140,7 +144,10 @@ type Ficha struct {
 	AlAnular                                                                      func(api.ERPAsiento)
 	// AlDescargar baja «ubl», «facturae» o «imprimir».
 	AlDescargar func(que string)
-	AlHecha     func(api.ERPActividad)
+	// AlPDF guarda y abre la factura en PDF y AlEnviar abre «Enviar por correo». Nil, la
+	// ficha no los ofrece (Pantalla.Salida).
+	AlPDF, AlEnviar func()
+	AlHecha         func(api.ERPActividad)
 	// AlPlanificar crea la tarea; `para` es su responsable (Sub vacío: quien la crea).
 	AlPlanificar func(tipo, resumen, vence string, para api.ERPPersona)
 	// Equipo es la gente que puede llevar una tarea: el selector de «Responsable».
@@ -161,6 +168,11 @@ type Ficha struct {
 	// Hoy es la fecha con la que se cuentan los días vencida; cero, la de ahora.
 	Hoy          time.Time
 	AlRequisitos func()
+	// ComprobarVIES es «Comprobar en VIES» debajo del NIF de un contacto (vies.go): lo
+	// pone la pantalla si tiene con qué preguntar (Pantalla.ComprobarVIES). Nil, no se
+	// ofrece, que es lo de siempre. VIES es lo que contestó la última comprobación.
+	ComprobarVIES func()
+	VIES          *EstadoVIES
 
 	// Los controles y los campos que se teclean fuera de ellos viven lo que la ficha:
 	// ver `Control`.
@@ -328,6 +340,11 @@ func (f *Ficha) Objeto(v tema.Variante, ancho float32) fyne.CanvasObject {
 			siguiente = SeparaCampos
 		}
 		add(o, alto, siguiente, false)
+		if k.Campo.Clave == "nif" && f.ComprobarVIES != nil {
+			pr := propuestoDe(f.tr, f.Modelo, func(c string) string { return f.Valores[c] }, "enFicha")
+			o, alto := bloqueVIES(f.tr, v, f.VIES, pr, f.ComprobarVIES, f.anchoCampos())
+			add(o, alto, HuecoDos, false)
+		}
 	}
 	if len(f.Asientos) > 0 {
 		o, alto := f.seccionAsientos(v)
@@ -421,8 +438,9 @@ func (p *pilaFicha) Layout(_ []fyne.CanvasObject, t fyne.Size) {
 
 // --- La cabecera ------------------------------------------------------------
 
-// cabecera es el título con la referencia debajo y, a la derecha, UBL, imprimir,
-// Facturae, su aviso con FACe, Sytue AI y Cerrar, en ese orden y los que toquen.
+// cabecera es el título con la referencia debajo y, a la derecha, UBL, imprimir, PDF y
+// enviar (si la pantalla los pide), Facturae, su aviso con FACe, Sytue AI y Cerrar, en
+// ese orden y los que toquen.
 func (f *Ficha) cabecera(v tema.Variante) (fyne.CanvasObject, float32) {
 	c := &cabeceraFicha{}
 	r := f.Registro
@@ -468,6 +486,8 @@ func (f *Ficha) cabecera(v tema.Variante) (fyne.CanvasObject, float32) {
 }
 
 // botonesCabecera reúne las acciones del registro en el mismo orden de la web.
+//
+//nolint:gocyclo // Las acciones del registro en el orden de la web, cada una con su condición.
 func (f *Ficha) botonesCabecera() []fyne.CanvasObject {
 	r := f.Registro
 	botones := make([]fyne.CanvasObject, 0, 5)
@@ -494,6 +514,13 @@ func (f *Ficha) botonesCabecera() []fyne.CanvasObject {
 	}
 	if r != nil && f.Modelo.Clave == api.ERPFacturaVenta {
 		botones = append(botones, NuevoEnlaceIcono(iconos.Recibo, f.t("form.print"), descargar("imprimir")))
+		if f.AlPDF != nil {
+			botones = append(botones, boton("PDF", f.t("form.downloadPdf"), iconos.Descargar, f.AlPDF))
+		}
+		// Enviar es escribir (POST): quien solo lee ventas recibiría un 403, como en la web.
+		if f.AlEnviar != nil && !f.EnPapelera && !f.SoloLectura {
+			botones = append(botones, boton("", f.t("send.action"), iconos.Correo, f.AlEnviar))
+		}
 	}
 	if r != nil && f.Modelo.Cobro && f.Facturae {
 		botones = append(botones, boton("Facturae", f.t("form.downloadFacturae"), iconos.Descargar, descargar("facturae")))
@@ -909,7 +936,7 @@ func (f *Ficha) pie() (fyne.CanvasObject, float32) {
 	guardar.Cargando = f.Guardando
 	l.izq = append(l.izq, guardar)
 	r := f.Registro
-	if f.Modelo.Contable && r != nil {
+	if f.Modelo.Contable && r != nil && !f.SinAsentar {
 		a := ui.NuevoBoton(f.t("action.post"), f.AlAsentar).Con(ui.Secundario, ui.TallaMD)
 		a.Inerte = f.Guardando
 		l.izq = append(l.izq, a)

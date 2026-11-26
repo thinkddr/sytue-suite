@@ -173,6 +173,28 @@ func abrirWeb(a Abridor, direccion string) error { return AbrirFuera(a, direccio
 //
 // Un fichero del equipo no se abre por aquí: para eso está `ficheros.Abrir`.
 
+// EsquemaOffice es el prefijo de esquema de Sytue Office, la edición local
+// (`nucleo/local/espacio.PrefijoEsquema`; aquí escrito otra vez porque `espacio` importa
+// `api` y no al revés).
+const EsquemaOffice = "sytueoffice-"
+
+// AbrirEnOffice entrega al sistema un enlace a otra app de Sytue Office
+// (`sytueoffice-<producto>:/abrir?local=…`): es como se abren las apps entre sí en la
+// edición local (PLAN-EDICION-LOCAL §5.11). Solo ese esquema, con producto de letras, y
+// SIN caer a la web: si nadie lo atiende, devuelve el error del sistema y quien llama
+// decide (abrir el fichero con la app del sistema, o decirlo).
+func AbrirEnOffice(a Abridor, enlace string) error {
+	u, err := url.Parse(strings.TrimSpace(enlace))
+	if err != nil || !strings.HasPrefix(u.Scheme, EsquemaOffice) || u.Host != "" || u.User != nil {
+		return ErrNoSeAbre
+	}
+	producto := strings.TrimPrefix(u.Scheme, EsquemaOffice)
+	if producto == "" || strings.Trim(producto, "abcdefghijklmnopqrstuvwxyz") != "" {
+		return ErrNoSeAbre
+	}
+	return a.OpenURL(u)
+}
+
 // ErrNoSeAbre es una dirección que no se le da al sistema.
 var ErrNoSeAbre = errors.New("api: esa dirección no se abre con el sistema")
 
@@ -375,6 +397,20 @@ var abre = map[string]string{
 	"key":     "slides",
 }
 
+// abreOffice son los formatos nativos de Sytue Office (la edición local): un ZIP sin
+// pérdida del modelo de la suite (`nucleo/local/biblioteca`). La edición conectada no los
+// abre, así que solo cuentan con [FormatosOffice] puesto.
+var abreOffice = map[string]string{
+	"docus":  "docs",
+	"calcus": "sheets",
+	"diapos": "slides",
+}
+
+// FormatosOffice lo pone la cáscara de Sytue Office (`apps/fyne/local`) al abrir: desde
+// entonces [AppQueAbre] reconoce también `.docus`, `.calcus` y `.diapos`. Con su valor
+// cero, el de las apps conectadas, todo sigue como siempre.
+var FormatosOffice bool
+
 // AppQueAbre es la clave del producto que abre ese fichero, por su nombre. El segundo
 // valor dice si alguno lo reclama.
 func AppQueAbre(nombre string) (string, bool) {
@@ -382,8 +418,26 @@ func AppQueAbre(nombre string) (string, bool) {
 	if i < 0 || i == len(nombre)-1 {
 		return "", false
 	}
-	p, ok := abre[strings.ToLower(nombre[i+1:])]
+	ext := strings.ToLower(nombre[i+1:])
+	p, ok := abre[ext]
+	if !ok && FormatosOffice {
+		p, ok = abreOffice[ext]
+	}
 	return p, ok
+}
+
+// ExtensionesOffice son las extensiones de la tabla de [Extensiones] más los formatos
+// nativos de Sytue Office de ese producto, en orden alfabético: lo que cada
+// `cmd-local/<app>/FyneApp.toml` declara como mínimo.
+func ExtensionesOffice(producto string) []string {
+	out := Extensiones(producto)
+	for ext, p := range abreOffice {
+		if p == producto {
+			out = append(out, ext)
+		}
+	}
+	slices.Sort(out)
+	return out
 }
 
 // Extensiones son las extensiones que abre ese producto, en orden alfabético. Es la
@@ -623,4 +677,19 @@ func importarDeDrive(ctx context.Context, drive *Drive, docs *Docs, id string, c
 		return Importado{}, demasiado
 	}
 	return docs.importar(ctx, meta.Name, datos, comentarios)
+}
+
+// AbrirFicheroEnOffice abre un fichero del equipo en la app de Sytue Office de ese
+// producto, por su esquema: `sytueoffice-<producto>:/abrir?local=file:///…`
+// (PLAN-EDICION-LOCAL §5.11). Pasa por [AbrirEnOffice], así que NO cae a la web: si el
+// sistema dice que nadie atiende el esquema devuelve su error, y quien llama lo abre con
+// la app predeterminada. Solo acepta un `file://` y un producto en minúsculas.
+func AbrirFicheroEnOffice(a Abridor, producto, fichero string) error {
+	f, err := url.Parse(fichero)
+	// El producto se mira aquí: `url.Parse` pasa el esquema a minúsculas y colaría «Docs».
+	if err != nil || f.Scheme != "file" || f.Path == "" || producto == "" ||
+		strings.ContainsFunc(producto, func(r rune) bool { return r < 'a' || r > 'z' }) {
+		return ErrNoSeAbre
+	}
+	return AbrirEnOffice(a, EsquemaOffice+producto+":/abrir?"+url.Values{"local": {f.String()}}.Encode())
 }

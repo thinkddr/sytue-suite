@@ -47,6 +47,10 @@ func PantallaInicio(v Vista, d Inicio) *fyne.Container {
 	// «Subir» ya no va aquí: es el «+» flotante de la app, en todos los anchos.
 	emitir := ui.NuevoBoton(v.Traduce("nav.studio"), d.AlEmitir).Con(ui.Secundario, ui.TallaSM).ConIcono(iconos.Emitir, iconos.TallaSM)
 	acciones := []fyne.CanvasObject{emitir}
+	if !v.Tiene(SecEmitir) {
+		// Sytue Office no emite: sin Estudio, la cabecera no ofrece nada.
+		acciones = nil
+	}
 	if v.Estado == SinSesion || v.Ventana < ui.CorteSM {
 		// Sin sesión no hay nada que emitir: el botón es «Entrar». Y en un teléfono
 		// (`hidden sm:flex`) emitir es el menú.

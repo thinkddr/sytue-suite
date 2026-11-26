@@ -38,8 +38,11 @@ type Edicion struct {
 	O            *Ocurrencia
 	CalendarioID string
 	Titulo       string
-	Inicio, Fin  time.Time
-	TodoElDia    bool
+	// Inicio y Fin son lo que dicen los campos, que se escriben y se leen en la zona de
+	// visualización: su hora de pared en ella es la de PARED del evento en `Zona`, que es
+	// en la que la lee EntradaDe (EdicionDe la pasa de una zona a otra).
+	Inicio, Fin time.Time
+	TodoElDia   bool
 	// Zona es el TZID del evento; vacío, la de visualización.
 	Zona                                    string
 	Lugar, Descripcion, Color, Videollamada string
@@ -129,6 +132,14 @@ type AccionesFormulario struct {
 	// Recursos lista las salas y los recursos con su disponibilidad en [desde, hasta).
 	// Nil: el formulario no ofrece reservar.
 	Recursos func(desde, hasta time.Time, listo func([]api.Resource, error))
+	// Sugerir es el autocompletado del campo de invitados (Pantalla.Invitar). Nil, sin él.
+	Sugerir func(q string, listo func([]SugerenciaInvitado))
+	// Reunion crea ya la reunión de un calendario (Pantalla.Reunion.Crear) y da su enlace.
+	// Nil, sin ella.
+	Reunion func(calendario, titulo string, inicio, fin time.Time, listo func(enlace string, err error))
+	// Ocupacion es la de los invitados en «buscar un hueco» (Pantalla.Invitar). Nil, solo
+	// la propia.
+	Ocupacion func(calendario string, correos []string, desde, hasta time.Time, listo func(map[string][]api.Hueco, error))
 	// Choques son los eventos ya cargados que se pisan con [inicio, fin), sin contar el
 	// de `uid` («Coincide con…»). Nil: no se avisa.
 	Choques func(inicio, fin time.Time, uid string) []Solape
@@ -148,8 +159,11 @@ type formulario struct {
 	creandoSala bool
 
 	titulo, inicio, fin, lugar, correo, cuenta, hasta *ui.Entrada
-	descripcion                                       *ui.AreaTexto
-	calendario, zona, repetir, finSerie, mostrar      *ui.Selector
+	// enlace es el campo libre del enlace de la reunión (Pantalla.PistaEnlace); nil, la
+	// sala de Rooms.
+	enlace                                       *ui.Entrada
+	descripcion                                  *ui.AreaTexto
+	calendario, zona, repetir, finSerie, mostrar *ui.Selector
 	// aviso es «Coincide con…» del último cálculo; vacío, ningún choque.
 	aviso string
 	// dias son los días elegidos de una semanal (`repeatDays`); nil, el del inicio.
@@ -177,6 +191,15 @@ type formulario struct {
 	// fecha; iconosFecha, esos iconos (se apagan en consulta).
 	inicioCaja, finCaja fyne.CanvasObject
 	iconosFecha         []*ui.BotonIcono
+	// Sin personas con Pantalla.Invitar (invitarlocal.go): las direcciones de la libreta
+	// bajo el campo, la señalada y el turno que descarta las respuestas viejas; y los
+	// invitados con que se abrió, que vuelven si se guarda donde no se puede invitar.
+	sugerencias         []SugerenciaInvitado
+	sugActiva, turnoSug int
+	invitadosIniciales  []string
+	// Con Pantalla.Reunion (reunionlocal.go): la reunión pedida al proveedor del
+	// calendario para cuando se guarde, la que se está creando y si falló.
+	reunionPedida, creandoReunion, errorReunion bool
 }
 
 // AbrirFormulario abre el modal sobre el lienzo. `destinos` son los calendarios donde se
@@ -193,7 +216,7 @@ func (p *Pantalla) AbrirFormulario(c fyne.Canvas, e Edicion, destinos []api.Cale
 
 // nuevoFormulario arma el formulario sin mostrarlo.
 func (p *Pantalla) nuevoFormulario(e Edicion, destinos []api.Calendar, a AccionesFormulario) *formulario {
-	f := &formulario{p: p, e: e, destinos: destinos, a: a, nuevo: e.O == nil}
+	f := &formulario{p: p, e: e, destinos: destinos, a: a, nuevo: e.O == nil, invitadosIniciales: slices.Clone(e.Invitados)}
 	if f.e.CalendarioID == "" {
 		f.e.CalendarioID = calendarioPorDefecto(destinos)
 	}
@@ -217,6 +240,7 @@ func calendarioPorDefecto(cals []api.Calendar) string {
 	return ""
 }
 
+//nolint:gocyclo // El formulario del evento se monta de una vez, campo a campo, con lo que ofrece cada calendario.
 func (f *formulario) construir() {
 	p, e := f.p, f.e
 	f.titulo = ui.NuevaEntrada(p.t("event.titlePlaceholder", nil))
@@ -233,7 +257,22 @@ func (f *formulario) construir() {
 			elegido = i
 		}
 	}
-	f.calendario = ui.NuevoSelector(nombres, func(i int) { f.e.CalendarioID = f.destinos[i].ID })
+	f.calendario = ui.NuevoSelector(nombres, func(i int) {
+		f.e.CalendarioID = f.destinos[i].ID
+		if p.reunionLocal() != nil {
+			// El botón de la reunión es el del proveedor del calendario elegido.
+			f.alCambiarCalendarioReunion()
+			if p.invitarLocal() == nil {
+				f.rehacer()
+			}
+		}
+		if p.invitarLocal() != nil {
+			// Los invitados salen o no según el calendario, y su ocupación es la de su cuenta.
+			f.sugerencias = nil
+			f.rehacer()
+			f.pedirHuecos()
+		}
+	})
 	f.calendario.Elegida = elegido
 
 	f.todoElDia = ui.NuevoConmutador(p.t("event.allDay", nil), func(si bool) {
@@ -270,6 +309,11 @@ func (f *formulario) construir() {
 	f.lugar.AlCambiar(func(s string) { f.e.Lugar = s })
 
 	f.construirInvitados()
+	if p.PistaEnlace != "" {
+		f.enlace = ui.NuevaEntrada("https://")
+		f.enlace.PonerTexto(e.Videollamada)
+		f.enlace.AlCambiar(f.alCambiarEnlace)
+	}
 
 	f.descripcion = ui.NuevaAreaTexto(p.t("event.descriptionPlaceholder", nil))
 	f.descripcion.Filas = 4
@@ -514,10 +558,14 @@ func (f *formulario) cambiarFinSerie(i int) {
 func (f *formulario) construirInvitados() {
 	p := f.p
 	f.correo = ui.NuevaEntrada(p.t("event.guestPlaceholder", nil))
-	f.correo.AlCambiar(func(string) {
+	f.correo.AlCambiar(func(s string) {
 		f.limpiar(&f.errCorreo, f.correo)
+		f.sugerir(s)
 	})
 	f.correo.AlTeclear = func(k *fyne.KeyEvent) bool {
+		if f.teclaSugerencias(k) {
+			return true
+		}
 		if k.Name == fyne.KeyReturn || k.Name == fyne.KeyEnter {
 			f.anadirInvitado(f.correo.Texto())
 			return true
@@ -525,9 +573,15 @@ func (f *formulario) construirInvitados() {
 		return false
 	}
 	f.correo.AlEnfocar = func(dentro bool) {
-		if !dentro {
-			f.anadirInvitado(f.correo.Texto()) // `onBlur`
+		if dentro {
+			return
 		}
+		// Con la lista de la libreta abierta, salir del campo puede ser pulsar una de
+		// sus direcciones: lo escrito a medias no es un error todavía.
+		if len(f.sugerencias) > 0 && !correoValido.MatchString(strings.TrimSpace(f.correo.Texto())) {
+			return
+		}
+		f.anadirInvitado(f.correo.Texto()) // `onBlur`
 	}
 }
 
@@ -753,8 +807,15 @@ func (f *formulario) rehacerFilas() {
 	if b := f.bloqueRecursos(); b != nil {
 		filas = append(filas, b)
 	}
-	filas = append(filas, f.bloqueColor(), f.bloqueInvitados(),
-		ui.GrupoCampo(p.t("event.description", nil), false, f.descripcion, "", ""))
+	filas = append(filas, f.bloqueColor())
+	if f.invitaAqui() {
+		filas = append(filas, f.bloqueInvitados())
+	} else if pista := f.pistaSinInvitar(); pista != "" {
+		// Sin personas, en un calendario de este equipo: dónde se puede invitar.
+		filas = append(filas, ui.GrupoCampo(p.t("event.guests", nil), false,
+			ui.NuevoParrafo(pista, tema.TextoSM, ui.Normal, "text-muted", v).A(f.util()), "", ""))
+	}
+	filas = append(filas, ui.GrupoCampo(p.t("event.description", nil), false, f.descripcion, "", ""))
 	if b := f.bloqueRecordatorios(); b != nil {
 		filas = append(filas, b)
 	}
@@ -774,6 +835,16 @@ func (f *formulario) bloqueVideollamada() fyne.CanvasObject {
 	p := f.p
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	hijos := []fyne.CanvasObject{alto(rotuloFuerte(p.t("event.conference", nil)), tema.TextoSM.Linea)}
+	if f.enlace != nil {
+		// A-06: cualquier enlace de reunión, que «Unirse» abre en el sistema.
+		sub := []fyne.CanvasObject{f.enlace, ui.NuevoParrafo(p.PistaEnlace, tema.TextoXS, ui.Normal, "text-subtle", v)}
+		if b := f.bloqueReunion(); b != nil {
+			// Sytue Office, A-13: crear la reunión con el proveedor del calendario.
+			sub = append(sub, b)
+		}
+		hijos = append(hijos, container.New(ui.Columna{Hueco: tema.Espacio(1)}, sub...))
+		return container.New(ui.Columna{Hueco: tema.Espacio(1.5)}, hijos...)
+	}
 	if url := f.e.Videollamada; url != "" {
 		// `border-border-subtle flex items-center justify-between gap-2 rounded-md
 		// border px-3 py-2`: el enlace subrayado y el botón fantasma.
@@ -830,11 +901,17 @@ func (f *formulario) bloqueColor() fyne.CanvasObject {
 	return container.New(ui.Columna{Hueco: tema.Espacio(1.5)}, alto(rotuloFuerte(f.p.t("common.colour", nil)), tema.TextoSM.Linea), m)
 }
 
-// bloqueInvitados son las píldoras de los añadidos y el campo del correo.
+// bloqueInvitados son las píldoras de los añadidos y el campo del correo; sin personas
+// con Pantalla.Invitar, también las direcciones de la libreta y la pista de por dónde
+// saldrá la invitación.
 func (f *formulario) bloqueInvitados() fyne.CanvasObject {
 	rotulo := f.p.t("event.guests", nil)
+	campo := fyne.CanvasObject(f.correo)
+	if extra := f.bajoElCampo(); len(extra) > 0 {
+		campo = container.New(ui.Columna{Hueco: espacio1p5}, append([]fyne.CanvasObject{f.correo}, extra...)...)
+	}
 	if len(f.e.Invitados) == 0 {
-		return ui.GrupoCampo(rotulo, false, f.correo, "", f.errCorreo)
+		return ui.GrupoCampo(rotulo, false, campo, "", f.errCorreo)
 	}
 	// Al editar, la respuesta que ya dio cada uno y quién organiza (GuestList.tsx).
 	respuestas := map[string]string{}
@@ -852,14 +929,28 @@ func (f *formulario) bloqueInvitados() fyne.CanvasObject {
 		pildoras = append(pildoras, nuevaPildoraInvitado(f.p, correo, respuestas[strings.ToLower(correo)], func() {
 			f.e.Invitados = quitar(f.e.Invitados, correo)
 			f.rehacer()
+			f.invitadosCambiaron()
 		}))
 	}
 	lista := container.New(ui.FilaAuto{Hueco: espacio1p5, SaltoFila: espacio1p5, Derecha: len(pildoras), Partir: true}, pildoras...)
-	filas := []fyne.CanvasObject{lista, f.correo}
+	filas := []fyne.CanvasObject{lista, campo}
 	if organizador != "" {
 		filas = append([]fyne.CanvasObject{f.p.filaOrganizador(organizador, f.util(), tema.TextoSM)}, filas...)
 	}
 	return ui.GrupoCampo(rotulo, false, container.New(ui.Columna{Hueco: espacio2}, filas...), "", f.errCorreo)
+}
+
+// bajoElCampo son la lista de la libreta y la pista (sin personas con Invitar).
+func (f *formulario) bajoElCampo() []fyne.CanvasObject {
+	var out []fyne.CanvasObject
+	if l := f.listaSugerencias(); l != nil {
+		out = append(out, l)
+	}
+	if pista := f.pistaInvitar(); pista != "" {
+		v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
+		out = append(out, ui.NuevoParrafo(pista, tema.TextoXS, ui.Normal, "text-subtle", v).A(f.util()))
+	}
+	return out
 }
 
 func quitar(l []string, s string) []string {
@@ -893,6 +984,7 @@ func (f *formulario) anadirInvitado(bruto string) {
 	f.correo.PonerTexto("")
 	f.errCorreo, f.correo.Invalida = "", false
 	f.rehacer()
+	f.invitadosCambiaron()
 }
 
 // pie es el de EventModal: «Eliminar» a la izquierda al editar, y «Cancelar» y
@@ -918,6 +1010,9 @@ func (f *formulario) pie() fyne.CanvasObject {
 func (f *formulario) inertes() {
 	for _, e := range []*ui.Entrada{f.titulo, f.inicio, f.fin, f.lugar, f.correo, f.cuenta, f.hasta} {
 		e.Inerte(true)
+	}
+	if f.enlace != nil {
+		f.enlace.Inerte(true)
 	}
 	for _, s := range []*ui.Selector{f.calendario, f.zona, f.repetir, f.finSerie} {
 		s.Inerte(true)
@@ -973,8 +1068,12 @@ func (f *formulario) enviar() {
 		f.rehacer()
 		return
 	}
-	// Un correo tecleado y sin confirmar: se añade si vale y, si no, se para aquí.
-	if borrador := strings.TrimSpace(f.correo.Texto()); borrador != "" {
+	if !f.invitaAqui() {
+		// Sin personas, en un calendario donde no se puede invitar: los invitados son los
+		// que traía el evento (los que se añadieran en otro calendario no se guardan).
+		f.e.Invitados = slices.Clone(f.invitadosIniciales)
+	} else if borrador := strings.TrimSpace(f.correo.Texto()); borrador != "" {
+		// Un correo tecleado y sin confirmar: se añade si vale y, si no, se para aquí.
 		if !correoValido.MatchString(borrador) {
 			f.errCorreo, f.correo.Invalida = p.t("event.guestInvalid", nil), true
 			f.rehacer()
@@ -989,6 +1088,8 @@ func (f *formulario) enviar() {
 	if len(f.e.Recursos) > 0 && f.e.UID == "" {
 		f.e.UID = nuevoUID()
 	}
+	// La reunión pedida al proveedor del calendario va con el UID del evento.
+	f.pedirReunion()
 	f.ocupar(f.guardar, true)
 	f.a.Guardar(f.e, func(ok bool) {
 		f.ocupar(f.guardar, false)
@@ -1015,6 +1116,8 @@ func (f *formulario) borrar() {
 // EntradaDe es lo que se manda al servicio: el evento ENTERO, porque el PUT sustituye.
 // Parte del evento guardado cuando se edita, para no perder lo que el formulario no
 // enseña (el organizador, el estado, la transparencia, los PARTSTAT de los invitados).
+//
+//nolint:gocyclo // Copia campo a campo el evento entero para el PUT, que sustituye: partirla es repartir la misma copia.
 func (e Edicion) EntradaDe(p *Pantalla) api.EventInput {
 	in := api.EventInput{}
 	if e.O != nil {
@@ -1043,15 +1146,32 @@ func (e Edicion) EntradaDe(p *Pantalla) api.EventInput {
 		in.Start, in.End, in.TZID = ini, ultimo.AddDate(0, 0, 1), ""
 	} else {
 		// La hora del formulario es la de PARED en la zona elegida.
-		loc, err := time.LoadLocation(e.Zona)
-		if err != nil {
-			loc = p.zona()
-		}
+		loc := e.zonaDe(p)
 		pared := func(t time.Time) time.Time {
 			t = t.In(p.zona())
 			return time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), 0, 0, loc)
 		}
 		in.Start, in.End, in.TZID = pared(e.Inicio), pared(e.Fin), e.Zona
+		if o := e.O; o != nil && !o.Event.AllDay && (e.Zona == o.Event.TZID || o.Event.TZID == "" && e.Zona == p.nombreZona()) {
+			// Con la zona de siempre, lo que no se ha tocado se queda en su instante tal
+			// cual: una hora de pared que no existe en la zona de visualización (la que
+			// se salta al pasar al horario de verano) o que existe dos veces (la que se
+			// repite al volver) no se puede llevar en los campos sin moverse una hora.
+			ini, fin := p.camposDe(*o)
+			if mismaPared(e.Inicio, ini, p.zona()) {
+				in.Start = o.Start
+			}
+			if mismaPared(e.Fin, fin, p.zona()) {
+				in.End = o.End
+			}
+			if o.Event.TZID == "" {
+				// Un evento sin zona (las horas en UTC de un .ics importado o de otro
+				// cliente) se queda sin ella si no se elige otra: ponerle la de
+				// visualización, que es la que enseña el formulario, movería las
+				// repeticiones de una serie que caen al otro lado de un cambio de hora.
+				in.TZID = ""
+			}
+		}
 	}
 	in.RRule = ""
 	switch {
@@ -1073,7 +1193,9 @@ func (e Edicion) EntradaDe(p *Pantalla) api.EventInput {
 		}
 		in.Attendees = append(in.Attendees, a)
 	}
-	in.Send = len(in.Attendees) > 0
+	// Sin personas (Sytue Office) no se manda nada a nadie: los invitados que trajera el
+	// evento se conservan, pero guardarlo no es invitarlos.
+	in.Send = len(in.Attendees) > 0 && !p.SinPersonas
 	// Sin saber los recordatorios, no viajan y el servicio conserva los que hubiera; si
 	// se saben —aunque sean cero—, sustituyen a los que la web deja editar.
 	in.Reminders = nil
@@ -1108,12 +1230,54 @@ func finInclusivo(inicio, fin time.Time) time.Time {
 	return inicio
 }
 
+// zonaDe es la zona en la que se lee la hora de pared de los campos: la de `Zona` o, si
+// está vacía o no se conoce, la de visualización.
+func (e Edicion) zonaDe(p *Pantalla) *time.Location {
+	if e.Zona != "" {
+		if loc, err := time.LoadLocation(e.Zona); err == nil {
+			return loc
+		}
+	}
+	return p.zona()
+}
+
+// enLaPared es `t` con la hora de pared que tiene en la zona `de`, puesta en la zona `a`.
+func enLaPared(t time.Time, de, a *time.Location) time.Time {
+	if t.IsZero() {
+		return t
+	}
+	t = t.In(de)
+	return time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), a)
+}
+
+// mismaPared dice si `a` y `b` dicen el mismo día y la misma hora y minuto en `loc`, que
+// es lo que dicen los campos.
+func mismaPared(a, b time.Time, loc *time.Location) bool {
+	a, b = a.In(loc), b.In(loc)
+	return a.Year() == b.Year() && a.YearDay() == b.YearDay() && a.Hour() == b.Hour() && a.Minute() == b.Minute()
+}
+
+// camposDe son el inicio y el fin de la ocurrencia como los enseñan los campos (Edicion).
+// Un evento con hora, con la hora de pared de SU zona —la que dice «Zona horaria», y en la
+// que EntradaDe la vuelve a leer—, se pinte en la zona que se pinte: uno de las 10:00 de
+// Madrid abierto con la pantalla en UTC dice 10:00, y guardarlo sin tocar nada lo deja
+// donde estaba. Antes decía 09:00 y se guardaba a las 09:00 de Madrid.
+func (p *Pantalla) camposDe(o Ocurrencia) (ini, fin time.Time) {
+	ini, fin = ocurrenciaInstantes(o, p.zona())
+	switch {
+	case o.Event.AllDay:
+		// Flotante: el mismo día en cualquier zona (ocurrenciaInstantes).
+		fin = finInclusivo(ini, fin)
+	case o.Event.TZID != "":
+		loc := Edicion{Zona: o.Event.TZID}.zonaDe(p)
+		ini, fin = enLaPared(ini, loc, p.zona()), enLaPared(fin, loc, p.zona())
+	}
+	return ini, fin
+}
+
 // EdicionDe es `editingDe`: la ocurrencia tal y como la entiende el formulario.
 func (p *Pantalla) EdicionDe(o Ocurrencia) Edicion {
-	ini, fin := ocurrenciaInstantes(o, p.zona())
-	if o.Event.AllDay {
-		fin = finInclusivo(ini, fin)
-	}
+	ini, fin := p.camposDe(o)
 	e := Edicion{
 		O: &o, CalendarioID: o.CalendarioID, Titulo: o.Event.Summary,
 		Inicio: ini, Fin: fin, TodoElDia: o.Event.AllDay, Zona: o.Event.TZID,

@@ -3,14 +3,11 @@ package integrationshttp
 
 import (
 	"context"
-	"net/http"
-	"net/url"
 	"strings"
-	"time"
 
 	"github.com/google/uuid"
 
-	"git.sytue.eu/sytue/one/apps/nucleo/htmltext"
+	cuentaschat "git.sytue.eu/sytue/one/apps/nucleo/cuentas/chat"
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/services/integrations/internal/connector"
 )
@@ -34,34 +31,20 @@ func externalTeamsChannels(ctx context.Context, rt connector.Runtime, cursor str
 	if !ok {
 		return page, httpx.ErrBadRequest
 	}
-	var out struct {
-		Value []struct {
-			ID      string `json:"id"`
-			Topic   string `json:"topic"`
-			Type    string `json:"chatType"` //nolint:tagliatelle // Graph contract
-			Members []struct {
-				DisplayName string `json:"displayName"` //nolint:tagliatelle // Graph contract
-			} `json:"members"`
-		} `json:"value"`
-		Next string `json:"@odata.nextLink"` //nolint:tagliatelle // Graph contract
+	chats, next, err := roomsGraph(rt).PaginaChats(ctx, token)
+	if err != nil {
+		return page, roomsProviderError(err)
 	}
-	q := url.Values{"$top": {"50"}, "$expand": {"members"}}
-	if token != "" {
-		q.Set("$skiptoken", token)
-	}
-	if err := roomsProviderJSON(ctx, rt, http.MethodGet, roomsGraphAPI+"/me/chats?"+q.Encode(), nil, &out); err != nil {
-		return page, err
-	}
-	for _, chat := range out.Value {
+	for _, chat := range chats {
 		if !externalTeamsChatID(chat.ID) {
 			continue
 		}
-		name := chat.Topic
+		name := chat.Tema
 		if name == "" {
 			names := []string{}
-			for _, member := range chat.Members {
-				if member.DisplayName != "" {
-					names = append(names, member.DisplayName)
+			for _, member := range chat.Miembros {
+				if member.Nombre != "" {
+					names = append(names, member.Nombre)
 				}
 			}
 			name = strings.Join(names, ", ")
@@ -72,7 +55,7 @@ func externalTeamsChannels(ctx context.Context, rt connector.Runtime, cursor str
 		remote := "chat/" + chat.ID
 		page.Items = append(page.Items, externalChannel{ID: remote, Name: name, Kind: "direct", Capabilities: externalCapabilities("microsoft-teams", remote)})
 	}
-	next, err := externalGraphNext(out.Next, "/v1.0/me/chats")
+	next, err = externalGraphNext(next, "/v1.0/me/chats")
 	if err != nil {
 		return page, err
 	}
@@ -82,59 +65,25 @@ func externalTeamsChannels(ctx context.Context, rt connector.Runtime, cursor str
 	return page, nil
 }
 
-func externalTeamsChatID(id string) bool {
-	return id != "" && len(id) <= 512 && !strings.ContainsAny(id, "/?#\r\n\x00")
-}
+// Las comprobaciones de los identificadores, la ruta de los mensajes y el mensaje de
+// Graph viven en el núcleo (`apps/nucleo/cuentas/chat`, RO-01), que también usa Sytue
+// Office: aquí solo se traduce su error de entrada al de la pasarela.
+func externalTeamsChatID(id string) bool { return cuentaschat.IDChatTeamsValido(id) }
 
 func externalTeamsPath(remote, thread string) (string, error) {
-	if chat, ok := strings.CutPrefix(remote, "chat/"); ok {
-		if !externalTeamsChatID(chat) || thread != "" {
-			return "", httpx.ErrBadRequest
-		}
-		return "/chats/" + url.PathEscape(chat) + "/messages", nil
-	}
-	if !validRoomsTeamsID(remote) {
+	path, err := cuentaschat.RutaMensajesTeams(remote, thread)
+	if err != nil {
 		return "", httpx.ErrBadRequest
-	}
-	team, channel, _ := strings.Cut(remote, "/")
-	path := "/teams/" + url.PathEscape(team) + "/channels/" + url.PathEscape(channel) + "/messages"
-	if thread != "" {
-		if !externalTeamsMessageID(thread) {
-			return "", httpx.ErrBadRequest
-		}
-		path += "/" + url.PathEscape(thread) + "/replies"
 	}
 	return path, nil
 }
 
-func externalTeamsMessageID(id string) bool {
-	return id != "" && len(id) <= 128 && !strings.ContainsAny(id, "/?#\r\n\x00")
-}
+func externalTeamsMessageID(id string) bool { return cuentaschat.IDMensajeTeamsValido(id) }
 
-type teamsExternalMessage struct {
-	ID      string     `json:"id"`
-	Created time.Time  `json:"createdDateTime"`    //nolint:tagliatelle // Graph contract
-	Edited  *time.Time `json:"lastEditedDateTime"` //nolint:tagliatelle // Graph contract
-	Deleted *time.Time `json:"deletedDateTime"`    //nolint:tagliatelle // Graph contract
-	ReplyTo string     `json:"replyToId"`          //nolint:tagliatelle // Graph contract
-	From    struct {
-		User struct {
-			ID   string `json:"id"`
-			Name string `json:"displayName"` //nolint:tagliatelle // Graph contract
-		} `json:"user"`
-	} `json:"from"`
-	Body struct {
-		Type    string `json:"contentType"` //nolint:tagliatelle // Graph contract
-		Content string `json:"content"`
-	} `json:"body"`
-}
+type teamsExternalMessage = cuentaschat.MensajeGraph
 
 func externalTeamsMessageDTO(msg teamsExternalMessage, remote, self string) externalMessage {
-	text := msg.Body.Content
-	if msg.Body.Type == "html" {
-		text = htmltext.Text(text)
-	}
-	return externalMessage{ID: msg.ID, RemoteID: remote, AuthorID: msg.From.User.ID, AuthorName: msg.From.User.Name, Text: text, CreatedAt: msg.Created, Edited: msg.Edited != nil, ThreadID: msg.ReplyTo, Owned: self != "" && msg.From.User.ID == self}
+	return externalMessage{ID: msg.ID, RemoteID: remote, AuthorID: msg.From.User.ID, AuthorName: msg.From.User.Name, Text: msg.Texto(), CreatedAt: msg.Created, Edited: msg.Edited != nil, ThreadID: msg.ReplyTo, Owned: self != "" && msg.From.User.ID == self}
 }
 
 func externalTeamsMessages(ctx context.Context, conn connector.Instance, rt connector.Runtime, remote, cursor, thread string) (externalMessagePage, error) {
@@ -142,31 +91,27 @@ func externalTeamsMessages(ctx context.Context, conn connector.Instance, rt conn
 	if err != nil {
 		return externalMessagePage{}, err
 	}
-	var out struct {
-		Value []teamsExternalMessage `json:"value"`
-		Next  string                 `json:"@odata.nextLink"` //nolint:tagliatelle // Graph contract
-	}
-	if err := roomsProviderJSON(ctx, rt, http.MethodGet, externalGraphTarget(path, cursor), nil, &out); err != nil {
-		return externalMessagePage{}, err
+	msgs, next, err := roomsGraph(rt).PaginaMensajes(ctx, remote, thread, cursor, externalGraphPage)
+	if err != nil {
+		return externalMessagePage{}, roomsProviderError(err)
 	}
 	page := externalMessagePage{Items: []externalMessage{}}
-	for _, msg := range out.Value {
+	for _, msg := range msgs {
 		if msg.Deleted == nil {
 			page.Items = append(page.Items, externalTeamsMessageDTO(msg, remote, conn.Config["_external_user_id"]))
 		}
 	}
-	page.NextCursor, err = externalGraphNext(out.Next, "/v1.0"+path)
+	page.NextCursor, err = externalGraphNext(next, "/v1.0"+path)
 	return page, err
 }
 
 func externalTeamsSend(ctx context.Context, conn connector.Instance, rt connector.Runtime, in externalWrite) (externalMessage, error) {
-	path, err := externalTeamsPath(in.RemoteID, in.ThreadID)
-	if err != nil {
+	if _, err := externalTeamsPath(in.RemoteID, in.ThreadID); err != nil {
 		return externalMessage{}, err
 	}
-	var out teamsExternalMessage
-	if err := roomsProviderJSON(ctx, rt, http.MethodPost, roomsGraphAPI+path, map[string]any{"body": map[string]string{"contentType": "text", "content": in.Text}}, &out); err != nil {
-		return externalMessage{}, err
+	out, err := roomsGraph(rt).Enviar(ctx, in.RemoteID, in.ThreadID, in.Text)
+	if err != nil {
+		return externalMessage{}, roomsProviderError(err)
 	}
 	return externalTeamsMessageDTO(out, in.RemoteID, conn.Config["_external_user_id"]), nil
 }
@@ -175,17 +120,15 @@ func externalTeamsAction(ctx context.Context, conn connector.Instance, rt connec
 	if !strings.HasPrefix(in.RemoteID, "chat/") || !externalTeamsMessageID(in.MessageID) {
 		return httpx.ErrBadRequest
 	}
-	path, err := externalTeamsPath(in.RemoteID, "")
-	if err != nil {
+	if _, err := externalTeamsPath(in.RemoteID, ""); err != nil {
 		return err
 	}
-	target := roomsGraphAPI + path + "/" + url.PathEscape(in.MessageID)
 	if in.Action == "delete" {
 		self := conn.Config["_external_user_id"]
 		if _, err := uuid.Parse(self); err != nil {
 			return httpx.ErrForbidden
 		}
-		return roomsProviderJSON(ctx, rt, http.MethodPost, roomsGraphAPI+"/users/"+url.PathEscape(self)+path+"/"+url.PathEscape(in.MessageID)+"/softDelete", nil, nil)
+		return roomsProviderError(roomsGraph(rt).Borrar(ctx, self, in.RemoteID, in.MessageID))
 	}
-	return roomsProviderJSON(ctx, rt, http.MethodPatch, target, map[string]any{"body": map[string]string{"contentType": "text", "content": in.Text}}, nil)
+	return roomsProviderError(roomsGraph(rt).Editar(ctx, in.RemoteID, in.MessageID, in.Text))
 }

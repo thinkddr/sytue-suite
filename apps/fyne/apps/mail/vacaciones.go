@@ -93,6 +93,25 @@ type dialogoVacaciones struct {
 	previoCuerpo *fyne.Container
 
 	cancelar, guardar *ui.Boton
+
+	// La respuesta automática por cuenta, en el servidor de cada una (la edición local,
+	// api.MailRespuestas; respuesta_cuenta.go). Con porCuenta nil todo lo de aquí abajo
+	// se queda en su valor cero y el diálogo es el de siempre.
+	porCuenta api.MailRespuestas
+	// cuentas son las que tienen servidor Sieve y cuenta, la elegida; actual, lo último
+	// que contestó su servidor.
+	cuentas []api.MailAlias
+	cuenta  string
+	actual  api.MailRespuesta
+	// grupoCuenta es el selector de la cuenta (o su dirección, si solo hay una), encima
+	// del cuerpo; nota, los avisos de esa cuenta; dias, cada cuántos días a la misma
+	// persona; cajaFechas, las dos fechas (se ocultan si el servidor no las admite).
+	grupoCuenta *fyne.Container
+	selCuenta   *ui.Selector
+	nota        *fyne.Container
+	dias        *ui.Entrada
+	grupoDias   *fyne.Container
+	cajaFechas  *fyne.Container
 }
 
 // verVacaciones abre la autorespuesta. Devuelve el diálogo para las pruebas.
@@ -104,6 +123,15 @@ func (b *Buzon) verVacaciones() *dialogoVacaciones {
 	t := b.P.T
 	g := &dialogoVacaciones{b: b, ancho: AnchoCuerpoDialogo(ui.DialogoMD, lienzo.Size().Width)}
 	g.caja = container.New(ui.Columna{})
+	if rs, ok := b.S.(api.MailRespuestas); ok {
+		// Por cuenta: solo las que contestaron como servidor Sieve al abrir los Ajustes.
+		g.porCuenta, g.cuentas = rs, b.cuentasConAutorespuesta()
+		if len(g.cuentas) == 0 {
+			return nil
+		}
+		g.cuenta = g.cuentas[0].ID
+		g.caja = container.New(ui.Columna{Hueco: tema.Espacio(5)})
+	}
 	g.montar(lienzo.Size().Width)
 	g.cancelar = ui.NuevoBoton(t.T("common.cancel", nil), func() { g.d.Cerrar() }).Con(ui.Fantasma, ui.TallaMD)
 	g.guardar = ui.NuevoBoton(t.T("common.save", nil), g.salvar).Con(ui.Primario, ui.TallaMD)
@@ -177,6 +205,10 @@ func (g *dialogoVacaciones) montar(ventana float32) {
 		enCajaDe(tema.Color("bg-subtle", v), v, container.New(margen(tema.Espacio(3)),
 			container.New(ui.Columna{Hueco: tema.Espacio(1.5)}, g.previoAsunto, g.previoCuerpo))))
 
+	if g.porCuenta != nil {
+		g.montarCuenta(campo, estado, fechas, previo)
+		return
+	}
 	g.form = container.New(ui.Columna{Hueco: tema.Espacio(5)},
 		ui.NuevaAyudaEnLinea(t.T("vacation.explainBody", nil)).ConTono(ui.AyudaInfo).ConTitulo(t.T("vacation.explainTitle", nil)),
 		estado,
@@ -189,6 +221,10 @@ func (g *dialogoVacaciones) montar(ventana float32) {
 func (g *dialogoVacaciones) cargar() {
 	g.estado = Cargando
 	g.pintar()
+	if g.porCuenta != nil {
+		g.cargarCuenta()
+		return
+	}
 	pedir(g.b, g.b.S.Vacation, func(v api.MailVacation, err error) {
 		if err != nil {
 			g.estado = Error
@@ -251,9 +287,12 @@ func (g *dialogoVacaciones) pintar() {
 		g.repintarFormulario()
 		cuerpo = g.form
 	}
-	g.guardar.Inerte = g.estado != Listo || g.alReves()
+	g.guardar.Inerte = g.estado != Listo || g.alReves() || g.noSeGuarda()
 	g.guardar.Refresh()
 	g.caja.Objects = []fyne.CanvasObject{cuerpo}
+	if g.grupoCuenta != nil {
+		g.caja.Objects = []fyne.CanvasObject{g.grupoCuenta, cuerpo}
+	}
 	g.caja.Refresh()
 	if g.d != nil {
 		g.d.Recolocar() // el diálogo se vuelve a medir con su contenido nuevo
@@ -316,6 +355,9 @@ func (g *dialogoVacaciones) repintarFormulario() {
 	}
 	g.previoCuerpo.Objects = lineas
 	g.previoCuerpo.Refresh()
+	if g.porCuenta != nil {
+		g.repintarCuenta()
+	}
 }
 
 // ponerPista cambia la pista del grupo (su último hijo). Se cambia la pieza y no su
@@ -333,6 +375,10 @@ func ponerPista(grupo *fyne.Container, texto string, tono ui.TonoAyuda, ancho fl
 
 // salvar es `handleSave`. Nunca sin una carga buena ni con el rango al revés.
 func (g *dialogoVacaciones) salvar() {
+	if g.porCuenta != nil {
+		g.salvarCuenta()
+		return
+	}
 	if g.estado != Listo || g.alReves() || g.guardar.Cargando {
 		return
 	}

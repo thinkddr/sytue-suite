@@ -11,8 +11,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"git.sytue.eu/sytue/one/services/syerp/internal/catalogo"
-	"git.sytue.eu/sytue/one/services/syerp/internal/domain"
+	"git.sytue.eu/sytue/one/apps/nucleo/erp/catalogo"
+	domain "git.sytue.eu/sytue/one/apps/nucleo/erp/dominio"
 )
 
 // Asiento es un apunte doble tal como sale a la API.
@@ -99,7 +99,7 @@ func (s *Store) asentarEn(ctx context.Context, tx pgx.Tx, m *catalogo.Modelo, id
 		return err
 	}
 
-	ref, err := reservarRef(ctx, tx, "asiento:"+a.Diario, prefijoDiario(a.Diario),
+	ref, err := reservarRef(ctx, tx, "asiento:"+a.Diario, domain.PrefijoDiario(a.Diario),
 		fmt.Sprintf("%04d", a.Fecha.Year()))
 	if err != nil {
 		return err
@@ -357,25 +357,4 @@ func (s *Store) AsientosDe(ctx context.Context, modelo, documentoID string) ([]A
 		return nil, ErrNoEncontrado
 	}
 	return out, err
-}
-
-// prefijoDiario convierte el nombre del diario en el prefijo de sus asientos
-// (ventas → VENTAS-2026-00001). Seis letras como mucho, que es lo que admite la
-// forma de la referencia.
-func prefijoDiario(diario string) string {
-	p := ""
-	for _, r := range diario {
-		if r >= 'a' && r <= 'z' {
-			p += string(r - 32)
-		} else if r >= 'A' && r <= 'Z' {
-			p += string(r)
-		}
-		if len(p) == 6 {
-			break
-		}
-	}
-	if len(p) < 2 {
-		return "DIARIO"
-	}
-	return p
 }

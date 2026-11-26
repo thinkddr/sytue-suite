@@ -18,6 +18,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	nucleoia "git.sytue.eu/sytue/one/apps/nucleo/ia"
 )
 
 // maxRespuesta acota el cuerpo que se deserializa del servicio de IA.
@@ -111,19 +113,10 @@ func (c *Cliente) Pedir(ctx context.Context, token string, p Peticion) (string, 
 	return r.Text, nil
 }
 
-// JSON recorta el objeto JSON de una respuesta del modelo.
-//
-// Existe porque el modelo pone el vallado ```json … ``` aunque se le diga que no,
-// y porque a veces antepone «Aquí tienes:». Se toma del primer `{` al último `}`:
-// es tosco y es exactamente lo que hace falta. Vacío si no hay objeto.
-func JSON(s string) string {
-	i := strings.Index(s, "{")
-	j := strings.LastIndex(s, "}")
-	if i < 0 || j <= i {
-		return ""
-	}
-	return s[i : j+1]
-}
+// JSON recorta el objeto JSON de una respuesta del modelo (del primer `{` al último
+// `}`; vacío si no hay objeto). La implementación es la de apps/nucleo/ia, que comparten
+// los clientes.
+func JSON(s string) string { return nucleoia.JSON(s) }
 
 // Identidad identifica al usuario y organización para los que se ejecuta el trabajo (§9.1).
 // La identidad va afirmada en cabeceras X-Sytue-Tenant y X-Sytue-Sub.

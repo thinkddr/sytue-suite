@@ -93,7 +93,7 @@ func (p *Pantalla) ficha() fyne.CanvasObject {
 		// «Selecciona un contacto», con la ilustración de la web y su acción de crear.
 		x := ui.NuevoVacio(p.t("detail.emptyTitle", nil), p.t("detail.emptyDescription", nil))
 		x.Ilustracion = iconos.Pintar(iconos.VacioContactos, v).Objeto()
-		if !p.SinConexion && p.Activa != nil {
+		if p.escribe() && p.Activa != nil {
 			x.Accion = ui.NuevoBoton(p.t("nav.newContact", nil), p.AlCrearContacto).
 				Con(ui.Primario, ui.TallaSM).ConIcono(iconos.Mas, 0)
 		}
@@ -217,7 +217,7 @@ func (p *Pantalla) accionesFicha(c api.Contact) fyne.CanvasObject {
 			}
 		}).Con(ui.Secundario, ui.TallaSM))
 	}
-	if !p.SinConexion {
+	if p.escribe() {
 		acciones = append(acciones, ui.NuevoBoton(p.t("common.edit", nil), func() {
 			if p.AlEditar != nil {
 				p.AlEditar(c)
@@ -262,7 +262,7 @@ func (p *Pantalla) elementosMas(c api.Contact, correo string) []fyne.CanvasObjec
 	if p.AlCompartir != nil {
 		accion("detail.shareByEmail", func() { p.AlCompartir(c) })
 	}
-	if p.AlCombinar != nil && !p.SinConexion && p.Total > 1 {
+	if p.AlCombinar != nil && p.escribe() && p.Total > 1 {
 		accion("detail.merge", func() { p.AlCombinar(c) })
 	}
 	return e
@@ -546,7 +546,7 @@ func (p *Pantalla) etiquetasDe(c api.Contact) fyne.CanvasObject {
 			libres = append(libres, g)
 		}
 	}
-	escribe := p.AlEtiquetar != nil && !p.SinConexion
+	escribe := p.AlEtiquetar != nil && p.escribe()
 	ocupada := p.EtiquetaOcupada != ""
 	var hijos []fyne.CanvasObject
 	if len(miembro) == 0 {
@@ -865,7 +865,7 @@ func (a *acotado) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 func (p *Pantalla) avatarDeFicha(c api.Contact) fyne.CanvasObject {
 	av := ui.NuevoAvatar(c.DisplayName()).Con(ui.AvatarXL)
 	av.Foto = p.Foto
-	if p.SinConexion {
+	if !p.escribe() {
 		return av
 	}
 	s := ui.NuevoSelectorAvatar(av)

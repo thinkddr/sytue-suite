@@ -9,7 +9,6 @@ import (
 	"fyne.io/fyne/v2"
 
 	"git.sytue.eu/sytue/one/apps/fyne/iconos"
-	"git.sytue.eu/sytue/one/apps/fyne/sesion"
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 )
@@ -32,6 +31,6 @@ func NuevaPaginaSinSesion(t *i18n.Translator, entrar func()) fyne.CanvasObject {
 
 // entrarDesde es el botón de la página: Entrar bloquea hasta volver del navegador, así
 // que va en su goroutine. Su error ya lo deja escrito `sesion.Entrar`.
-func entrarDesde(s *sesion.Suite) func() {
+func entrarDesde(s *suiteSesion) func() {
 	return func() { go func() { _ = s.Entrar(context.Background()) }() }
 }

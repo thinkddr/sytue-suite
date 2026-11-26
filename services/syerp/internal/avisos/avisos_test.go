@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"git.sytue.eu/sytue/one/services/syerp/internal/obligaciones"
+	"git.sytue.eu/sytue/one/apps/nucleo/erp/obligaciones"
 )
 
 func TestTocanYCorreo(t *testing.T) {

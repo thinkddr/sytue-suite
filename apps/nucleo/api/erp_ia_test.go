@@ -144,11 +144,11 @@ func TestERPIAHablaElIdiomaDelServicio(t *testing.T) {
 			`json:"existente,omitempty"`, `json:"enlaces,omitempty"`, `json:"faltan,omitempty"`,
 			`json:"tarea,omitempty"`, `"creados": creados, "actividades": actividades`,
 		},
-		"services/syerp/internal/ia/informe.go": {
+		"apps/nucleo/erp/ia/informe.go": {
 			`json:"columnas"`, `json:"filas"`, `json:"recortada,omitempty"`, `json:"error,omitempty"`,
 			`json:"titulo"`, `json:"vista"`, `json:"consulta"`,
 		},
-		"services/syerp/internal/ia/acciones.go": {`json:"resumen"`, `json:"avisos,omitempty"`},
+		"apps/nucleo/erp/ia/acciones.go": {`json:"resumen"`, `json:"avisos,omitempty"`},
 	} {
 		codigo := webref.Read(t, fichero)
 		for _, l := range literales {

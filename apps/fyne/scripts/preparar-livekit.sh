@@ -7,6 +7,9 @@ set -euo pipefail
 
 AQUI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RAIZ="$(cd "$AQUI/../../.." && pwd)"
+# Sin LiveKit en el go.mod no hay nada que preparar: es un árbol autónomo de Sytue Office
+# (con `edicionlocal` las llamadas son su API vacía y su go.mod no lo pide). empaquetar.sh y accion.sh llaman a este guion siempre.
+grep -qE '^[[:space:]]*(require[[:space:]]+)?github\.com/livekit/server-sdk-go/v2[[:space:]]+v' "$AQUI/../go.mod" || exit 0
 # shellcheck source=/dev/null
 . "$RAIZ/deploy/sytue-git/versions.env"
 version="${LIVEKIT_GO_VERSION:?falta LIVEKIT_GO_VERSION}"

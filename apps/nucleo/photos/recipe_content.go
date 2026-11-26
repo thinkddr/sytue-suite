@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"path/filepath"
 	"strings"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/photos/model"
@@ -71,6 +72,25 @@ func (r *Repository) captureRecipeOrigin(ctx context.Context, id, base, operatio
 	}
 	version, err := r.engine.ReadyVersion("original", id)
 	if errors.Is(err, ErrNotFound) {
+		if raw, err := r.engine.ReadRaw(ctx, "asset", id); err == nil {
+			_, externa, err := r.externalAsset(raw)
+			clear(raw)
+			if err != nil {
+				return recipeOrigin{}, err
+			}
+			if externa != nil {
+				// Foto enlazada (FO-09): la receta lee el original de su fichero.
+				if esVideo(asset.MediaType) {
+					return recipeOrigin{}, model.ErrInvalidInput
+				}
+				descriptor := records.SnapshotRow{Kind: "original", ID: id, Size: externa.Request.Size, SHA256: externa.Request.SHA256}
+				return recipeOrigin{Version: 1, Scope: r.scope, Target: target, Base: base, Operation: operation, Asset: asset, Descriptor: descriptor, Externo: externa.Path}, nil
+			}
+		}
+		// Un vídeo copiado a la fototeca (ImportarVideo, FO-09) tampoco se edita.
+		if esVideo(asset.MediaType) {
+			return recipeOrigin{}, model.ErrInvalidInput
+		}
 		// Foto ingestada en este dispositivo: su original vive enlazado desde la
 		// fila media, no como entrada binaria del catálogo.
 		file, err := r.linkedOriginal(ctx, id)
@@ -172,6 +192,9 @@ func (r *Repository) prepareRecipeContent(ctx context.Context, raw, captured []b
 }
 
 func (r *Repository) capturedOriginal(ctx context.Context, origin recipeOrigin) ([]byte, error) {
+	if origin.Externo != "" {
+		return leerExterno(ctx, origin.Externo, origin.Descriptor.Size, origin.Descriptor.SHA256, photorender.MaxOriginal)
+	}
 	if origin.Retained != nil {
 		body := storage.PipeRead(ctx, nil, func(ctx context.Context, out io.Writer) error {
 			return r.engine.ReadRetainedFile(ctx, *origin.Retained, out)
@@ -238,14 +261,30 @@ func (r *Repository) validatePreparedRecipe(ctx context.Context, raw, captured [
 }
 
 func validRecipeOriginal(origin recipeOrigin, asset string) bool {
+	if origin.Externo != "" {
+		return validExternalRecipeOriginal(origin, asset)
+	}
 	if origin.Retained != nil {
-		// El original retenido no puede venir mezclado con una entrada de catálogo.
-		file := *origin.Retained
-		empty := origin.Original.Kind == "" && origin.Original.ID == "" && !origin.Original.Binary
-		return empty && origin.Original.Version.Commit.Metadata == nil && origin.Original.Version.Reference == (storage.Reference{}) &&
-			file.Version == 1 && file.Scope == origin.Scope && file.Target == origin.Target && file.Row.Kind == "original" &&
-			file.Row.ID == asset && file.Row.Validate() == nil && file.Row.Size == origin.Asset.Bytes &&
-			origin.Descriptor == file.Row
+		return validRetainedRecipeOriginal(origin, asset)
 	}
 	return origin.Original.Binary && origin.Original.Kind == "original" && origin.Original.ID == asset && origin.Descriptor.Kind == "original" && origin.Descriptor.ID == asset && origin.Descriptor.Size == origin.Asset.Bytes && origin.Descriptor.Validate() == nil
+}
+
+// validExternalRecipeOriginal es el original de una foto enlazada (FO-09), que se lee de
+// su fichero: no puede venir mezclado con un retenido ni con una entrada de catálogo.
+func validExternalRecipeOriginal(origin recipeOrigin, asset string) bool {
+	empty := origin.Original.Kind == "" && origin.Original.ID == "" && !origin.Original.Binary && origin.Original.Version.Reference == (storage.Reference{})
+	return empty && origin.Retained == nil && filepath.IsAbs(origin.Externo) && origin.Descriptor.Kind == "original" &&
+		origin.Descriptor.ID == asset && origin.Descriptor.Size == origin.Asset.Bytes && origin.Descriptor.Validate() == nil
+}
+
+// validRetainedRecipeOriginal es el original retenido: no puede venir mezclado con una
+// entrada de catálogo.
+func validRetainedRecipeOriginal(origin recipeOrigin, asset string) bool {
+	file := *origin.Retained
+	empty := origin.Original.Kind == "" && origin.Original.ID == "" && !origin.Original.Binary
+	return empty && origin.Original.Version.Commit.Metadata == nil && origin.Original.Version.Reference == (storage.Reference{}) &&
+		file.Version == 1 && file.Scope == origin.Scope && file.Target == origin.Target && file.Row.Kind == "original" &&
+		file.Row.ID == asset && file.Row.Validate() == nil && file.Row.Size == origin.Asset.Bytes &&
+		origin.Descriptor == file.Row
 }

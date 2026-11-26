@@ -12,8 +12,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"git.sytue.eu/sytue/one/services/syerp/internal/catalogo"
-	"git.sytue.eu/sytue/one/services/syerp/internal/domain"
+	"git.sytue.eu/sytue/one/apps/nucleo/erp/catalogo"
+	domain "git.sytue.eu/sytue/one/apps/nucleo/erp/dominio"
 )
 
 // ConvertirVenta crea el siguiente documento en una transacción y conserva su
@@ -72,7 +72,7 @@ func (s *Store) ConvertirVenta(ctx context.Context, cat *catalogo.Catalogo, mode
 		if err != nil {
 			return err
 		}
-		return comprobarImportesVenta(origen, grupos)
+		return domain.ComprobarImportesVenta(origen.Data, grupos)
 	})
 	return out, traducirError(err)
 }
@@ -148,33 +148,4 @@ func copiarLineasVenta(ctx context.Context, tx pgx.Tx, cat *catalogo.Catalogo, o
 		}
 	}
 	return domain.Desglose(fiscales), nil
-}
-
-func comprobarImportesVenta(origen Registro, grupos []domain.GrupoIVA) error {
-	base, err := domain.Centimos(origen.Data, "base")
-	if err != nil {
-		return err
-	}
-	iva, err := domain.Centimos(origen.Data, "iva")
-	if err != nil {
-		return err
-	}
-	var bases, cuotas int64
-	for _, g := range grupos {
-		bases += g.Base
-		cuotas += g.Cuota
-	}
-	if len(grupos) > 0 && (base != bases || iva != cuotas) {
-		return fmt.Errorf("revisa la base y el IVA del documento: no coinciden con sus líneas: %w", domain.ErrDatos)
-	}
-	if origen.Data["total"] != nil {
-		total, err := domain.Centimos(origen.Data, "total")
-		if err != nil {
-			return err
-		}
-		if total != base+iva {
-			return fmt.Errorf("revisa el total del documento: no coincide con su base e IVA: %w", domain.ErrDatos)
-		}
-	}
-	return nil
 }

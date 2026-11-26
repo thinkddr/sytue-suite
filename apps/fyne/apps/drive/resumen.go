@@ -33,6 +33,12 @@ import (
 // ponytail: SOLO ficheros de texto, como la web: un PDF o un .docx necesitan un
 // extractor que la suite todavía no tiene.
 
+// Asistente es quien contesta a «Resumir»: `*api.IA` lo cumple, y en Sytue Office la IA de
+// la persona, con `FuncionIA` (PLAN §5.7, DR-10).
+type Asistente interface {
+	Asistir(context.Context, api.PeticionIA) (string, error)
+}
+
 // TopeResumen es lo que se lee del fichero: un resumen no mejora con más.
 const TopeResumen = 200 * 1024
 
@@ -127,7 +133,7 @@ func (dr *dialogoResumen) pedir() {
 
 // Resumir lee como mucho TopeResumen bytes del fichero y le pide a la IA la `accion`
 // («resumir» o «puntos»). Un fichero vacío es un fallo, como en la web (422).
-func Resumir(ctx context.Context, svc *api.Drive, cliente *api.IA, el Elemento, accion string) (string, error) {
+func Resumir(ctx context.Context, svc *api.Drive, cliente Asistente, el Elemento, accion string) (string, error) {
 	r, err := svc.Download(ctx, el.ID)
 	if err != nil {
 		return "", err

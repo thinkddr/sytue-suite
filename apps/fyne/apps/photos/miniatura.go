@@ -4,6 +4,7 @@
 package photos
 
 import (
+	"fmt"
 	"image"
 	"image/color"
 	"math"
@@ -257,6 +258,13 @@ func (m *Miniatura) CreateRenderer() fyne.WidgetRenderer {
 	r.fondoCandado = ui.NuevaCaja(negro60, color.NRGBA{}, tema.RadioPill)
 	r.candado = iconos.TrazoConTinta(iconos.Candado, iconoCandado, blanco)
 	r.aprox = ui.Texto("~", escalonAprox, ui.Normal, tema.Color("text-subtle", v))
+	// Lo de Sytue Office (FO-09): la duración de un vídeo y el aviso de un original
+	// enlazado que ya no está. En una foto de la conectada no se ven nunca.
+	r.fondoVideo = ui.NuevaCaja(negro60, color.NRGBA{}, tema.RadioPill)
+	r.video = iconos.TrazoConTinta(iconos.Video, iconoTesela, blanco)
+	r.duracion = ui.Texto(DuracionCorta(m.Foto.DurationMs), tema.TextoXS, ui.Medio, blanco)
+	r.fondoFalta = ui.NuevaCaja(negro60, color.NRGBA{}, tema.Forma("radius-control"))
+	r.falta = iconos.TrazoConTinta(iconos.Aviso, iconoTesela, blanco)
 	r.rehacer()
 	r.Refresh() // regla 7 de ui.go: sin esto la foto marcada nace sin su 70 %
 	return r
@@ -300,6 +308,11 @@ type miniaturaRenderer struct {
 	corazonLleno *iconos.Dibujo
 	fondoAprox   *ui.Caja
 	aprox        *canvas.Text
+	fondoVideo   *ui.Caja
+	video        *iconos.Dibujo
+	duracion     *canvas.Text
+	fondoFalta   *ui.Caja
+	falta        *iconos.Dibujo
 	// fondoCandado y candado son la marca de una foto cifrada.
 	fondoCandado *ui.Caja
 	candado      *iconos.Dibujo
@@ -321,6 +334,24 @@ func (r *miniaturaRenderer) rehacer() {
 	r.objetos = append(r.objetos, r.aprox)
 	r.objetos = append(r.objetos, r.fondoCandado.Objetos()...)
 	r.objetos = append(r.objetos, r.candado.Objeto())
+	r.objetos = append(r.objetos, r.fondoVideo.Objetos()...)
+	r.objetos = append(r.objetos, r.video.Objeto(), r.duracion)
+	r.objetos = append(r.objetos, r.fondoFalta.Objetos()...)
+	r.objetos = append(r.objetos, r.falta.Objeto())
+}
+
+// DuracionCorta es la duración de un vídeo como la enseña la tesela: «0:07», «12:34»,
+// «1:02:03». Vacía sin duración.
+func DuracionCorta(ms int64) string {
+	if ms <= 0 {
+		return ""
+	}
+	s := (ms + 500) / 1000
+	h, m, seg := s/3600, s/60%60, s%60
+	if h > 0 {
+		return fmt.Sprintf("%d:%02d:%02d", h, m, seg)
+	}
+	return fmt.Sprintf("%d:%02d", m, seg)
 }
 
 // generar es lo que Fyne le pide al raster: el mapa de bits en píxeles de DISPOSITIVO.
@@ -407,14 +438,47 @@ func (r *miniaturaRenderer) Layout(t fyne.Size) {
 		r.aprox.Hide()
 	}
 
-	// El candado de una cifrada, arriba a la derecha (`right-1 top-1`), siempre: dice
-	// de un vistazo qué fotos solo se descifran en este dispositivo.
+	// Las marcas de arriba a la derecha, de derecha a izquierda: el candado de una cifrada
+	// (`right-1 top-1`, siempre: dice de un vistazo qué fotos solo se descifran en este
+	// dispositivo), el vídeo con su duración (FO-09) y el aviso de un original enlazado
+	// que ya no está o ha cambiado.
+	borde := t.Width - margenMarca
 	ladoCandado := iconoCandado + 2*rellenoCoraz
-	xc := t.Width - margenMarca - ladoCandado
+	xc := borde - ladoCandado
 	ui.MoverCaja(r.fondoCandado, fyne.NewPos(xc, margenMarca), fyne.NewSize(ladoCandado, ladoCandado))
 	verCaja(r.fondoCandado, m.Cifrada)
 	r.candado.Colocar(xc+rellenoCoraz, margenMarca+rellenoCoraz, iconoCandado)
 	r.candado.Ver(m.Cifrada)
+	if m.Cifrada {
+		borde = xc - margenMarca
+	}
+	esVideo := m.Foto.EsVideo()
+	r.duracion.Text = DuracionCorta(m.Foto.DurationMs)
+	anchoTexto := float32(0)
+	if r.duracion.Text != "" {
+		anchoTexto = ui.Medir(r.duracion.Text, tema.TextoXS, ui.Medio).Width + rellenoCoraz
+	}
+	anchoVideo := iconoTesela + 2*rellenoCoraz + anchoTexto + rellenoCoraz
+	xv := borde - anchoVideo
+	ui.MoverCaja(r.fondoVideo, fyne.NewPos(xv, margenMarca), fyne.NewSize(anchoVideo, lado))
+	verCaja(r.fondoVideo, esVideo)
+	r.video.Colocar(xv+rellenoCoraz, margenMarca+rellenoCoraz, iconoTesela)
+	r.video.Ver(esVideo)
+	ui.ColocarTexto(r.duracion, tema.TextoXS, xv+rellenoCoraz+iconoTesela+rellenoCoraz, margenMarca+(lado-tema.TextoXS.Linea)/2)
+	if esVideo && r.duracion.Text != "" {
+		r.duracion.Show()
+	} else {
+		r.duracion.Hide()
+	}
+	if esVideo {
+		borde = xv - margenMarca
+	}
+	falta := m.Foto.EstadoExterno != ""
+	xf := borde - lado
+	ui.MoverCaja(r.fondoFalta, fyne.NewPos(xf, margenMarca), fyne.NewSize(lado, lado))
+	verCaja(r.fondoFalta, falta)
+	r.falta.Colocar(xf+rellenoCoraz, margenMarca+rellenoCoraz, iconoTesela)
+	r.falta.Ver(falta)
 }
 
 // Refresh repinta lo que depende del estado y REHACE la disposición: marcar una foto no
@@ -433,6 +497,8 @@ func (r *miniaturaRenderer) Refresh() {
 	}
 	r.fondoCoraz.Pintar(negro60, color.NRGBA{})
 	r.fondoAprox.Pintar(tema.Color(fondoAprox, v), color.NRGBA{})
+	r.fondoVideo.Pintar(negro60, color.NRGBA{})
+	r.fondoFalta.Pintar(negro60, color.NRGBA{})
 	r.fondoCandado.Pintar(negro60, color.NRGBA{})
 	r.filete.StrokeColor = tokens.Crudo("border-subtle", v)
 	// `opacity-70`: la foto marcada deja ver el `bg-bg-subtle` de debajo, igual que

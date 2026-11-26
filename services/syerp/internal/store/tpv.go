@@ -5,55 +5,29 @@ package store
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"slices"
 	"strconv"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"git.sytue.eu/sytue/one/platform/pkg/validation"
-	"git.sytue.eu/sytue/one/services/syerp/internal/catalogo"
-	"git.sytue.eu/sytue/one/services/syerp/internal/domain"
+	"git.sytue.eu/sytue/one/apps/nucleo/erp/catalogo"
+	domain "git.sytue.eu/sytue/one/apps/nucleo/erp/dominio"
+	"git.sytue.eu/sytue/one/apps/nucleo/erp/tpv"
 )
 
-type LineaTPV struct {
-	Producto string `json:"producto"`
-	Cantidad int64  `json:"cantidad"`
-	// Precio esperado: si cambió el catálogo, se pide revisar la cesta.
-	Precio  int64  `json:"precio"`
-	TipoIVA string `json:"tipo_iva"`
-}
-type CobroTPV struct {
-	Operacion string     `json:"operacion"`
-	Sesion    string     `json:"sesion"`
-	Cliente   string     `json:"cliente"`
-	Medio     string     `json:"medio"`
-	Recibido  int64      `json:"recibido"`
-	Lineas    []LineaTPV `json:"lineas"`
-}
+// La forma del cobro y sus reglas son las de apps/nucleo/erp/tpv, que comparte el
+// ERP de Sytue Office.
+type (
+	LineaTPV = tpv.Linea
+	CobroTPV = tpv.Cobro
+)
+
 type VentaTPV struct {
 	Factura Registro `json:"factura"`
 	Cambio  int64    `json:"cambio"`
-}
-
-func (c CobroTPV) Validar() error {
-	if uuid.Validate(c.Operacion) != nil || uuid.Validate(c.Sesion) != nil || (c.Cliente != "" && uuid.Validate(c.Cliente) != nil) || (c.Medio != "efectivo" && c.Medio != "tarjeta") || c.Recibido < 0 || c.Recibido > 1000000000 || len(c.Lineas) < 1 || len(c.Lineas) > 100 {
-		return fmt.Errorf("cobro de TPV inválido: %w", domain.ErrDatos)
-	}
-	vistos := map[string]bool{}
-	for _, l := range c.Lineas {
-		if uuid.Validate(l.Producto) != nil || vistos[l.Producto] || l.Cantidad < 1 || l.Cantidad > 1000 || l.Precio < 0 || l.Precio > 1000000 || !slices.Contains([]string{"21", "10", "5", "4", "0"}, l.TipoIVA) {
-			return fmt.Errorf("línea de TPV inválida: %w", domain.ErrDatos)
-		}
-		vistos[l.Producto] = true
-	}
-	return nil
 }
 
 // CobrarTPV registra un cobro ya realizado físicamente. No carga una tarjeta:
@@ -64,12 +38,10 @@ func (s *Store) CobrarTPV(ctx context.Context, cat *catalogo.Catalogo, c CobroTP
 	if err := c.Validar(); err != nil {
 		return out, err
 	}
-	crudo, err := json.Marshal(c)
+	huella, err := c.Huella()
 	if err != nil {
 		return out, err
 	}
-	hash := sha256.Sum256(crudo)
-	huella := hex.EncodeToString(hash[:])
 	err = s.escritura(ctx, func(tx pgx.Tx) error {
 		// Serializa reintentos incluso antes de que exista su factura.
 		if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended(current_setting('app.tenant', true) || ':tpv', 0))`); err != nil {
@@ -115,9 +87,7 @@ func recuperarCobroTPV(ctx context.Context, tx pgx.Tx, c CobroTPV, huella string
 	if err != nil {
 		return out, false, err
 	}
-	if c.Medio == "efectivo" {
-		out.Cambio = c.Recibido - total
-	}
+	out.Cambio = tpv.Cambio(c, total)
 	return out, true, nil
 }
 
@@ -153,12 +123,8 @@ func prepararCobroTPV(ctx context.Context, tx pgx.Tx, cat *catalogo.Catalogo, c 
 		return preparado, err
 	}
 	preparado.Lineas = lineas
-	for _, g := range domain.Desglose(lineas) {
-		preparado.Base += g.Base
-		preparado.IVA += g.Cuota
-	}
-	preparado.Total = preparado.Base + preparado.IVA
-	if err := validarImporteCobroTPV(c, preparado.Total); err != nil {
+	preparado.Base, preparado.IVA, preparado.Total = tpv.Totales(lineas)
+	if err := tpv.ValidarImporte(c, preparado.Total); err != nil {
 		return preparado, err
 	}
 	preparado.Cliente, preparado.Tipo, err = clienteCobroTPV(ctx, tx, cat, c.Cliente, preparado.Total, por)
@@ -178,23 +144,7 @@ func exigirTerritorioTPV(ctx context.Context, tx pgx.Tx) error {
 	if err := tx.QueryRow(ctx, `SELECT pais, cp FROM organizacion WHERE tenant = current_setting('app.tenant', true)`).Scan(&pais, &cp); err != nil {
 		return err
 	}
-	if pais != "ES" || (len(cp) >= 2 && slices.Contains([]string{"35", "38", "51", "52"}, cp[:2])) {
-		return fmt.Errorf("este TPV utiliza IVA de España peninsular y Baleares: %w", domain.ErrDatos)
-	}
-	return nil
-}
-
-func validarImporteCobroTPV(c CobroTPV, total int64) error {
-	if total <= 0 || total > 1000000000 || (c.Medio == "efectivo" && c.Recibido < total) {
-		return fmt.Errorf("el importe recibido no cubre la venta: %w", domain.ErrDatos)
-	}
-	// Ley 7/2012, artículo 7: el límite incluye exactamente 1.000 €.
-	// No se presume la excepción de particulares no residentes: el TPV no
-	// recoge todavía la documentación necesaria para justificararla.
-	if c.Medio == "efectivo" && total >= 100000 {
-		return fmt.Errorf("una venta de 1.000 € o más no se puede cobrar en efectivo; utiliza tarjeta: %w", domain.ErrDatos)
-	}
-	return nil
+	return tpv.ExigirTerritorio(pais, cp)
 }
 
 func clienteCobroTPV(ctx context.Context, tx pgx.Tx, cat *catalogo.Catalogo, cliente string, total int64, por string) (string, string, error) {
@@ -203,16 +153,13 @@ func clienteCobroTPV(ctx context.Context, tx pgx.Tx, cat *catalogo.Catalogo, cli
 		if err := tx.QueryRow(ctx, `SELECT COALESCE(data->>'nif','') FROM records WHERE tenant = current_setting('app.tenant', true) AND id = $1::uuid AND model = 'contacto' AND deleted_at IS NULL`, cliente).Scan(&nif); err != nil {
 			return "", "", err
 		}
-		if !validation.NIF(nif) {
-			return "", "", fmt.Errorf("el cliente necesita un NIF válido: %w", domain.ErrDatos)
-		}
-		return cliente, "F1", nil
+		tipo, err := tpv.TipoFactura(cliente, nif, total)
+		return cliente, tipo, err
 	}
-	// Tope general, sin presumir una actividad minorista de la organización.
-	if total > 40000 {
-		return "", "", fmt.Errorf("por encima de 400 € identifica al cliente para emitir factura completa: %w", domain.ErrDatos)
+	if _, err := tpv.TipoFactura("", "", total); err != nil {
+		return "", "", err
 	}
-	err := tx.QueryRow(ctx, `SELECT id::text FROM records WHERE tenant = current_setting('app.tenant', true) AND model = 'contacto' AND data->>'externo_id' = 'tpv:publico' AND deleted_at IS NULL LIMIT 1`).Scan(&cliente)
+	err := tx.QueryRow(ctx, `SELECT id::text FROM records WHERE tenant = current_setting('app.tenant', true) AND model = 'contacto' AND data->>'externo_id' = $1 AND deleted_at IS NULL LIMIT 1`, tpv.ExternoPublico).Scan(&cliente)
 	if err == nil {
 		return cliente, "F2", nil
 	}
@@ -220,7 +167,7 @@ func clienteCobroTPV(ctx context.Context, tx pgx.Tx, cat *catalogo.Catalogo, cli
 		return "", "", err
 	}
 	m, _ := cat.Modelo("contacto")
-	r, err := insertarNuevo(ctx, tx, Nuevo{Modelo: m, Data: map[string]any{"nombre": "TPV", "tipo": "organizacion", "externo_id": "tpv:publico"}, Etiqueta: "TPV"}, nil, por)
+	r, err := insertarNuevo(ctx, tx, Nuevo{Modelo: m, Data: map[string]any{"nombre": "TPV", "tipo": "organizacion", "externo_id": tpv.ExternoPublico}, Etiqueta: "TPV"}, nil, por)
 	if err != nil {
 		return "", "", err
 	}
@@ -229,13 +176,13 @@ func clienteCobroTPV(ctx context.Context, tx pgx.Tx, cat *catalogo.Catalogo, cli
 
 func crearFacturaTPV(ctx context.Context, tx pgx.Tx, cat *catalogo.Catalogo, c CobroTPV, preparado cobroTPVPreparado, huella, por string) (Registro, error) {
 	m, _ := cat.Modelo("factura_venta")
-	factura, err := insertarNuevo(ctx, tx, Nuevo{desdeTPV: true, Modelo: m, Data: map[string]any{"cliente": preparado.Cliente, "fecha": preparado.Ahora.Format("2006-01-02"), "base": preparado.Base, "iva": preparado.IVA, "total": preparado.Total, "tipo_factura": preparado.Tipo, "regimen_iva": "iva_general", "tpv_operacion": c.Operacion, "sesion": c.Sesion, "medio_pago": c.Medio, "tpv_huella": huella}}, nil, por)
+	factura, err := insertarNuevo(ctx, tx, Nuevo{desdeTPV: true, Modelo: m, Data: tpv.DatosFactura(c, preparado.Cliente, preparado.Tipo, preparado.Ahora.Format("2006-01-02"), huella, preparado.Base, preparado.IVA)}, nil, por)
 	if err != nil {
 		return Registro{}, err
 	}
 	lm, _ := cat.Modelo("linea_factura")
 	for _, l := range preparado.Lineas {
-		if _, err := insertarNuevo(ctx, tx, Nuevo{Modelo: lm, Etiqueta: l.Descripcion, Data: map[string]any{"factura": factura.ID, "descripcion": l.Descripcion, "cantidad": l.Cantidad, "precio_con_iva": l.Precio, "tipo_iva": strconv.FormatInt(l.Tipo, 10)}}, nil, por); err != nil {
+		if _, err := insertarNuevo(ctx, tx, Nuevo{Modelo: lm, Etiqueta: l.Descripcion, Data: tpv.DatosLinea(factura.ID, l)}, nil, por); err != nil {
 			return Registro{}, err
 		}
 	}
@@ -249,11 +196,8 @@ func (s *Store) registrarCobroTPV(ctx context.Context, tx pgx.Tx, cat *catalogo.
 	if err := s.asentarEn(ctx, tx, m, factura.ID, por, &asiento); err != nil {
 		return out, err
 	}
-	cuenta, diario := "572000", "bancos"
-	if c.Medio == "efectivo" {
-		cuenta, diario = "570000", "caja"
-		out.Cambio = c.Recibido - preparado.Total
-	}
+	cuenta, diario := tpv.Caja(c.Medio)
+	out.Cambio = tpv.Cambio(c, preparado.Total)
 	if _, err := escribirAsiento(ctx, tx, diario, preparado.Ahora, "TPV "+factura.Ref, "", por, []Apunte{{Cuenta: cuenta, Debe: preparado.Total}, {Cuenta: "430000", Haber: preparado.Total, Tercero: preparado.Cliente}}); err != nil {
 		return out, err
 	}
@@ -291,18 +235,11 @@ func lineasTPV(ctx context.Context, tx pgx.Tx, entradas []LineaTPV) ([]domain.Li
 		if err := escanearRegistro(tx.QueryRow(ctx, `SELECT id::text, model, ref, etiqueta, estado, data, created_at, updated_at FROM records WHERE tenant = current_setting('app.tenant', true) AND id = $1::uuid AND model = 'producto' AND deleted_at IS NULL FOR SHARE`, l.Producto), &producto); err != nil {
 			return nil, err
 		}
-		precio, err := domain.Centimos(producto.Data, "precio_con_iva")
-		if err != nil || producto.Data["precio_con_iva"] == nil || precio != l.Precio || cadenaDe(producto.Data["tipo_iva"]) != l.TipoIVA || producto.Estado == "pausada" {
-			return nil, fmt.Errorf("revisa el precio y el IVA de %s: %w", producto.Etiqueta, domain.ErrDatos)
-		}
-		tipo, err := strconv.ParseInt(l.TipoIVA, 10, 64)
+		linea, err := tpv.LineaDe(l, producto.Etiqueta, producto.Estado, producto.Data)
 		if err != nil {
 			return nil, err
 		}
-		if tipo == 0 {
-			return nil, fmt.Errorf("el TPV solo vende productos sujetos a IVA; las exenciones se facturan desde facturación: %w", domain.ErrDatos)
-		}
-		lineas = append(lineas, domain.LineaFactura{Descripcion: producto.Etiqueta, Cantidad: strconv.FormatInt(l.Cantidad, 10), Precio: precio, Tipo: tipo, Importe: precio * l.Cantidad})
+		lineas = append(lineas, linea)
 	}
 	return lineas, nil
 }
@@ -311,22 +248,15 @@ func lineasTPV(ctx context.Context, tx pgx.Tx, entradas []LineaTPV) ([]domain.Li
 // emitir una factura. Reutiliza los precios y validaciones de la cesta.
 func (s *Store) PresupuestoTPV(ctx context.Context, cat *catalogo.Catalogo, c CobroTPV, por string) (Registro, error) {
 	var out Registro
-	if c.Cliente == "" {
-		return out, fmt.Errorf("elige el cliente del presupuesto: %w", domain.ErrDatos)
-	}
 	// Un presupuesto no requiere caja abierta ni importe recibido.
-	c.Sesion = c.Operacion
-	c.Medio = "tarjeta"
-	c.Recibido = 0
-	if err := c.Validar(); err != nil {
-		return out, err
-	}
-	crudo, err := json.Marshal(c)
+	c, err := c.ParaPresupuesto()
 	if err != nil {
 		return out, err
 	}
-	hash := sha256.Sum256(crudo)
-	huella := hex.EncodeToString(hash[:])
+	huella, err := c.Huella()
+	if err != nil {
+		return out, err
+	}
 	err = s.escritura(ctx, func(tx pgx.Tx) error {
 		if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended(current_setting('app.tenant',true)||':presupuesto-tpv',0))`); err != nil {
 			return err
@@ -348,11 +278,7 @@ func (s *Store) PresupuestoTPV(ctx context.Context, cat *catalogo.Catalogo, c Co
 		if err != nil {
 			return err
 		}
-		var base, iva int64
-		for _, g := range domain.Desglose(lineas) {
-			base += g.Base
-			iva += g.Cuota
-		}
+		base, iva, _ := tpv.Totales(lineas)
 		if base+iva <= 0 || base+iva > 1000000000 {
 			return fmt.Errorf("el importe del presupuesto no es válido: %w", domain.ErrDatos)
 		}

@@ -428,7 +428,7 @@ func (p *Pantalla) cajaIndice(c *Cuaderno, f *formAjustes, repintar func(), v te
 			"text-subtle", v)))
 
 	piezas := []fyne.CanvasObject{indice}
-	if p.puedeAdministrarCuaderno(c) {
+	if p.puedeAdministrarCuaderno(c) && !p.SinCompartir {
 		interruptor := ui.NuevoConmutador(t("crypto.title", nil), func(si bool) {
 			if !si {
 				f.cifrado, f.crypto = false, nil

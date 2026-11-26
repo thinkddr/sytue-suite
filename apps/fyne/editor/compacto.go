@@ -149,15 +149,18 @@ func (m *Marco) opcionesCompactas() []fyne.CanvasObject {
 	formato := c.formato()
 	// El porcentaje vuelve al 100, como el de la barra de estado que en compacto no se ve.
 	zoom := ui.NuevoElementoMenu(strconv.Itoa(c.Zoom)+" %", iconos.Ninguno, func() { c.PonerZoom(100) })
-	return []fyne.CanvasObject{
-		rotulo, compartir,
+	cabeza := []fyne.CanvasObject{rotulo, compartir}
+	if c.sinCompartir() {
+		cabeza = cabeza[:1] // edición local: no hay a quién compartir (O-02)
+	}
+	return append(cabeza, []fyne.CanvasObject{
 		item("action.undo", c.SoloLectura || !formato.PuedeDeshacer, func() { c.Mandar(Deshacer, "") }),
 		item("action.redo", c.SoloLectura || !formato.PuedeRehacer, func() { c.Mandar(Rehacer, "") }),
 		ui.NuevoSeparadorMenu(), zoom,
 		item("status.zoom.out", c.Zoom <= ZoomMin, m.estado.menos.AlPulsar),
 		item("status.zoom.in", c.Zoom >= ZoomMax, m.estado.mas.AlPulsar),
 		ui.NuevoSeparadorMenu(),
-	}
+	}...)
 }
 
 func (m *Marco) renombrarCompacto() {

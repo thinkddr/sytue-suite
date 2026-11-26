@@ -76,6 +76,8 @@ func NuevoBotonArchivo(ctx *Contexto) *BotonArchivo {
 
 // Menu construye el menú con el estado de ahora: sin red, las descargas y guardar
 // versión se apagan, como en la web.
+//
+//nolint:gocyclo // Las entradas del menú «Archivo» en el orden de la web, cada una con su condición.
 func (b *BotonArchivo) Menu() *ui.Menu {
 	c := b.ctx
 	item := func(clave string, inerte bool, f func(), vars ...i18n.Vars) *ui.ElementoMenu {
@@ -95,6 +97,18 @@ func (b *BotonArchivo) Menu() *ui.Menu {
 	}
 	if c.Abrir != nil {
 		elems = append(elems, item("list.new.open", c.SinRed, c.Abrir))
+	}
+	// «Guardar» y «Guardar como…» en un fichero del disco: solo en la edición local
+	// (fichero.go), con su rótulo ya traducido. No dependen de la red.
+	for _, g := range []struct {
+		rotulo string
+		f      func()
+	}{{c.RotuloGuardarFichero, c.GuardarFichero}, {c.RotuloGuardarComo, c.GuardarComo}} {
+		if g.f != nil && g.rotulo != "" {
+			e := ui.NuevoElementoMenu(g.rotulo, iconos.Ninguno, g.f)
+			e.Denso = true
+			elems = append(elems, e)
+		}
 	}
 	if len(elems) > 0 {
 		elems = append(elems, ui.NuevoSeparadorMenu())

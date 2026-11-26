@@ -177,22 +177,31 @@ func CatalogHistory(scope Scope, entries []RecordEntry) ([]ObjectVersion, error)
 	if !scope.Valid() {
 		return nil, ErrRecord
 	}
-	versions := make(map[Reference]ObjectVersion, len(entries))
-	events := make(map[string]Reference, len(entries))
+	decoded := make([]ObjectVersion, 0, len(entries))
 	for _, entry := range entries {
 		version, err := DecodeObject(entry, scope)
 		if err != nil {
 			return nil, err
 		}
+		decoded = append(decoded, version)
+	}
+	return historyOf(decoded)
+}
+
+// historyOf es CatalogHistory sobre las versiones que dio DecodeObject de sus entradas.
+func historyOf(decoded []ObjectVersion) ([]ObjectVersion, error) {
+	versions := make(map[Reference]ObjectVersion, len(decoded))
+	events := make(map[string]Reference, len(decoded))
+	for _, version := range decoded {
 		if _, exists := events[version.Reference.EventID]; exists {
 			return nil, ErrRecord
 		}
 		events[version.Reference.EventID] = version.Reference
 		versions[version.Reference] = version
 	}
-	children := make(map[Reference][]Reference, len(entries))
-	degree := make(map[Reference]int, len(entries))
-	queue := make([]Reference, 0, len(entries))
+	children := make(map[Reference][]Reference, len(decoded))
+	degree := make(map[Reference]int, len(decoded))
+	queue := make([]Reference, 0, len(decoded))
 	for ref, version := range versions {
 		degree[ref] = len(version.Commit.Parents)
 		if degree[ref] == 0 {
@@ -245,6 +254,11 @@ func CatalogHeads(scope Scope, entries []RecordEntry) ([]ObjectVersion, error) {
 	if err != nil {
 		return nil, err
 	}
+	return headsOf(history), nil
+}
+
+// headsOf son las puntas de una historia de CatalogHistory, con sus mismas versiones.
+func headsOf(history []ObjectVersion) []ObjectVersion {
 	parents := map[Reference]bool{}
 	for _, version := range history {
 		for _, parent := range version.Commit.Parents {
@@ -263,5 +277,5 @@ func CatalogHeads(scope Scope, entries []RecordEntry) ([]ObjectVersion, error) {
 		}
 		return strings.Compare(a.Reference.EventID, b.Reference.EventID)
 	})
-	return heads, nil
+	return heads
 }

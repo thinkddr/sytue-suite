@@ -16,6 +16,9 @@ import (
 // Papelera devuelve los documentos de quien pregunta en la papelera, el último tirado
 // primero (hasta 200). Con `kind`, solo de ese tipo: Calcus ve sus hojas.
 func (d *Docs) Papelera(ctx context.Context, kind DocKind) ([]Document, error) {
+	if p, ok := d.datos().(DocsTrashData); ok {
+		return p.TrashedDocuments(ctx, kind)
+	}
 	q := url.Values{}
 	if kind != "" {
 		q.Set("kind", string(kind))
@@ -30,11 +33,17 @@ func (d *Docs) Papelera(ctx context.Context, kind DocKind) ([]Document, error) {
 // que en su carpeta de Drive ya hay otro fichero con ese nombre; con
 // `already_restored`, que ya hay otro documento vivo abierto desde el mismo fichero.
 func (d *Docs) Restaurar(ctx context.Context, id string) error {
+	if p, ok := d.datos().(DocsTrashData); ok {
+		return p.RestoreDocument(ctx, id)
+	}
 	return d.sinCuerpo(ctx, http.MethodPost, "/trash/"+url.PathEscape(id)+"/restore", nil)
 }
 
 // Purgar lo elimina para siempre. Un 423 es una retención legal.
 func (d *Docs) Purgar(ctx context.Context, id string) error {
+	if p, ok := d.datos().(DocsTrashData); ok {
+		return p.PurgeDocument(ctx, id)
+	}
 	return d.sinCuerpo(ctx, http.MethodDelete, "/trash/"+url.PathEscape(id), nil)
 }
 
@@ -42,6 +51,9 @@ func (d *Docs) Purgar(ctx context.Context, id string) error {
 // a partir de `despues`. Devuelve cuántos no se pudieron eliminar y desde dónde
 // seguir: "" es que no queda nada.
 func (d *Docs) Vaciar(ctx context.Context, kind DocKind, despues string) (fallidos int, siguiente string, err error) {
+	if p, ok := d.datos().(DocsTrashData); ok {
+		return p.EmptyTrash(ctx, kind, despues)
+	}
 	q := url.Values{}
 	if kind != "" {
 		q.Set("kind", string(kind))

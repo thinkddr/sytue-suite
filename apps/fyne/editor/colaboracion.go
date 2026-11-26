@@ -48,11 +48,11 @@ func cuerpoColaboracion(c *Contexto) fyne.CanvasObject {
 	if c.Tipo == Documento {
 		grupos = append(grupos, c.grupoRevision(), SeparadorGrupos())
 	}
-	return Grupos(append(grupos,
-		NuevoGrupo(c.Traducir("group.versions"), versiones...),
-		SeparadorGrupos(),
-		NuevoGrupo(c.Traducir("group.share"), c.botonCompartir()),
-	)...)
+	grupos = append(grupos, NuevoGrupo(c.Traducir("group.versions"), versiones...))
+	if !c.sinCompartir() {
+		grupos = append(grupos, SeparadorGrupos(), NuevoGrupo(c.Traducir("group.share"), c.botonCompartir()))
+	}
+	return Grupos(grupos...)
 }
 
 // grupoRevision es «Revisión»: activar el control de cambios, abrir el panel de revisión

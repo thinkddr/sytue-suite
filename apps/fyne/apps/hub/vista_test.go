@@ -20,6 +20,9 @@ import (
 	"git.sytue.eu/sytue/one/apps/nucleo/auth"
 )
 
+// La sesión de Sytue ID es la Cuenta del Hub conectado (vista.go no importa `auth`).
+var _ Cuenta = (*auth.Session)(nil)
+
 // hubDoble apunta lo que se le pide y contesta vacío.
 type hubDoble struct {
 	mu       sync.Mutex

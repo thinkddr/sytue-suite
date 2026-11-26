@@ -19,7 +19,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"git.sytue.eu/sytue/one/apps/nucleo/auth"
+	"git.sytue.eu/sytue/one/apps/nucleo/autorizacion"
 )
 
 // Session es lo que el cliente necesita de internal/auth: un token vigente, y poder
@@ -76,11 +76,11 @@ type Error struct {
 	URL    string
 	Body   string
 	// causa es lo que lo provocó cuando no llegó a salir la petición: el
-	// `auth.ErrLoginRequired` de un 401 que se sabe sin preguntar (ver token).
+	// `autorizacion.ErrLoginRequired` de un 401 que se sabe sin preguntar (ver token).
 	causa error
 }
 
-// Unwrap deja ver la causa: `errors.Is(err, auth.ErrLoginRequired)` sigue valiendo.
+// Unwrap deja ver la causa: `errors.Is(err, autorizacion.ErrLoginRequired)` sigue valiendo.
 func (e *Error) Unwrap() error { return e.causa }
 
 // token pide el access token para `destino`. Sin sesión —no hay nada guardado, o Sytue
@@ -91,7 +91,7 @@ func (e *Error) Unwrap() error { return e.causa }
 // (visto en una ventana real el 2026-09-27).
 func (c *Client) token(ctx context.Context, destino string) (string, error) {
 	t, err := c.session.AccessToken(ctx)
-	if errors.Is(err, auth.ErrLoginRequired) {
+	if errors.Is(err, autorizacion.ErrLoginRequired) {
 		return "", &Error{Status: http.StatusUnauthorized, URL: destino, causa: err}
 	}
 	return t, err
@@ -102,17 +102,17 @@ func (c *Client) authorize(req *http.Request) (*http.Request, string, error) {
 	var token string
 	var err error
 	if scoped, ok := c.session.(interface {
-		AccessTokenScoped(context.Context) (string, *auth.AuthorizationScope, error)
+		AccessTokenScoped(context.Context) (string, *autorizacion.AuthorizationScope, error)
 	}); ok {
-		var scope *auth.AuthorizationScope
+		var scope *autorizacion.AuthorizationScope
 		token, scope, err = scoped.AccessTokenScoped(ctx)
-		req = req.WithContext(auth.WithAuthorizationScope(ctx, scope))
-		if errors.Is(err, auth.ErrLoginRequired) {
+		req = req.WithContext(autorizacion.WithAuthorizationScope(ctx, scope))
+		if errors.Is(err, autorizacion.ErrLoginRequired) {
 			err = &Error{Status: http.StatusUnauthorized, URL: req.URL.String(), causa: err}
 		}
 	} else {
-		if auth.RequestAuthorizationIntent(ctx) != nil {
-			return nil, "", auth.ErrAuthorizationChanged
+		if autorizacion.RequestAuthorizationIntent(ctx) != nil {
+			return nil, "", autorizacion.ErrAuthorizationChanged
 		}
 		token, err = c.token(ctx, req.URL.String())
 	}
@@ -123,10 +123,10 @@ func (c *Client) authorize(req *http.Request) (*http.Request, string, error) {
 }
 
 func validateAuthorizationIntent(req *http.Request) error {
-	if intent := auth.RequestAuthorizationIntent(req.Context()); intent != nil {
-		scope := auth.RequestAuthorizationScope(req.Context())
+	if intent := autorizacion.RequestAuthorizationIntent(req.Context()); intent != nil {
+		scope := autorizacion.RequestAuthorizationScope(req.Context())
 		if !intent.Allows(scope, req.Header.Get("Authorization")) {
-			return auth.ErrAuthorizationChanged
+			return autorizacion.ErrAuthorizationChanged
 		}
 	}
 	return nil
@@ -269,8 +269,8 @@ func (c *Client) una(ctx context.Context, r Request) (*http.Response, string, er
 		req.Header[k] = v
 	}
 	var token string
-	if !r.Anonymous && c.session == nil && auth.RequestAuthorizationIntent(ctx) != nil {
-		return nil, "", auth.ErrAuthorizationChanged
+	if !r.Anonymous && c.session == nil && autorizacion.RequestAuthorizationIntent(ctx) != nil {
+		return nil, "", autorizacion.ErrAuthorizationChanged
 	}
 	if !r.Anonymous && c.session != nil {
 		if req, token, err = c.authorize(req); err != nil {
@@ -296,8 +296,8 @@ func (c *Client) Stream(ctx context.Context, metodo, path string, query url.Valu
 	for k, v := range cabeceras {
 		req.Header[k] = v
 	}
-	if c.session == nil && auth.RequestAuthorizationIntent(ctx) != nil {
-		return nil, auth.ErrAuthorizationChanged
+	if c.session == nil && autorizacion.RequestAuthorizationIntent(ctx) != nil {
+		return nil, autorizacion.ErrAuthorizationChanged
 	}
 	if c.session != nil {
 		var err error

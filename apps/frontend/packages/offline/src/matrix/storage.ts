@@ -54,6 +54,12 @@ export interface StorageObjectVersion {
   commit: StorageObjectCommit;
 }
 export class StorageRecordError extends Error {
+  /**
+   * Qué lo rechazó cuando fue el servicio (`get_404_pq_vault_not_found`): operación,
+   * estado HTTP y código de error, para «Más información». Sin él, `record.invalid`
+   * no decía cuál de treinta comprobaciones fue.
+   */
+  check?: string;
   constructor(readonly reason: 'invalid' | 'incomplete' = 'invalid') {
     super(`storage_${reason}`);
     this.name = 'StorageRecordError';

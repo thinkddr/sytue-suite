@@ -354,6 +354,17 @@ async function errorCode(res: Response): Promise<string> {
   }
 }
 
+/** Un registro que el servicio rechazó, con la operación, el estado y su código. */
+function recordHttpError(
+  op: 'post' | 'get' | 'list' | 'find',
+  status: number,
+  code: string,
+): StorageRecordError {
+  const error = new StorageRecordError();
+  error.check = `${op}_${status}` + (/^[a-z0-9_]{1,40}$/u.test(code) ? `_${code}` : '');
+  return error;
+}
+
 /** Los dos rechazos de la bóveda que el cliente distingue; si no, `unavailable`. */
 async function pqVaultFailure(res: Response, where = 'keys_put'): Promise<PqVaultError> {
   const code = await errorCode(res);
@@ -1258,10 +1269,11 @@ export class PqVault {
         ...(signal ? { signal } : {}),
       });
       if (!res.ok) {
+        const code = await errorCode(res);
         // Otro dispositivo copia en la bóveda: nada se publicó; se dice tal cual.
-        if (res.status === 409 && (await errorCode(res)) === 'pq_vault_copy_in_progress')
+        if (res.status === 409 && code === 'pq_vault_copy_in_progress')
           throw new PqVaultError('copy');
-        throw new StorageRecordError();
+        throw recordHttpError('post', res.status, code);
       }
       const saved = (await res.json()) as PqVaultRecordResponse;
       if (saved.vault_id !== room || typeof saved.event_id !== 'string')
@@ -1272,15 +1284,19 @@ export class PqVault {
     const readRaw = async (reference: MatrixReference): Promise<Record<string, unknown>> => {
       assertOpen();
       const params = new URLSearchParams({ vault_id: reference.room_id });
+      // El `$` del id (`$pqe_…`) va tal cual, que en una ruta es válido. Codificado
+      // (`%24`) no llegaba: Astro descodifica la ruta con `decodeURI`, que deja los
+      // reservados como están, y el BFF no reconocía `records/%24pqe_…` (404). Drive
+      // se quedaba en `prepare/record.invalid` al releer lo que acababa de publicar.
       const res = await this.fetchImpl(
-        `${this.base}/api/pq-vault/records/${encodeURIComponent(reference.event_id)}?${params.toString()}`,
+        `${this.base}/api/pq-vault/records/${encodeURIComponent(reference.event_id).replace(/%24/gu, '$')}?${params.toString()}`,
         {
           method: 'GET',
           credentials: 'same-origin',
           headers: { [storageScopeHeader]: scopeHeader },
         },
       );
-      if (!res.ok) throw new StorageRecordError();
+      if (!res.ok) throw recordHttpError('get', res.status, await errorCode(res));
       const rec = (await res.json()) as PqVaultRecordResponse;
       if (
         rec.vault_id !== reference.room_id ||
@@ -1411,7 +1427,7 @@ export class PqVault {
           credentials: 'same-origin',
           headers: { [storageScopeHeader]: scopeHeader },
         });
-        if (!res.ok) throw new StorageRecordError();
+        if (!res.ok) throw recordHttpError('list', res.status, await errorCode(res));
         const page = (await res.json()) as PqVaultRecordPageResponse;
         const rawEntries = Array.isArray(page.entries) ? page.entries : [];
         const entries: StorageRecordEntry[] = [];
@@ -1445,7 +1461,7 @@ export class PqVault {
         headers: { [storageScopeHeader]: scopeHeader },
         ...(signal ? { signal } : {}),
       });
-      if (!res.ok) throw new StorageRecordError();
+      if (!res.ok) throw recordHttpError('find', res.status, await errorCode(res));
       const page = (await res.json()) as PqVaultRecordPageResponse;
       const entries = Array.isArray(page.entries) ? page.entries : [];
       if (entries.length === 0) return null;

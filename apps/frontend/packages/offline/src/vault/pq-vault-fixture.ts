@@ -299,6 +299,10 @@ export function createHarness(
       return Response.json({ entries });
     }
     if (url.pathname.startsWith('/drive/api/pq-vault/records/') && method === 'GET') {
+      // Como en producción: Astro descodifica la ruta con `decodeURI`, que no toca
+      // `%24`, y el BFF de entonces no reconocía `records/%24pqe_…`.
+      if (url.pathname.includes('%24'))
+        return Response.json({ error: 'pq_vault_not_found' }, { status: 404 });
       const eid = decodeURIComponent(url.pathname.slice('/drive/api/pq-vault/records/'.length));
       const found = records.find((r) => r.event_id === eid);
       if (!found) return new Response(null, { status: 404 });

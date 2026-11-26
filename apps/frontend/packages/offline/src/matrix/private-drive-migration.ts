@@ -103,7 +103,7 @@ interface RowIntent extends DriveWriteIntent {
  * `StorageRecordError` como el de siempre: quien ya lo trataba no cambia.
  */
 export class DriveImportError extends StorageRecordError {
-  constructor(readonly check: DriveImportCheck) {
+  constructor(override readonly check: DriveImportCheck) {
     super('invalid');
     this.name = 'DriveImportError';
   }

@@ -4,6 +4,7 @@
  * Ejecutar: `bun test`.
  */
 import { GlobalRegistrator } from '@happy-dom/global-registrator';
+import { leerFuentes } from '@sytue/config/guardianes';
 import { expect, test } from 'bun:test';
 import { render } from 'preact';
 import type { VNode } from 'preact';
@@ -92,13 +93,28 @@ test('dentro de un campo, las flechas son del campo', () => {
  */
 test('nadie promete role="toolbar" sin el componente que lo cumple', async () => {
   // Las apps y la ofimática común (`packages/office`), que es código de app.
-  const raiz = new URL('../../../../', import.meta.url);
+  //
+  // Un glob por raíz: unas llaves que cruzan un `/` (`{apps/…,packages/office/…}`) no
+  // casan NADA con el Bun fijado, y este test pasó en verde sin haber leído un fichero
+  // (`@sytue/config/guardianes`). Mínimos medidos el 2026-11-25 (595 y 115 `.tsx`) y
+  // puestos muy por debajo.
+  //
+  // Y se busca el ATRIBUTO, no la cadena: `[role="toolbar"]` es un selector que BUSCA
+  // una barra (Notes lo usa para saber si el foco se fue a una, y sus pruebas para
+  // encontrar la que pinta `<Toolbar>`), y no promete nada. Cuando el patrón se
+  // arregló y el test leyó por fin algo, eso fueron sus cinco primeros «infractores».
+  const cwd = new URL('../../../../', import.meta.url);
+  const atributo = /(?<!\[)role="toolbar"/;
   const infractores: string[] = [];
-  const fuentes = new Bun.Glob('{apps/*/src/**/*.tsx,packages/office/src/**/*.tsx}');
-  for await (const rel of fuentes.scan({ cwd: raiz.pathname })) {
-    const fuente = await Bun.file(new URL(rel, raiz)).text();
-    for (const [i, linea] of fuente.split('\n').entries()) {
-      if (linea.includes('role="toolbar"')) infractores.push(`${rel}:${i + 1}`);
+  const recorridos = [
+    { glob: 'apps/*/src/**/*.tsx', cwd, minimo: 300 },
+    { glob: 'packages/office/src/**/*.tsx', cwd, minimo: 50 },
+  ];
+  for (const recorrido of recorridos) {
+    for (const [rel, fuente] of await leerFuentes(recorrido)) {
+      for (const [i, linea] of fuente.split('\n').entries()) {
+        if (atributo.test(linea)) infractores.push(`${rel}:${i + 1}`);
+      }
     }
   }
   expect(infractores, 'usa <Toolbar> de @sytue/ui en vez de escribir el rol').toEqual([]);

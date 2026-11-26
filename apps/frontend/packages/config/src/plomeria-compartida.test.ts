@@ -20,15 +20,25 @@
  * el comportamiento es DE VERDAD distinto y aplastarlo sería peor que repetirlo.
  */
 import { expect, test } from 'bun:test';
+import { leerFuentes } from './guardianes.js';
 
 /**
  * Dónde se mira: las apps y la ofimática común (`packages/office`), que es código de
  * app aunque viva en un paquete —Docus, Calcus, Diapos y CertiPDF montan sus vistas y
  * su BFF—. Sin ella, todo lo que se movió allí quedaba fuera de estas reglas. Rutas
  * relativas a `apps/frontend/`, como las excepciones.
+ *
+ * UN GLOB POR RAÍZ, y no uno solo con las dos entre llaves (`{apps/…,packages/office/…}`):
+ * con el Bun fijado esas llaves no casan NADA, y este guardián y el de los iconos
+ * pasaron en verde sin haber leído un fichero (ver `guardianes.ts`). Cada raíz lleva lo
+ * mínimo que tiene que devolver, medido el 2026-11-25 —1723 y 320 ficheros revisables;
+ * 182 y 13 `.astro`— y puesto muy por debajo.
  */
 const RAIZ = new URL('../../../', import.meta.url);
-const FUENTES = '{apps/*/src/**/*,packages/office/src/**/*}';
+const FUENTES = [
+  { glob: 'apps/*/src/**/*', revisables: 1000, astro: 100 },
+  { glob: 'packages/office/src/**/*', revisables: 200, astro: 8 },
+];
 
 interface Regla {
   /** Trozo de código literal que solo aparece cuando alguien ha copiado el cuerpo. */
@@ -87,6 +97,8 @@ const REGLAS: Regla[] = [
     // Sytue Bases nació copiando el `lib/cabeceras.ts` de Sytue Web, con la conexión
     // limitada a `'self'`: en las dos, la shell se quedó sin Hub (campana y presencia
     // mudas) hasta el 2026-10-05. La directiva escrita a mano en una app es la copia.
+    // Se busca en el texto, comentarios incluidos: para explicar un origen de la CSP,
+    // nómbrese la opción `conectar` de `cabecerasCerradas`, que es lo que se le pasa.
     marcador: 'connect-src',
     usa: "`cabecerasCerradas(hubBaseUrl())` de '@sytue/config/astro-middleware'",
     excepciones: {},
@@ -108,13 +120,14 @@ function seRevisa(rel: string): boolean {
 
 test('la plomería compartida no se copia, se importa', async () => {
   const infractores: string[] = [];
-  for await (const rel of new Bun.Glob(FUENTES).scan({ cwd: RAIZ.pathname })) {
-    if (!seRevisa(rel)) continue;
-    const fuente = await Bun.file(new URL(rel, RAIZ)).text();
-    for (const regla of REGLAS) {
-      if (!fuente.includes(regla.marcador)) continue;
-      if (rel in regla.excepciones) continue;
-      infractores.push(`${rel}: lleva «${regla.marcador}» — usa ${regla.usa}`);
+  for (const { glob, revisables } of FUENTES) {
+    const fuentes = await leerFuentes({ glob, cwd: RAIZ, minimo: revisables, filtro: seRevisa });
+    for (const [rel, fuente] of fuentes) {
+      for (const regla of REGLAS) {
+        if (!fuente.includes(regla.marcador)) continue;
+        if (rel in regla.excepciones) continue;
+        infractores.push(`${rel}: lleva «${regla.marcador}» — usa ${regla.usa}`);
+      }
     }
   }
   expect(infractores).toEqual([]);
@@ -152,14 +165,19 @@ test('no quedan excepciones que ya no hagan falta', async () => {
  */
 test('todo <link> de icono lleva el sufijo de caché', async () => {
   const sinSufijo: string[] = [];
-  for await (const rel of new Bun.Glob(`${FUENTES}.astro`).scan({ cwd: RAIZ.pathname })) {
-    const src = await Bun.file(new URL(rel, RAIZ)).text();
-    src.split('\n').forEach((linea, i) => {
-      if (!/href=/.test(linea)) return;
-      if (!/favicon|apple-touch-icon/.test(linea)) return;
-      if (linea.includes('SUFIJO_ICONOS')) return;
-      sinSufijo.push(`${rel}:${i + 1}  ${linea.trim()}`);
-    });
+  for (const { glob, astro } of FUENTES) {
+    for (const [rel, src] of await leerFuentes({
+      glob: `${glob}.astro`,
+      cwd: RAIZ,
+      minimo: astro,
+    })) {
+      src.split('\n').forEach((linea, i) => {
+        if (!/href=/.test(linea)) return;
+        if (!/favicon|apple-touch-icon/.test(linea)) return;
+        if (linea.includes('SUFIJO_ICONOS')) return;
+        sinSufijo.push(`${rel}:${i + 1}  ${linea.trim()}`);
+      });
+    }
   }
   expect(
     sinSufijo,

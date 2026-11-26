@@ -501,6 +501,28 @@ version_code() { # <vX.Y.Z | X.Y.Z>
   printf '%d\n' $((x * 1000000 + y * 1000 + z))
 }
 
+# codesign con --timestamp, reintentando SOLO cuando el servicio de sellos de tiempo
+# de Apple no contesta («A timestamp was expected but was not found»: release-desktop
+# 45693645649 se quedó en rojo por eso). Cualquier otro fallo de codesign sale a la
+# primera, con su salida.
+codesign_sellado() { # <argumentos de codesign…>
+  local salida intento
+  for intento in 1 2 3 4; do
+    if salida="$(codesign "$@" 2>&1)"; then
+      [ -z "$salida" ] || printf '%s\n' "$salida" >&2
+      return 0
+    fi
+    printf '%s\n' "$salida" >&2
+    case "$salida" in
+    *"A timestamp was expected but was not found"* | *"The timestamp service is not available"*) ;;
+    *) return 1 ;;
+    esac
+    [ "$intento" -lt 4 ] || return 1
+    echo "::warning::codesign sin sello de tiempo de Apple; reintento $intento de 3 en $((intento * 15)) s" >&2
+    sleep $((intento * 15))
+  done
+}
+
 # El instalador del bundle de Linux. POSIX sh y sin `make`, que no viene en muchos
 # escritorios: copia cada programa, escribe su entrada del menú con rutas completas
 # —`~/.local/bin` no está en el PATH de todos— y avisa al escritorio para que se
@@ -1124,7 +1146,7 @@ firmar_tienda() { # <.app> <dir de la app> <app id>
   incorporar_widgets_apple "$app" "$dir" macappstore "$SYTUE_MAS_IDENTIDAD" || return 1
   # Atributos extendidos fuera (un com.apple.FinderInfo hace fallar a codesign).
   xattr -cr "$app"
-  codesign -f -s "$SYTUE_MAS_IDENTIDAD" --options runtime --timestamp --entitlements "$ent" "$app"
+  codesign_sellado -f -s "$SYTUE_MAS_IDENTIDAD" --options runtime --timestamp --entitlements "$ent" "$app"
   rm -f "$claro" "$ent"
   codesign --verify --strict "$app" || {
     echo "::error::la firma de $app no verifica." >&2
@@ -2772,7 +2794,7 @@ XML
           } >"$derechos"
         fi
         ! command -v xattr >/dev/null 2>&1 || xattr -cr "$destino"
-        codesign -f -s "$SYTUE_MACOS_IDENTIDAD" --options runtime --timestamp --entitlements "$derechos" "$destino"
+        codesign_sellado -f -s "$SYTUE_MACOS_IDENTIDAD" --options runtime --timestamp --entitlements "$derechos" "$destino"
         rm -f "$derechos"
         codesign --verify --strict "$destino" || {
           echo "::error::la firma Developer ID de $destino no verifica." >&2

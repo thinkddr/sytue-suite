@@ -18,6 +18,7 @@ import shutil
 import stat
 import subprocess
 import sys
+import time
 
 
 AQUI = pathlib.Path(__file__).resolve().parent
@@ -31,8 +32,29 @@ def generador():
     return module
 
 
+# El servicio de sellos de tiempo de Apple a veces no contesta y `codesign
+# --timestamp` falla con «A timestamp was expected but was not found»: dejó en rojo
+# la Mac App Store de la release-desktop 45693645649 (SytueWidgetBridge de ERP) por
+# algo pasajero. Solo ESE fallo se reintenta, con espera; cualquier otro rechazo de
+# codesign sale a la primera. La salida va a stderr: stdout lleva el resumen JSON.
+SIN_SELLO = ("A timestamp was expected but was not found", "The timestamp service is not available")
+ESPERAS_SELLO = (10, 30, 60)
+
+
 def ejecutar(argumentos):
-    subprocess.run([str(a) for a in argumentos], check=True)
+    orden = [str(a) for a in argumentos]
+    if not (orden and orden[0] == "codesign" and "--timestamp" in orden):
+        subprocess.run(orden, check=True)
+        return
+    for espera in ESPERAS_SELLO + (None,):
+        r = subprocess.run(orden, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        sys.stderr.write(r.stdout)
+        if r.returncode == 0:
+            return
+        if espera is None or not any(m in r.stdout for m in SIN_SELLO):
+            raise subprocess.CalledProcessError(r.returncode, orden, r.stdout)
+        print(f"::warning::codesign sin sello de tiempo de Apple; se reintenta en {espera} s", file=sys.stderr)
+        time.sleep(espera)
 
 
 def capturar(argumentos):

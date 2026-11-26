@@ -792,3 +792,52 @@ devolver({"ok": ok, "sin_id": error_id, "sin_firma": error_firma})
 	pyRestoLanza(t, r.SinID, "ValueError", "sin signing ID en SwiftSupport")
 	pyRestoLanza(t, r.SinFirma, "ValueError", "sin firma en SwiftSupport")
 }
+
+// El servicio de sellos de tiempo de Apple a veces no contesta: `codesign
+// --timestamp` se reintenta solo por eso (release-desktop 45693645649 quedó en rojo
+// en la Mac App Store de ERP), y cualquier otro rechazo sale a la primera.
+func TestWidgetkitAppleReintentaCodesignSoloSinSelloDeTiempo(t *testing.T) {
+	var r map[string]struct {
+		Llamadas int   `json:"llamadas"`
+		Esperas  []int `json:"esperas"`
+		Error    *int  `json:"error"`
+	}
+	pyRestoCorrer(t, widgetkitDobles+`
+llamadas, esperas = [], []
+def correr(salidas):
+    restantes = list(salidas)
+    def run(orden, **kw):
+        llamadas.append(orden)
+        codigo, texto = restantes.pop(0)
+        return types.SimpleNamespace(returncode=codigo, stdout=texto)
+    return run
+sin_sello = "x: A timestamp was expected but was not found.\n"
+resultado = {}
+for nombre, salidas in {
+    "pasajero": [(1, sin_sello), (0, "")],
+    "otro": [(1, "x: errSecInternalComponent\n")],
+    "siempre": [(1, sin_sello)] * 4,
+}.items():
+    llamadas.clear()
+    esperas.clear()
+    error = None
+    with patch.object(widgetkit.subprocess, "run", correr(salidas)), \
+            patch.object(widgetkit.time, "sleep", esperas.append), \
+            contextlib.redirect_stderr(io.StringIO()):
+        try:
+            widgetkit.ejecutar(["codesign", "-f", "-s", "Distribución", "--timestamp", "/tmp/x.framework"])
+        except widgetkit.subprocess.CalledProcessError as e:
+            error = e.returncode
+    resultado[nombre] = {"llamadas": len(llamadas), "esperas": list(esperas), "error": error}
+devolver(resultado)
+`, &r)
+	if p := r["pasajero"]; p.Llamadas != 2 || p.Error != nil || !reflect.DeepEqual(p.Esperas, []int{10}) {
+		t.Errorf("un sello que falta una vez se reintenta y firma: %+v", p)
+	}
+	if o := r["otro"]; o.Llamadas != 1 || o.Error == nil || len(o.Esperas) != 0 {
+		t.Errorf("otro rechazo de codesign no se reintenta: %+v", o)
+	}
+	if s := r["siempre"]; s.Llamadas != 4 || s.Error == nil || !reflect.DeepEqual(s.Esperas, []int{10, 30, 60}) {
+		t.Errorf("sin sello nunca, se rinde tras tres reintentos: %+v", s)
+	}
+}

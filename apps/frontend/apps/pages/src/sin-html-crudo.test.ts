@@ -6,18 +6,20 @@
  * iframe aislado con sandbox, inert y tabindex=-1; nunca mediante
  * dangerouslySetInnerHTML. PAGES-PLAN §14.
  */
+import { leerFuentes } from '@sytue/config/guardianes';
 import { expect, test } from 'bun:test';
 
-const RAIZ_SRC = new URL('./', import.meta.url);
-
 test('ningún fichero de src/ usa dangerouslySetInnerHTML', async () => {
-  const infractores: string[] = [];
-  for await (const rel of new Bun.Glob('**/*').scan({ cwd: RAIZ_SRC.pathname })) {
-    if (!/\.(ts|tsx|astro)$/.test(rel) || rel.includes('.test.')) continue;
-    const fuente = await Bun.file(new URL(rel, RAIZ_SRC)).text();
-    if (fuente.includes('dangerouslySetInnerHTML')) {
-      infractores.push(rel);
-    }
-  }
+  // Con el recorrido a cero, este guardián seguía en verde (medido el 2026-11-25, ver
+  // `@sytue/config/guardianes`): de 208 ficheros, que salgan 100 como poco.
+  const fuentes = await leerFuentes({
+    glob: '**/*',
+    cwd: new URL('./', import.meta.url),
+    minimo: 100,
+    filtro: (rel) => /\.(ts|tsx|astro)$/.test(rel) && !rel.includes('.test.'),
+  });
+  const infractores = fuentes
+    .filter(([, fuente]) => fuente.includes('dangerouslySetInnerHTML'))
+    .map(([rel]) => rel);
   expect(infractores).toEqual([]);
 });

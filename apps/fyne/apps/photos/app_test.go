@@ -426,6 +426,11 @@ func TestLosNumerosSonLosDePhotosAppTsx(t *testing.T) {
 	fondo := webref.Read(t, "apps/frontend/apps/photos/src/lib/fondoLienzo.ts")
 	recuerdos := webref.Read(t, "apps/frontend/apps/photos/src/components/Recuerdos.tsx")
 	subida := webref.Read(t, "apps/frontend/apps/photos/src/client/subida.ts")
+	// El tope de describir se comparte en la web entre el lote y «Organizar con IA».
+	ia := webref.Read(t, "apps/frontend/apps/photos/src/lib/respuestaIA.ts")
+	agrupar := webref.Read(t, "apps/frontend/apps/photos/src/lib/agruparIA.ts")
+	organizar := webref.Read(t, "apps/frontend/apps/photos/src/lib/organizarIA.ts")
+	seccion := webref.Read(t, "apps/frontend/apps/photos/src/components/OrganizarConIA.tsx")
 	for _, c := range []struct{ fuente, literal, que string }{
 		{app, fmt.Sprintf("setInterval(onNext, %d)", DuracionPase/time.Millisecond), "el pase"},
 		{app, fmt.Sprintf("lineaDeTiempo(cursor, %d,", PaginaLinea), "la página"},
@@ -433,7 +438,12 @@ func TestLosNumerosSonLosDePhotosAppTsx(t *testing.T) {
 		{app, fmt.Sprintf("setTimeout(() => void cargarMas(), %d)", EsperaBusqueda/time.Millisecond), "la búsqueda"},
 		{app, fmt.Sprintf(".slice(0, %d)", TopeParecidas), "«Más como estas»"},
 		{app, fmt.Sprintf("min: %d, max: %d, defecto: %d", AnchoFichaMin, AnchoFichaMax, AnchoFicha), "la ficha"},
-		{app, fmt.Sprintf("TOPE_DESCRIBIR = %d", TopeDescribir), "el lote de Sytue AI"},
+		{ia, fmt.Sprintf("TOPE_DESCRIBIR = %d", TopeDescribir), "el lote de Sytue AI"},
+		{app, "import { TOPE_DESCRIBIR } from '../lib/respuestaIA.js';", "el lote de Sytue AI"},
+		{agrupar, fmt.Sprintf("TOPE_ORGANIZAR = %d", api.TopeOrganizar), "las fotos de una pasada de organizar"},
+		{organizar, fmt.Sprintf("PAGINAS_ORGANIZAR = %d", PaginasOrganizar), "las páginas que mira organizar"},
+		{organizar, fmt.Sprintf("POR_PAGINA_ORGANIZAR = %d", PorPaginaOrganizar), "la página de organizar"},
+		{seccion, fmt.Sprintf("MINIATURAS = %d", MiniaturasOrganizar), "las miniaturas de un álbum propuesto"},
 		{fondo, "'" + prefFondo + "'", "el fondo del lienzo"},
 		{recuerdos, "sytue-fotos-recuerdos-ocultos:", "los recuerdos ocultos"},
 		{subida, "'/" + CarpetaFotos + "'", "la carpeta de Drive"},

@@ -98,6 +98,7 @@ import {
   type Tirada,
 } from '../lib/deshacer.js';
 import { sinResultados } from '../lib/sinResultados.js';
+import { TOPE_DESCRIBIR } from '../lib/respuestaIA.js';
 import { posicionVisor, saltoVisor, type PosicionVisor } from '../lib/posicionVisor.js';
 import { accionDeGaleria, accionDelVisor, gruposDeAtajos } from '../lib/atajos.js';
 import { estiloDeTesela } from '../lib/filas.js';
@@ -460,8 +461,6 @@ function Galeria({ locale, user, hubBaseUrl, soloFavoritas = false }: Props): JS
       avisarFallo(e);
     }
   };
-  /** Tope por pasada. Cada foto es una llamada de visión, y se cobra. */
-  const TOPE_DESCRIBIR = 50;
   const [describiendoLote, setDescribiendoLote] = useState<{
     hechas: number;
     total: number;

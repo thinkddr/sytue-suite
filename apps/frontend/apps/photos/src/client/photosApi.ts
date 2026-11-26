@@ -380,6 +380,39 @@ export async function preguntarFoto(id: string, pregunta: string): Promise<strin
   return cuerpo.answer ?? '';
 }
 
+/**
+ * «Organizar con IA»: Sytue AI propone álbumes con lo que ya vio en estas fotos. Solo
+ * PROPONE —no crea nada— y viaja lo justo de cada una: lo que se le cuenta al modelo.
+ * `signal` es «Parar» a mitad de la llamada.
+ */
+export async function agruparFotos(
+  fotos: readonly Foto[],
+  signal?: AbortSignal,
+): Promise<{ titulo: string; ids: string[] }[]> {
+  const res = await fetch(base('/api/agrupar'), {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'content-type': 'application/json', accept: 'application/json' },
+    body: JSON.stringify({
+      fotos: fotos.map(({ id, takenAt, takenAtFromExif, location, description, tags }) => ({
+        id,
+        takenAt,
+        takenAtFromExif,
+        location,
+        description,
+        tags,
+      })),
+    }),
+    signal: signal ?? null,
+  });
+  const cuerpo = (await res.json().catch(() => ({}))) as {
+    albumes?: { titulo: string; ids: string[] }[];
+    error?: string;
+  };
+  if (!res.ok) throw new Error(cuerpo.error ?? `ia_${res.status}`);
+  return cuerpo.albumes ?? [];
+}
+
 /** Guarda qué sale en la foto. */
 export const guardarDescripcion = (id: string, description: string, tags: string[]) =>
   mandar<void>('PUT', `/api/v1/assets/${encodeURIComponent(id)}/description`, {

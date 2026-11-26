@@ -996,7 +996,9 @@ esquemas_extra_de() { # <dir de la app> -> esquemas separados por espacios
   propio="$(metadato "$1" esquema)"
   crudo="$(sed -n 's/^[[:space:]]*esquemas_extra[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' "$1/FyneApp.toml" | head -1)"
   [ -z "$crudo" ] || IFS=, read -ra lista <<<"$crudo"
-  for e in "${lista[@]}"; do
+  # `${lista[@]+…}`: sin esquemas extra (todas menos Mail) la lista está vacía, y el bash
+  # 3.2 del Mac, con `set -u`, da «lista[@]: unbound variable» y para el empaquetado.
+  for e in ${lista[@]+"${lista[@]}"}; do
     if ! [[ "$e" =~ ^[a-z][a-z0-9+.-]*$ ]] || [ "$e" = "$propio" ] || [[ "$e" == sytue* ]] ||
       [ "$e" = http ] || [ "$e" = https ] || [ "$e" = file ]; then
       echo "::error::$1: «$e» no vale como esquema extra (minúsculas, ni el propio, ni de la suite, ni web)" >&2

@@ -18,7 +18,8 @@ import (
 // (`pages/api/describir.ts`, `preguntar.ts`, `terminos.ts` y `editar-ia.ts`); aquí son
 // las mismas instrucciones, con las mismas reglas, y los mismos lectores de respuesta
 // (`lib/respuestaIA.ts`, `lib/terminos.ts` y `lib/edicionIA.ts`). Si cambian allí,
-// cambian aquí: lo que el modelo lee tiene que ser lo mismo desde las dos.
+// cambian aquí: lo que el modelo lee tiene que ser lo mismo desde las dos. La quinta,
+// «Organizar con IA» (`agrupar.ts`), está en photos_agrupar.go.
 
 // ErrIAIlegible es que el modelo contestó algo que no se puede usar: se dice, en vez de
 // escribir en el `alt` de la foto una frase que no describe nada.

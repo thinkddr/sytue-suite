@@ -133,7 +133,7 @@ intermedios() {
   local dir f archivos=()
   dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)/.github/actions/apple"
   for f in "$@"; do archivos+=("$dir/$f"); done
-  llavero_operacion publicos "${archivos[@]}" ||
+  llavero_operacion publicos ${archivos[@]+"${archivos[@]}"} ||
     mal 'no se pudo añadir el intermedio público fijado al llavero exclusivo'
 }
 
@@ -272,7 +272,7 @@ perfil() { # <App ID> [mac|developerid] [ruta]
       "$HOME/Library/MobileDevice/Provisioning Profiles"
     )
   fi
-  for dir in "${dirs[@]}"; do
+  for dir in ${dirs[@]+"${dirs[@]}"}; do
     [ -d "$dir" ] || continue
     elegido="$(for f in "$dir"/*.mobileprovision "$dir"/*.provisionprofile; do
       # Los de iOS, solo con su extensión (como siempre); los de Mac, con las dos.
@@ -299,7 +299,7 @@ if (appid.split(".", 1)[-1] == sys.argv[1]
   done
   [ -n "$elegido" ] || [ "$mac" != developerid ] ||
     mal "no hay ningún perfil Developer ID (MAC_APP_DIRECT) instalado para $id: configúralo con su App Group autorizado antes de empaquetar."
-  [ -n "$elegido" ] || mal "no hay ningún perfil de tienda instalado para ${id} en «${dirs[*]}»: ¿pasó «apple-firma.sh preparar $([ -z "$mac" ] && echo ios || echo macappstore) ${id}»?"
+  [ -n "$elegido" ] || mal "no hay ningún perfil de tienda instalado para ${id} en «${dirs[*]+${dirs[*]}}»: ¿pasó «apple-firma.sh preparar $([ -z "$mac" ] && echo ios || echo macappstore) ${id}»?"
   printf '%s\n' "$elegido"
 }
 

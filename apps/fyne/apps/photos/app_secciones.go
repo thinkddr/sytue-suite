@@ -96,6 +96,7 @@ func (a *App) datosAlbumes() Albumes {
 		AlGuardar: a.guardarMonton,
 		AlVer:     func(fotos []api.Photo) { a.AbrirParecidas(idsDe(fotos)) },
 		Cifrados:  a.seccionAlbumesCifrados(),
+		Organizar: a.datosOrganizar(),
 	}
 }
 

@@ -444,8 +444,13 @@ func TestUnEnlaceConTituloLlevaHastaEl(t *testing.T) {
 
 // TestUnaTablaSePintaComoEnLaWeb: medido en la web con esta misma nota en una tarjeta de
 // 323,7 (300,7 de cuerpo): la tabla empieza a 30,75 (la línea de «Recuento:» y su `mb-2`),
-// las líneas de 22,75, las columnas a lo que piden (152,546875 y 35,671875) y la cabecera
-// en negrita y centrada.
+// las líneas de 22,75 y la cabecera en negrita.
+//
+// Desde el 2026-11-26, como la web de ahora (`.sytue-prose table`: `w-full` y
+// `table-layout: fixed`; `th { text-left }`): la tabla ocupa los 300,7 y las dos columnas
+// se los reparten a partes iguales, y la cabecera va a la izquierda. «Salón y comedor
+// grande» (152,546875 sin relleno) ya no cabe en su mitad y ocupa dos líneas. Antes las
+// columnas iban a lo que pedían (152,546875 y 35,671875) y la cabecera, centrada.
 //
 // Desde el 2026-11-24 una tabla sin estilo propio lleva la rejilla del tema: un pelo de
 // `border` y `px-2 py-1` en cada celda (y la cabecera sobre `bg-subtle`), que es la regla
@@ -475,11 +480,12 @@ func TestUnaTablaSePintaComoEnLaWeb(t *testing.T) {
 	pelo, fila := tema.Borde, 22.75+2*pyCeldaTabla
 	casi("la fila de cabecera", donde["Cuarto"].Y, 30.75+pelo+pyCeldaTabla)
 	casi("la segunda fila", donde["Cocina"].Y, 30.75+pelo+fila+pelo+pyCeldaTabla)
-	col2 := pelo + 152.546875 + 2*pxCeldaTabla + pelo + pxCeldaTabla
+	mitad := (300.7 - 3*pelo) / 2
+	col2 := pelo + mitad + pelo + pxCeldaTabla
 	casi("la segunda columna", x["12"], col2)
-	casi("«Cajas» (la cabecera, que es la más ancha)", x["Cajas"], col2)
-	casi("«Cuarto» centrada", x["Cuarto"]+medirTrozo("Cuarto", donde["Cuarto"].Trozos[0].estilo)/2, pelo+pxCeldaTabla+152.546875/2)
-	casi("«Fin.»", donde["Fin."].Y, 30.75+3*fila+4*pelo)
+	casi("«Cajas», la cabecera, a la izquierda", x["Cajas"], col2)
+	casi("«Cuarto» a la izquierda", x["Cuarto"], pelo+pxCeldaTabla)
+	casi("«Fin.» (la última fila con dos líneas)", donde["Fin."].Y, 30.75+3*fila+22.75+4*pelo)
 	if donde["Cuarto"].Trozos[0].estilo.peso < ui.SemiNegrita {
 		t.Error("la cabecera no va en negrita")
 	}

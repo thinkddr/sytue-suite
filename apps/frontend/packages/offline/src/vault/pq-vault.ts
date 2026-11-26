@@ -557,6 +557,8 @@ async function addSigningKey(o: {
 interface SigningKeyView {
   generation: number;
   key_id: string;
+  /** `traspaso` si se registró pasando el correo de Matrix a la bóveda (ADR 0087). */
+  reason?: string;
   retired_at?: string;
 }
 
@@ -607,6 +609,22 @@ async function registerSigningKeyOnce(o: {
   const active = (Array.isArray(keys) ? keys : []).find((k) => !k.retired_at);
   const raw = encoder.encode(o.signingKey);
   try {
+    // Primero, de quién es la activa. Si es ESTA clave, no hay nada que registrar (con
+    // traspaso, solo si ya se hizo con él), y la declaración ni se pide: una clave no se
+    // sucede a sí misma y el núcleo la rechaza (`previousKeyID == keyID`). Se pedía
+    // antes de comparar, con la activa como anterior, y el correo se quedaba en
+    // `prepare/vault.unavailable.signing_failed` en cuanto se volvía a abrir una
+    // bóveda ya registrada. Es lo que ya hacía el cliente nativo (`pqvault`).
+    if (active) {
+      const own = await o.core.invoke<{ key_id: string }>({
+        operation: 'vault.signing.public',
+        signing_key: raw.slice(),
+      });
+      if (own.key_id === active.key_id) {
+        if (!o.handover || active.reason === 'traspaso') return { status: 'registered' };
+        return { status: 'unavailable', check: 'signing_handover_taken' };
+      }
+    }
     const enroll = await o.core.invoke<{
       profile: string;
       key_id: string;
@@ -623,8 +641,6 @@ async function registerSigningKeyOnce(o: {
       generation: active ? active.generation + 1 : 1,
       ...(active ? { previous_key_id: active.key_id } : {}),
     });
-    // Un traspaso se pide siempre: Sytue ID dice si esa clave ya lo tiene.
-    if (active && active.key_id === enroll.key_id && !o.handover) return { status: 'registered' };
     const res = await o.call('PUT', {
       public_key: {
         profile: enroll.profile,
@@ -1021,7 +1037,14 @@ export class PqVault {
                 }),
             }).catch((error: unknown): SigningKeyOutcome => ({
               status: 'unavailable',
-              check: error instanceof PqVaultError && error.check ? error.check : 'signing_failed',
+              // Con el código fijo del fallo cuando lo hay (`signing_failed_crypto_rejected`):
+              // `signing_failed` a secas no decía si fue el núcleo, la red o Sytue ID.
+              check:
+                error instanceof PqVaultError && error.check
+                  ? error.check
+                  : error instanceof Error && /^[a-z0-9_]{1,40}$/u.test(error.message)
+                    ? `signing_failed_${error.message}`
+                    : 'signing_failed',
             }))
           : { status: 'missing', check: 'signing_missing' };
       options.signal?.throwIfAborted();

@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
+	"git.sytue.eu/sytue/one/apps/nucleo/fallo"
 	"git.sytue.eu/sytue/one/apps/nucleo/ingress"
 	privateMail "git.sytue.eu/sytue/one/apps/nucleo/mail"
 	"git.sytue.eu/sytue/one/apps/nucleo/offline"
@@ -194,49 +195,56 @@ func (r *Application) Prepare(parent context.Context) error {
 	r.ready = false
 	r.mu.Unlock()
 	if err := r.resources.Revalidate(ctx); err != nil {
-		return err
+		return fallo.En("revalidar", err)
 	}
 	if err := r.group.Register(ctx); err != nil {
-		return err
+		return fallo.En("registrar", err)
 	}
 	caps, err := r.cfg.Source.PrivateStorageCapabilities(ctx, r.scope)
 	if err != nil {
-		return err
+		return fallo.En("capacidades", err)
 	}
-	if caps.Validate(r.scope) != nil || caps.Shared || !caps.PrivateIngressReady {
-		return privateMail.ErrNotReady
+	// Cada «no» con su nombre (paquete fallo): el servicio decía
+	// `private_ingress_ready: false` a todas las cuentas y no había forma de verlo.
+	switch {
+	case caps.Validate(r.scope) != nil:
+		return fallo.En("capacidades_invalidas", privateMail.ErrNotReady)
+	case caps.Shared:
+		return fallo.En("compartido", privateMail.ErrNotReady)
+	case !caps.PrivateIngressReady:
+		return fallo.En("entrada_no_lista", privateMail.ErrNotReady)
 	}
 	state := caps.LegacyMigrationState
 	if r.cfg.Vault {
 		if state, err = r.captureVault(ctx, caps); err != nil {
-			return fmt.Errorf("mail vault source: %w", err)
+			return fallo.En("origen_boveda", fmt.Errorf("mail vault source: %w", err))
 		}
 	}
 	if r.cfg.RequireLegacy {
 		if err := r.prepareHistorical(ctx, caps); err != nil {
-			return fmt.Errorf("mail historical source: %w", err)
+			return fallo.En("historico", fmt.Errorf("mail historical source: %w", err))
 		}
 		state = r.historical.RetainedState()
 	}
 	plan, err := r.enrollment.Ensure(ctx, state.Epoch)
 	if err != nil {
-		return fmt.Errorf("mail receiver enrollment: %w", err)
+		return fallo.En("inscripcion", fmt.Errorf("mail receiver enrollment: %w", err))
 	}
 	if err := r.prepareTarget(ctx, caps, state); err != nil {
-		return fmt.Errorf("mail private destination: %w", err)
+		return fallo.En("destino", fmt.Errorf("mail private destination: %w", err))
 	}
 	if r.cfg.Vault {
 		if err := r.core.ImportDirectSource(ctx, r.cfg.Source); err != nil {
-			return fmt.Errorf("mail vault import: %w", err)
+			return fallo.En("importar", fmt.Errorf("mail vault import: %w", err))
 		}
 	} else if err := r.cutover.Prepare(ctx); err != nil {
-		return fmt.Errorf("mail identity cutover: %w", err)
+		return fallo.En("traspaso_identidad", fmt.Errorf("mail identity cutover: %w", err))
 	}
 	if err := r.prepareWorker(ctx, state.Epoch, plan); err != nil {
-		return fmt.Errorf("mail receiver setup: %w", err)
+		return fallo.En("receptor", fmt.Errorf("mail receiver setup: %w", err))
 	}
 	if err := r.resources.Revalidate(ctx); err != nil {
-		return fmt.Errorf("mail final session validation: %w", err)
+		return fallo.En("revalidar_final", fmt.Errorf("mail final session validation: %w", err))
 	}
 	r.mu.Lock()
 	r.ready = true

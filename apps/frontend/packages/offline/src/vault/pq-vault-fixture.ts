@@ -50,10 +50,13 @@ export function createMockCore(): PqcRuntime {
         const recipient = request.recipient as string;
         const found = [...identities.values()].find((v) => v.recipient === recipient);
         if (!found) throw new Error('unknown_recipient');
+        // Con su aleatoriedad, como el de verdad: el mismo registro sellado dos veces
+        // da dos cifrados distintos (de ahí el 409 de un `transaction_id` repetido).
         const payload = JSON.stringify({
           room: request.room,
           record: Buffer.from(request.record as Uint8Array).toString('base64'),
           proof: Buffer.from(request.proof as Uint8Array).toString('base64'),
+          nonce: crypto.randomUUID(),
         });
         const env: PqcEnvelope = {
           v: 1,
@@ -261,6 +264,10 @@ export function createHarness(
         (r) => r.vault_id === body.vault_id && r.tx === body.transaction_id,
       );
       if (existing) {
+        // Como `services/drive`: el mismo `transaction_id` solo vale con el MISMO cuerpo;
+        // el mismo registro cifrado otra vez por otro cliente es un 409 `conflict`.
+        if (JSON.stringify(existing.payload) !== JSON.stringify(body.payload))
+          return conflict('conflict');
         return Response.json({
           event_id: existing.event_id,
           vault_id: existing.vault_id,
@@ -287,8 +294,10 @@ export function createHarness(
     }
     if (url.pathname === '/drive/api/pq-vault/records' && method === 'GET') {
       const vid = url.searchParams.get('vault_id');
+      // Con `transaction_id`, como el servicio: solo el registro de esa transacción.
+      const tx = url.searchParams.get('transaction_id');
       const entries = records
-        .filter((r) => r.vault_id === vid)
+        .filter((r) => r.vault_id === vid && (tx === null || r.tx === tx))
         .reverse()
         .map((r) => ({
           event_id: r.event_id,

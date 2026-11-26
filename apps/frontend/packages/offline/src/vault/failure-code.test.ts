@@ -57,6 +57,74 @@ test('el código del fallo dice qué comprobación fue, con lo que es fijo en el
     ],
     [new AggregateError([new DriveImportError('inventory')], secret), 'drive.import.inventory'],
     [new Error(secret), 'error.Error'],
+    // Los `new Error` del código con su texto fijo dicen cuál fue (antes, `error.Error`
+    // a secas en Mail): el núcleo, IndexedDB y la caché cifrada. Nada más se copia.
+    [new Error('crypto_rejected'), 'error.Error.crypto_rejected'],
+    [new Error('crypto_runtime_unavailable'), 'error.Error.crypto_runtime_unavailable'],
+    [new Error('indexeddb cleared'), 'error.Error.indexeddb_cleared'],
+    [new Error('offline_record_tampered'), 'error.Error.offline_record_tampered'],
+    [new Error('informe secreto'), 'error.Error'],
+    [new Error('crypto ' + secret), 'error.Error'],
+    // Y el paso en que iba la apertura, si lo marcó (`mail.capacidades`).
+    [
+      Object.defineProperty(new Error('crypto_rejected'), 'vaultStep', {
+        value: 'mail.capacidades',
+      }),
+      'mail.capacidades.error.Error.crypto_rejected',
+    ],
+    [
+      Object.defineProperty(new PqVaultError('unavailable'), 'vaultStep', { value: 'mail.motor' }),
+      'mail.motor.vault.unavailable',
+    ],
+    [Object.defineProperty(new Error('x'), 'vaultStep', { value: secret }), 'error.Error'],
+    // El núcleo contesta `crypto_rejected` cuando antes falló un puerto del anfitrión:
+    // cuál y con qué código, que es lo que de verdad pasó.
+    [
+      Object.defineProperty(
+        Object.defineProperty(new Error('crypto_rejected'), 'hostFailure', {
+          value: {
+            method: 'source.capabilities',
+            error: new HttpError(
+              409,
+              'Conflict',
+              secret,
+              '{"error":{"code":"mail_source_frozen"}}',
+            ),
+          },
+        }),
+        'vaultStep',
+        { value: 'mail.capacidades' },
+      ),
+      'mail.capacidades.error.Error.crypto_rejected.host.source.capabilities.http.409.mail_source_frozen',
+    ],
+    [
+      Object.defineProperty(new Error('crypto_rejected'), 'hostFailure', {
+        value: { method: secret, error: new Error('x') },
+      }),
+      'error.Error.crypto_rejected',
+    ],
+    // El núcleo dice con palabras fijas en qué paso dijo «no» (`motivo`, paquete
+    // fallo de Go): así se vio que el servicio contestaba «entrada no lista».
+    [
+      Object.defineProperty(
+        Object.defineProperty(new Error('crypto_rejected'), 'coreReason', {
+          value: 'abrir.preparar.entrada_no_lista.no_listo',
+        }),
+        'vaultStep',
+        { value: 'mail.motor' },
+      ),
+      'mail.motor.error.Error.crypto_rejected.core.abrir.preparar.entrada_no_lista.no_listo',
+    ],
+    [
+      Object.defineProperty(new Error('crypto_rejected'), 'coreReason', { value: secret }),
+      'error.Error.crypto_rejected',
+    ],
+    [
+      Object.defineProperty(new Error('crypto_rejected'), 'coreReason', {
+        value: 'a.'.repeat(90) + 'b',
+      }),
+      'error.Error.crypto_rejected',
+    ],
     ['texto suelto', 'unknown'],
   ];
   for (const [error, code] of cases) {

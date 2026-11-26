@@ -4,6 +4,7 @@ package store
 import (
 	"context"
 	"io"
+	"reflect"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -53,6 +54,46 @@ func (s *Store) PrivateIngressQueue(authority callaccess.PrivateIngressAuthority
 		}
 		return objects.Get(ctx, tenant, key)
 	}}
+}
+
+// EntradaPrivada dice si la entrada privada del correo está montada para un ámbito
+// y la prepara (jmap.PrivateIngress). Es la misma cola que PrivateIngressQueue: la
+// autoridad de Rooms que firma reclamaciones y recibos y el almacén de objetos de lo
+// cifrado. Sin las dos, o para un ámbito que no es de quien pregunta, no está lista.
+//
+// Faltaba en producción: el servicio contestaba `private_ingress_ready: false` a
+// todas las cuentas, el núcleo de cliente rechazaba `mail.capabilities` y Mail se
+// quedaba en `prepare/error.Error` aun vaciando los datos.
+type EntradaPrivada struct {
+	autoridad callaccess.PrivateIngressAuthority
+	objetos   objectstore.PrivateIngressObjects
+}
+
+// NuevaEntradaPrivada. Una autoridad o un almacén nil (también un puntero nil
+// dentro de la interfaz) dejan la entrada sin montar.
+func NuevaEntradaPrivada(autoridad callaccess.PrivateIngressAuthority, objetos objectstore.PrivateIngressObjects) EntradaPrivada {
+	return EntradaPrivada{autoridad: autoridad, objetos: objetos}
+}
+
+func (e EntradaPrivada) PrivateIngressReady(ctx context.Context, scope storage.Scope) (bool, error) {
+	return !nulo(e.autoridad) && !nulo(e.objetos) && mailIngressOwner(ctx, scope), nil
+}
+
+func (e EntradaPrivada) PreparePrivateIngress(ctx context.Context, scope storage.Scope) error {
+	if lista, _ := e.PrivateIngressReady(ctx, scope); !lista {
+		return pg.ErrPrivateIngressMissing
+	}
+	return nil
+}
+
+// nulo: nil, o un puntero nil envuelto en la interfaz (`callaccess.New` devuelve
+// *Client nil si falta la URL o el secreto de Rooms).
+func nulo(v any) bool {
+	if v == nil {
+		return true
+	}
+	r := reflect.ValueOf(v)
+	return r.Kind() == reflect.Pointer && r.IsNil()
 }
 
 func mailIngressOwner(ctx context.Context, scope storage.Scope) bool {

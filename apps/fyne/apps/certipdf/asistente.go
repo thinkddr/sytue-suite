@@ -302,17 +302,24 @@ func (a *panelAsistente) terminar(clave string, respuesta []ia.Bloque) {
 // enviar es la consulta en sí, en el modo calidad, que es el de la web.
 func (a *panelAsistente) enviar(contexto, instruccion, accion string) {
 	p := a.l.pant
-	if p == nil || p.IA == nil || p.doc == nil {
+	if p == nil || (p.IA == nil && p.Asistir == nil) || p.doc == nil {
 		a.terminar("pdf.ai.failed", nil)
 		return
 	}
-	doc, cliente := p.doc, p.IA
+	doc, cliente, propio := p.doc, p.IA, p.Asistir
 	go func() {
 		ctx, parar := context.WithTimeout(p.ctx, plazoIA)
 		defer parar()
-		texto, err := doc.asistir(ctx, cliente, api.PeticionIA{
+		peticion := api.PeticionIA{
 			Accion: accion, Instruccion: instruccion, Contexto: contexto, Tipo: "pdf", Modo: "calidad",
-		})
+		}
+		var texto string
+		var err error
+		if propio != nil {
+			texto, err = propio(ctx, peticion)
+		} else {
+			texto, err = doc.asistir(ctx, cliente, peticion)
+		}
 		texto = strings.TrimSpace(texto)
 		fyne.Do(func() {
 			defer p.avisarRed()
@@ -331,7 +338,7 @@ func (a *panelAsistente) enviar(contexto, instruccion, accion string) {
 // fotografía pesa varias veces menos que el PNG sin leerse peor.
 func (a *panelAsistente) leerEscaneo() {
 	p := a.l.pant
-	if a.ocupado || p == nil || p.doc == nil || p.IA == nil {
+	if a.ocupado || p == nil || p.doc == nil || (p.IA == nil && p.Asistir == nil) {
 		return
 	}
 	a.ocupado, a.error, a.respuesta = true, "", nil
@@ -342,13 +349,19 @@ func (a *panelAsistente) leerEscaneo() {
 		}
 	}
 	a.rehacer()
-	doc, cliente := p.doc, p.IA
+	doc, cliente, propio := p.doc, p.IA, p.Asistir
 	go func() {
 		leidas := make([]paginaLeida, 0, len(paginas))
 		for i, n := range paginas {
 			pct := int(math.Round(float64(i+1) / float64(len(paginas)) * 100))
 			fyne.Do(func() { a.leyendo = pct; a.rehacer() })
-			leidas = append(leidas, paginaLeida{pagina: n, texto: transcribir(p.ctx, doc, cliente, n)})
+			var texto string
+			if propio != nil {
+				texto = transcribirCon(p.ctx, doc, propio, n)
+			} else {
+				texto = transcribir(p.ctx, doc, cliente, n)
+			}
+			leidas = append(leidas, paginaLeida{pagina: n, texto: texto})
 		}
 		junto := juntar(leidas)
 		fyne.Do(func() {
@@ -369,6 +382,16 @@ func transcribir(ctx context.Context, doc *Documento, cliente *api.IA, n int) st
 	if doc == nil || doc.pdf.CheckRemoteProcessing(ctx) != nil {
 		return ""
 	}
+	return transcribirCon(ctx, doc, func(ctx context.Context, q api.PeticionIA) (string, error) {
+		return doc.asistir(ctx, cliente, q)
+	}, n)
+}
+
+// transcribirCon es transcribir con quien atiende la consulta ya elegido.
+func transcribirCon(ctx context.Context, doc *Documento, asistir func(context.Context, api.PeticionIA) (string, error), n int) string {
+	if doc == nil || asistir == nil {
+		return ""
+	}
 	ctx, parar := context.WithTimeout(ctx, plazoIA)
 	defer parar()
 	imgs, err := doc.Imagenes(ctx, n, n, 2)
@@ -379,7 +402,7 @@ func transcribir(ctx context.Context, doc *Documento, cliente *api.IA, n int) st
 	if jpeg.Encode(&buf, imgs[n], &jpeg.Options{Quality: 92}) != nil {
 		return ""
 	}
-	texto, _ := doc.asistir(ctx, cliente, api.PeticionIA{
+	texto, _ := asistir(ctx, api.PeticionIA{
 		Accion: "transcribir", Instruccion: instruccionOCR, Tipo: "pdf", Modo: "calidad",
 		Imagen: buf.Bytes(), ImagenTipo: "image/jpeg",
 	})

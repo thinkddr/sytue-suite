@@ -19,9 +19,9 @@ import (
 	"time"
 	_ "time/tzdata" // la imagen es distroless: sin esto no hay Europe/Madrid
 
+	"git.sytue.eu/sytue/one/apps/nucleo/erp/obligaciones"
 	"git.sytue.eu/sytue/one/platform/pkg/correo"
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
-	"git.sytue.eu/sytue/one/services/syerp/internal/obligaciones"
 	"git.sytue.eu/sytue/one/services/syerp/internal/permisos"
 	"git.sytue.eu/sytue/one/services/syerp/internal/store"
 )

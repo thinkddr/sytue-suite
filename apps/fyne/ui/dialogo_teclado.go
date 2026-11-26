@@ -11,7 +11,7 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 
-	"git.sytue.eu/sytue/one/apps/fyne/sesion"
+	"git.sytue.eu/sytue/one/apps/fyne/anfitrion"
 )
 
 // El teclado del teléfono y la hoja de un diálogo.
@@ -31,7 +31,7 @@ import (
 // Fyne en iOS ya son puntos: dividir también allí por la escala dejaba el teclado en un
 // tercio en un iPhone de @3x.
 var AltoTeclado = func(c fyne.Canvas) float32 {
-	alto := sesion.AltoTeclado()
+	alto := anfitrion.AltoTeclado()
 	if runtime.GOOS == "android" && c != nil && c.Scale() > 0 {
 		alto /= c.Scale()
 	}

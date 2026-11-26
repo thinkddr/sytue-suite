@@ -352,6 +352,19 @@ func (p *Pantalla) crearEvento(n Nota) {
 	})
 }
 
+// crearEventoFuera es «Añadir al calendario» sin Calendar de la suite: el título de la
+// nota (o el principio de su texto) y su texto, a CrearEventoFuera.
+func (p *Pantalla) crearEventoFuera(n Nota) {
+	if p.CrearEventoFuera == nil {
+		return
+	}
+	titulo := resumenNota(n.Titulo, n.Contenido, 200)
+	if titulo == "" {
+		titulo = p.tr.T("note.untitled", nil)
+	}
+	p.CrearEventoFuera(titulo, resumenNota("", n.Contenido, 4000))
+}
+
 // ---- Lo que se pinta ----
 
 func (p *Pantalla) texto(s string, e tema.Escalon, peso ui.Peso, tinta string, v tema.Variante) *ui.Parrafo {

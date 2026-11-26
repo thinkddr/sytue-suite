@@ -610,3 +610,25 @@ func TestElAltaDeDAVx5NoLlevaContrasena(t *testing.T) {
 		t.Error("sin usuario no hay alta que rellenar")
 	}
 }
+
+func TestAbrirEnOfficeSoloSuEsquema(t *testing.T) {
+	var abiertos []string
+	a := abridorFunc(func(u *url.URL) error { abiertos = append(abiertos, u.String()); return nil })
+	for _, bien := range []string{"sytueoffice-docs:/abrir?local=file:///tmp/a%20b.docx", "sytueoffice-pdf:/abrir"} {
+		if err := AbrirEnOffice(a, bien); err != nil {
+			t.Fatal(bien, err)
+		}
+	}
+	for _, mal := range []string{"sytue-docs:/abrir", "https://sytue.eu", "sytueoffice-:/x", "sytueoffice-do cs:/x", "sytueoffice-docs://host/x", "javascript:alert(1)", "sytueoffice-Docs1:/x"} {
+		if err := AbrirEnOffice(a, mal); err == nil {
+			t.Fatal("abrió", mal)
+		}
+	}
+	if len(abiertos) != 2 {
+		t.Fatal(abiertos)
+	}
+}
+
+type abridorFunc func(*url.URL) error
+
+func (f abridorFunc) OpenURL(u *url.URL) error { return f(u) }

@@ -14,8 +14,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	domain "git.sytue.eu/sytue/one/apps/nucleo/erp/dominio"
 	"git.sytue.eu/sytue/one/platform/pkg/keycrypto"
-	"git.sytue.eu/sytue/one/services/syerp/internal/domain"
 	"git.sytue.eu/sytue/one/services/syerp/internal/verifactu"
 )
 

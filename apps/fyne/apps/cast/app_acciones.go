@@ -1440,3 +1440,22 @@ func (a *App) Cerrar() {
 	}
 	a.actualizarEncendido()
 }
+
+// FotogramaDeAhora es el fotograma que enseña el reproductor del vídeo id y su instante,
+// si es ese el que se está viendo y ya hay imagen. Es el «Usar el fotograma de ahora»
+// de Sytue Office, que pone de póster lo que se ve sin ffmpeg (CA-06).
+func (a *App) FotogramaDeAhora(id string) (image.Image, time.Duration, bool) {
+	if a.reproductor == nil || a.ruta != RutaVer || a.ver.id != id {
+		return nil, 0, false
+	}
+	img, _ := a.reproductor.UltimoFotograma()
+	return img, a.reproductor.Posicion(), img != nil
+}
+
+// TirarPoster saca el póster de id de la caché, para que se vuelva a pedir (cuando lo
+// cambia alguien que no es esta pantalla).
+func (a *App) TirarPoster(id string) {
+	if a.v.Teca != nil {
+		a.v.Teca.Tirar(id)
+	}
+}

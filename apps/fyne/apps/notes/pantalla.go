@@ -151,6 +151,9 @@ type Pantalla struct {
 	// los documentos de las notas `doc`, por ID (ver `docDe`).
 	imagenes map[string]imagenRemota
 	docs     map[string]docRemoto
+	// bajandoImagen son las notas de imagen por URL cuya imagen se está bajando a
+	// petición (imagen_url.go), por ID.
+	bajandoImagen map[string]bool
 	// ancla es el título (su slug) al que llevar la nota abierta en cuanto se pinte: el
 	// `h=` de un enlace a una nota (`ancla` de NotesApp.tsx).
 	ancla string
@@ -222,6 +225,24 @@ type Pantalla struct {
 	// Asistir es Sytue AI (`api.IA.Asistir`): con él, el editor lleva el asistente al
 	// final de la barra (asistente.go). Nil: no sale.
 	Asistir func(context.Context, api.PeticionIA) (string, error)
+	// SinCompartir quita lo que no tiene sentido sin cuenta (Sytue Office, N-05):
+	// «Compartido conmigo» de la barra y cifrar un cuaderno en sus ajustes. Falso: todo
+	// como siempre.
+	SinCompartir bool
+	// VolcadoCifrado es el aviso al importar la copia de un cuaderno cifrado donde no se
+	// puede abrir (N-05). Vacío: el aviso genérico de siempre.
+	VolcadoCifrado string
+	// CrearEventoFuera, sin Calendar de la suite (Sytue Office, N-08), da «Añadir al
+	// calendario» abriendo la app de calendario con el formulario relleno: el título y el
+	// texto de la nota. Nil: como siempre (solo con `Suite.Calendar`).
+	CrearEventoFuera func(titulo, descripcion string)
+	// AbrirLocal abre un fichero de este equipo enlazado desde una nota (`file://…`, N-07)
+	// con su app. Nil: un `file://` va al sistema como cualquier enlace, como siempre.
+	AbrirLocal func(ruta string)
+	// FicherosLocales son los ficheros del equipo en las notas (Sytue Office, N-06 y
+	// N-07, ficheros_locales.go): la nota de imagen con la imagen dentro y el enlace al
+	// soltar un fichero. Nil: como siempre.
+	FicherosLocales *FicherosLocales
 }
 
 // ConServiciosVinculados añade el acceso a las páginas del proveedor sin copiarlas
@@ -628,6 +649,8 @@ func bloqueDeAncla(d *Documento, slug string) (int, bool) {
 
 // sincronizar vuelca el estado de la pantalla en cada vista antes de pintarla. Está
 // junto y no repartido para que no haya un campo que solo se actualice en un camino.
+//
+//nolint:gocyclo // Junto a propósito (ver arriba): repartido, un campo se quedaría sin actualizar en algún camino.
 func (p *Pantalla) sincronizar() {
 	if p.activo.Crudo.DailyDate == "" {
 		p.dia.semana, p.dia.marcasDestino = nil, nil
@@ -644,6 +667,7 @@ func (p *Pantalla) sincronizar() {
 	// `notes` y no las visibles, así que ni el filtro ni el orden las tocan ahí.
 	p.lateral.Notas, p.lateral.NotaActiva = p.notas, p.lienzo.Seleccionada
 	p.lateral.Vista, p.lateral.Bloqueado = p.vista, p.bloqueado
+	p.lateral.SinCompartidas = p.SinCompartir
 
 	p.barra.Cuaderno, p.barra.Filtro, p.barra.Orden = p.activo, p.filtro, p.orden
 	p.barra.Etiquetas, p.barra.FiltroEstado = p.etiquetas, p.filtroEstado
@@ -660,6 +684,26 @@ func (p *Pantalla) sincronizar() {
 	p.barra.AlMoverCuaderno = nil
 	if p.puedeMoverCuaderno(p.activo) {
 		p.barra.AlMoverCuaderno = func() { p.dialogoMoverCuaderno(p.activo) }
+	}
+	// «Añadir una imagen del equipo…» (Sytue Office, N-06).
+	p.barra.AlImagenLocal, p.barra.RotuloImagenLocal = nil, ""
+	if f := p.FicherosLocales; f != nil && f.Elegir != nil && p.puedeFicherosLocales() {
+		p.barra.AlImagenLocal, p.barra.RotuloImagenLocal = p.elegirImagenLocal, f.Rotulo
+	}
+	// «Añadir una imagen de una dirección web…» (Sytue Office, imagen_url.go).
+	p.barra.AlImagenURL, p.barra.RotuloImagenURL = nil, ""
+	if p.puedeImagenURL() {
+		p.barra.AlImagenURL, p.barra.RotuloImagenURL = p.dialogoImagenURL, textoImagenURL(p.tr.Locale(), "anadir")
+	}
+	// La imagen que una nota de imagen lleva dentro, solo donde puede haberla. Ahí la de
+	// una dirección no se pide sola: «Cargar la imagen», si se puede.
+	p.lienzo.ImagenAdjunta, p.lienzo.SinBajar, p.lienzo.CargarImagen, p.lienzo.CargandoImagen = nil, false, nil, nil
+	if p.FicherosLocales != nil {
+		p.lienzo.ImagenAdjunta, p.lienzo.SinBajar = p.imagenAdjuntaDe, true
+		if p.puedeImagenURL() {
+			p.lienzo.CargarImagen = p.cargarImagenRemota
+			p.lienzo.CargandoImagen = func(id string) bool { return p.bajandoImagen[id] }
+		}
 	}
 
 	p.lienzo.Cuaderno, p.lienzo.Bloqueado = p.activo, p.bloqueado
@@ -1427,6 +1471,12 @@ func (p *Pantalla) seguirEnlace(href string) {
 		p.ancla = ancla
 		p.abrirResultado(api.NoteHit{ID: nota, NotebookID: cuaderno})
 		return
+	}
+	if p.AbrirLocal != nil {
+		if u, err := url.Parse(href); err == nil && u.Scheme == "file" && u.Path != "" {
+			p.AbrirLocal(rutaDeEnlace(u))
+			return
+		}
 	}
 	_ = api.AbrirFuera(fyne.CurrentApp(), href)
 }

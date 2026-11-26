@@ -501,3 +501,38 @@ The full browser tests with Playwright are in `test/e2e/`.
 2. **Kubernetes mode (`kube`, in production)**: `cloud-api` and `cloud-controller` create the real resources (`Namespace`, `Deployment`, `Service`, `Ingress`, `NetworkPolicy`) in the cluster and `cloud-builder` runs isolated container image builds.
 
 The reference templates for enabling `kube` mode on a cluster are in `services/cloud/deploy/go-live/`.
+
+<a id="sytue-office"></a>
+
+## 6. Sytue Office: building, packaging and testing
+
+Sytue Office ([ADR 0083](decisions.md#0083)) is the fifteen Fyne apps of `apps/fyne/cmd-local`,
+built with the `goolm,edicionlocal` tags. The same `apps/fyne/scripts/empaquetar.sh` that packages
+the connected apps packages them with `SYTUE_ARBOL=cmd-local`: executables `sytue-office-<app>`,
+the desktop bundle `office`, identifiers `eu.sytue.office.<app>` and their own URL schemes
+(`sytueoffice-<product>:`), so both editions install side by side. What each app does and does not
+do yet: [`apps/fyne/SYTUE-OFFICE.md`](../apps/fyne/SYTUE-OFFICE.md).
+
+<a id="sytue-office-publico"></a>
+
+### 6.1 Sytue Office in this repository
+
+It reaches this repository with the regular sync from sytue-one, together with what its CI needs
+(the pinned versions in `deploy/sytue-git/versions.env`, the download and release-upload scripts
+in `deploy/sytue-git/bin/` and the CI tool installer in `.github/actions/toolchain/`).
+
+- **On a computer**: `./sytue-deploy --mode sytue-office` builds and installs the apps on Linux and
+  macOS ([`QUICKSTART.md` § 9](../QUICKSTART.md#9-sytue-office)). It sets `SYTUE_PARA_ESTE_EQUIPO=1`,
+  so a Linux newer than Debian 12 can build with its own glibc: the package is only for that
+  computer.
+- **On each release**: [`.github/workflows/office.yml`](../.github/workflows/office.yml) packages
+  Linux x86-64 and ARM64 and Windows in Debian 12 (glibc 2.36, the floor `empaquetar.sh` enforces),
+  macOS universal and Android, on GitHub-hosted runners only, and attaches each package and a
+  `SHA256SUMS` to the release. They are **unsigned**: the signing certificates live in sytue-one.
+  To rebuild a release that failed halfway: _Actions → office → Run workflow_ with its tag. A pull
+  request that changes `office.yml` builds every package too, without attaching anything: that is
+  how the workflow gets tested before the first release that uses it.
+- **When merging the sync that brought it**: `upstream/sytue-one` has to move forward to the
+  export it came in (it does not come from a sytue-one tag; it sits on top of the latest sync), so
+  the next sync starts from there. If another sync landed in the meantime, that is no longer a
+  fast-forward: export the edition again, with sytue-one's `main` merged, on top of the new one.

@@ -66,8 +66,8 @@ func protectedTeamsMeeting(ctx context.Context, rt connector.Runtime, req extern
 	var who struct {
 		ID string `json:"id"`
 	}
-	if err := roomsProviderJSON(ctx, rt, http.MethodGet, roomsGraphAPI+"/me?$select=id", nil, &who); err != nil {
-		return externalMeetingResult{}, err
+	if err := roomsGraph(rt).Pedir(ctx, http.MethodGet, "/me?$select=id", nil, &who); err != nil {
+		return externalMeetingResult{}, roomsProviderError(err)
 	}
 	if who.ID != req.Account {
 		return externalMeetingResult{}, httpx.ErrConflict.WithCode("external_reconnect_required")
@@ -77,7 +77,7 @@ func protectedTeamsMeeting(ctx context.Context, rt connector.Runtime, req extern
 		return externalMeetingResult{}, err
 	}
 	var verified teamsMeeting
-	if err := roomsProviderJSON(ctx, rt, http.MethodGet, roomsGraphAPI+"/me/onlineMeetings/"+url.PathEscape(created.ID), nil, &verified); err != nil {
+	if err := roomsGraph(rt).Pedir(ctx, http.MethodGet, "/me/onlineMeetings/"+url.PathEscape(created.ID), nil, &verified); err != nil {
 		return externalMeetingResult{}, httpx.ErrConflict.WithCode("external_meeting_unknown")
 	}
 	if verified.ID != created.ID || verified.Participants.Organizer.Identity.User.ID != req.Account {
@@ -90,7 +90,7 @@ func protectedTeamsMeeting(ctx context.Context, rt connector.Runtime, req extern
 }
 
 func writeProtectedTeamsMeeting(ctx context.Context, rt connector.Runtime, req externalMeetingRequest, now time.Time) (teamsMeeting, error) {
-	target, method := roomsGraphAPI+"/me/onlineMeetings", http.MethodPost
+	target, method := "/me/onlineMeetings", http.MethodPost
 	body := map[string]any{"isEndToEndEncryptionEnabled": true}
 	if req.ID == "" {
 		body["subject"] = "Sytue Rooms"
@@ -103,15 +103,15 @@ func writeProtectedTeamsMeeting(ctx context.Context, rt connector.Runtime, req e
 		target += "/" + url.PathEscape(req.ID)
 		method = http.MethodPatch
 		var original teamsMeeting
-		if err := roomsProviderJSON(ctx, rt, http.MethodGet, target, nil, &original); err != nil {
-			return teamsMeeting{}, err
+		if err := roomsGraph(rt).Pedir(ctx, http.MethodGet, target, nil, &original); err != nil {
+			return teamsMeeting{}, roomsProviderError(err)
 		}
 		if original.ID != req.ID || original.Participants.Organizer.Identity.User.ID != req.Account {
 			return teamsMeeting{}, httpx.ErrForbidden
 		}
 	}
 	var created teamsMeeting
-	if err := roomsProviderJSON(ctx, rt, method, target, body, &created); err != nil {
+	if err := roomsProviderError(roomsGraph(rt).Pedir(ctx, method, target, body, &created)); err != nil {
 		var apiError *httpx.Error
 		if errors.As(err, &apiError) && (apiError.Code == "rooms_provider_permission" || apiError.Status == http.StatusTooManyRequests) {
 			return teamsMeeting{}, err

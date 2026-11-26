@@ -186,6 +186,8 @@ func (c *Cabecera) lineaDeDebajo() string {
 		return k.Tema
 	case k.Personas > 0:
 		return c.T.T("dm.peopleCount", i18n.Vars{"count": k.Personas})
+	case k.SinPresencia && k.Presencia == ui.SinPresencia:
+		return ""
 	}
 	s := c.T.T(clavePresencia(ponerDesconectado(k.Presencia)), nil)
 	if k.EstadoPar != "" {

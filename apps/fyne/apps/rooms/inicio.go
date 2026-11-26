@@ -89,7 +89,7 @@ func NuevoBloqueInicio(t *i18n.Translator, l i18n.Locale, in InicioCanal, sinMen
 
 	if directo {
 		// La presencia solo en un 1:1: en un directo de grupo no hay «el otro».
-		if c.Personas == 0 {
+		if c.Personas == 0 && (!c.SinPresencia || c.Presencia != ui.SinPresencia) {
 			p := t.T(clavePresencia(ponerDesconectado(c.Presencia)), nil)
 			if c.EstadoPar != "" {
 				p += " · " + c.EstadoPar

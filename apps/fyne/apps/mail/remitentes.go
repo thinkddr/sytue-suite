@@ -51,7 +51,7 @@ func valorDe(b Borrador) string {
 // remitentes son las opciones del «De»: las de Sytue, ya sin repetir, y detrás las
 // externas que envían, en el orden de la lista (la primera vez que sale una instancia
 // es la que cuenta). Una externa sin dirección, o con la de una opción de Sytue, no se
-// ofrece: dos «ana@ejemplo.eu» iguales no dirían por dónde sale el correo.
+// ofrece: dos «ana@example.org» iguales no dirían por dónde sale el correo.
 func remitentes(sytue []string, externas []api.ExternalMailAccount) []OpcionDe {
 	out := make([]OpcionDe, 0, len(sytue)+len(externas))
 	vistas := map[string]bool{}

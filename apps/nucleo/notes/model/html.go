@@ -4,6 +4,7 @@
 package model
 
 import (
+	"net/url"
 	"regexp"
 	"slices"
 	"strconv"
@@ -210,6 +211,9 @@ type saneador struct {
 	out      strings.Builder
 	abiertas []string
 	saltando int
+	// ficheros deja también los enlaces a ficheros de este equipo
+	// (SanitizeHTMLConFicheros).
+	ficheros bool
 }
 
 // abre atiende una etiqueta de apertura (o autocerrada).
@@ -226,7 +230,7 @@ func (s *saneador) abre(z *html.Tokenizer, autocerrada bool) {
 	if s.saltando > 0 || !allowedTags[tag] {
 		return
 	}
-	attrs := atributosPermitidos(z, tag, hasAttr)
+	attrs := atributosPermitidos(z, tag, hasAttr, s.ficheros)
 	if tag == "img" && !strings.HasPrefix(attrs, ` src="`) {
 		return // una imagen sin `src` que valga no se pinta: fuera entera
 	}
@@ -280,12 +284,20 @@ func (s *saneador) termina() string {
 
 // SanitizeHTML devuelve el HTML de entrada reducido a la allowlist. Nunca
 // devuelve error: lo que no está permitido, no sale.
-func SanitizeHTML(in string) string {
+func SanitizeHTML(in string) string { return sanear(in, false) }
+
+// SanitizeHTMLConFicheros es SanitizeHTML que deja además los enlaces a ficheros de
+// este equipo (`file:///…`, EnlaceAFichero). Solo para la edición local (Sytue Office,
+// N-07), donde la nota no la pinta el navegador de nadie más: en el servicio y en la
+// edición conectada, un `file:` sigue cayéndose como cualquier otro esquema.
+func SanitizeHTMLConFicheros(in string) string { return sanear(in, true) }
+
+func sanear(in string, ficheros bool) string {
 	in = strings.TrimSpace(in)
 	if in == "" {
 		return ""
 	}
-	var s saneador
+	s := saneador{ficheros: ficheros}
 	z := html.NewTokenizer(strings.NewReader(in))
 	for {
 		switch tt := z.Next(); tt {
@@ -307,8 +319,9 @@ func SanitizeHTML(in string) string {
 
 // atributosPermitidos devuelve los atributos que sobreviven para esa etiqueta, ya
 // serializados y escapados. La lista es corta a propósito: `href` en enlaces (solo
-// http/https/mailto) y `style` reducido a color de texto y de fondo.
-func atributosPermitidos(z *html.Tokenizer, tag string, hasAttr bool) string {
+// http/https/mailto, y `file:` con ficheros) y `style` reducido a color de texto y de
+// fondo.
+func atributosPermitidos(z *html.Tokenizer, tag string, hasAttr, ficheros bool) string {
 	if !hasAttr {
 		return ""
 	}
@@ -326,7 +339,7 @@ func atributosPermitidos(z *html.Tokenizer, tag string, hasAttr bool) string {
 		switch {
 		case repetido:
 		case clave == "href" && tag == "a":
-			b.WriteString(enlacePermitido(valor))
+			b.WriteString(enlacePermitido(valor, ficheros))
 		case clave == "type" && tag == "input":
 			if strings.EqualFold(valor, "checkbox") {
 				b.WriteString(` type="checkbox"`)
@@ -352,9 +365,31 @@ func atributosPermitidos(z *html.Tokenizer, tag string, hasAttr bool) string {
 	}
 }
 
-// enlacePermitido es el `href` de un enlace si vale —una dirección web, un correo o un
-// adjunto de la nota—, ya serializado, o "".
-func enlacePermitido(valor string) string {
+// EnlaceAFichero dice si raw es un enlace a un fichero de ESTE equipo: `file:` sin
+// máquina (o `localhost`), sin usuario, consulta ni fragmento y con una ruta absoluta
+// (`file:///home/ana/x.pdf`, `file:///C:/Users/ana/x.pdf`). `url.Parse` ya rechaza los
+// caracteres de control.
+func EnlaceAFichero(raw string) bool {
+	if raw == "" || len(raw) > 2048 {
+		return false
+	}
+	u, err := url.Parse(raw)
+	if err != nil || !strings.EqualFold(u.Scheme, "file") || u.Opaque != "" || u.User != nil {
+		return false
+	}
+	if u.Host != "" && !strings.EqualFold(u.Host, "localhost") {
+		return false
+	}
+	return strings.HasPrefix(u.Path, "/") && len(u.Path) > 1 && u.RawQuery == "" && u.Fragment == "" && !u.ForceQuery
+}
+
+// enlacePermitido es el `href` de un enlace si vale —una dirección web, un correo, un
+// adjunto de la nota o, con ficheros, un fichero de este equipo—, ya serializado, o "".
+func enlacePermitido(valor string, ficheros bool) string {
+	if ficheros && EnlaceAFichero(valor) {
+		// Un fichero de este equipo lo abre su app, no una pestaña: sin `target`.
+		return ` href="` + html.EscapeString(valor) + `"`
+	}
 	if !ValidWebURL(valor) && !strings.HasPrefix(valor, "mailto:") && !EsAdjunto(valor) {
 		return ""
 	}

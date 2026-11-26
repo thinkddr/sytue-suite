@@ -5,6 +5,7 @@ package rooms
 
 import (
 	"image/color"
+	"slices"
 	"strings"
 
 	"fyne.io/fyne/v2"
@@ -14,6 +15,7 @@ import (
 
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
+	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 )
 
@@ -83,10 +85,17 @@ type CrearCanal struct {
 	Personas *NuevoDirecto
 	// AlCrear recibe el nombre, el tema, si es privado y las personas elegidas.
 	AlCrear func(nombre, asunto string, privado bool, personas []Persona)
+	// Cuentas son dónde se puede crear cuando el servicio junta varias cuentas (Sytue
+	// Office, `CuentasCreables`): con más de una sale arriba un selector con el rótulo
+	// RotuloCuentas, y la elegida es Cuenta. Sin ellas, el formulario de siempre.
+	Cuentas       []api.RoomsTeam
+	RotuloCuentas string
+	Cuenta        string
 
 	nombre, temaCanal *ui.Entrada
 	publico, privado  *ui.Eleccion
 	crear             *ui.Boton
+	selCuenta         *ui.Selector
 	caja              *fyne.Container
 }
 
@@ -156,12 +165,16 @@ func (c *CrearCanal) construir() {
 			ui.NuevoRotulo(t.T("createChannel.visibility", nil), tema.TextoSM, ui.SemiNegrita, "text"),
 			container.New(ui.Columna{}, c.publico, explicacion("createChannel.publicHelp"))),
 		container.New(ui.Columna{}, c.privado, explicacion("createChannel.privateHelp")))
-	hijos := []fyne.CanvasObject{
+	var hijos []fyne.CanvasObject
+	if campo := c.campoCuenta(); campo != nil {
+		hijos = append(hijos, campo)
+	}
+	hijos = append(hijos,
 		ui.GrupoCampo(t.T("createChannel.name", nil), true, c.nombre, ayuda, c.ErrorNombre),
 		visibilidad,
 		ui.GrupoCampo(t.T("channel.topic", nil), false, c.temaCanal, t.T("createChannel.topicHelp", nil), ""),
 		ui.GrupoCampo(t.T("createChannel.people", nil), false, c.Personas, t.T("createChannel.peopleHelp", nil), ""),
-	}
+	)
 	if c.Fallo {
 		hijos = append(hijos, ui.NuevoRotulo(t.T("createChannel.failed", nil), tema.TextoSM, ui.Normal, "danger-text"))
 	}
@@ -173,6 +186,28 @@ func (c *CrearCanal) construir() {
 		c.Personas.Ocupado = c.Ocupado // `disabled={busy}` del selector
 		c.Personas.Refresh()
 	}
+}
+
+// campoCuenta es el selector de cuenta, o nil con una o ninguna.
+func (c *CrearCanal) campoCuenta() fyne.CanvasObject {
+	if len(c.Cuentas) < 2 {
+		return nil
+	}
+	if c.selCuenta == nil {
+		nombres := make([]string, len(c.Cuentas))
+		for i, k := range c.Cuentas {
+			nombres[i] = k.Name
+		}
+		c.selCuenta = ui.NuevoSelector(nombres, func(i int) {
+			if i >= 0 && i < len(c.Cuentas) {
+				c.Cuenta = c.Cuentas[i].ID
+			}
+		})
+		c.selCuenta.Rotulo = c.RotuloCuentas
+	}
+	c.selCuenta.Elegida = slices.IndexFunc(c.Cuentas, func(k api.RoomsTeam) bool { return k.ID == c.Cuenta })
+	c.selCuenta.Inerte(c.Ocupado)
+	return ui.GrupoCampo(c.RotuloCuentas, false, c.selCuenta, "", "")
 }
 
 // CreateRenderer monta la columna.

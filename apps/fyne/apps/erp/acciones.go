@@ -114,6 +114,43 @@ var Errores = map[string]string{
 	"upstream_unavailable": "error.offline",
 }
 
+// ErroresLocales son los códigos que solo contesta el ERP de Sytue Office, con su texto
+// (es, en; los otros veinticuatro idiomas, en `traduccionesErrores`, textos_idiomas.go):
+// no están en ERRORES de la web —la tabla de arriba es la suya, fila a fila— ni en su
+// catálogo. El servicio de la suite no los manda nunca.
+var ErroresLocales = map[string][2]string{
+	"no_disponible_local": {
+		"Esto aún no está en Sytue ERP de Sytue Office.",
+		"This is not available yet in Sytue ERP in Sytue Office.",
+	},
+	// Por qué no salió la factura por la cuenta de correo de Sytue Mail (enviar_factura.go).
+	"cuenta_correo_desconocida": {
+		"Esa cuenta de correo ya no está en Sytue Mail. Elige otra.",
+		"That email account is no longer in Sytue Mail. Choose another one.",
+	},
+	"correo_acceso": {
+		"La cuenta de correo no deja entrar: vuelve a conectarla en Sytue Mail.",
+		"The email account refused the sign-in: reconnect it in Sytue Mail.",
+	},
+	"correo_sin_red": {
+		"No se ha podido hablar con el servidor de correo. Mira la conexión, y que «Sin conexión» no esté puesto en Ajustes.",
+		"Could not reach the mail server. Check the connection, and that «Offline» is not on in Settings.",
+	},
+	"correo_incierto": {
+		"La conexión se cortó al enviar y puede que la factura haya salido. Míralo en Enviados antes de repetirlo.",
+		"The connection dropped while sending and the invoice may have gone out. Check Sent before trying again.",
+	},
+}
+
+// textoLocal es el texto de un código de ErroresLocales en el idioma de `tr`; lo que
+// falte en ese idioma cae al inglés.
+func textoLocal(codigo string, tr *i18n.Translator) (string, bool) {
+	if _, ok := ErroresLocales[codigo]; !ok {
+		return "", false
+	}
+	return i18n.Propios{Base: ErroresLocales, Traducciones: traduccionesErrores}.En(tr.Locale(), codigo), true
+}
+
 // prefijoSinVerbo es la familia `sin_verbo_<verbo>`: el rol alcanza el módulo pero no
 // el gesto (asentar, conciliar…).
 const prefijoSinVerbo = "sin_verbo_"
@@ -145,6 +182,9 @@ func ClaveDeError(e *api.Error) string {
 func MensajeDeError(err error, tr *i18n.Translator) string {
 	var e *api.Error
 	if errors.As(err, &e) {
+		if texto, ok := textoLocal(e.Code(), tr); ok {
+			return texto
+		}
 		return tr.T(ClaveDeError(e), nil)
 	}
 	return tr.T("error.generic", nil)
@@ -230,6 +270,7 @@ func (p *Pantalla) abrirFicha(r, semilla *Registro) {
 	f := NuevaFicha(p.tr, m, r, semilla, p.lista.Pagina.Etiquetas)
 	f.EnPapelera, f.Facturae = p.lista.Papelera, p.facturae()
 	f.SoloLectura = !p.PuedeEscribir(m.Modulo)
+	f.SinAsentar = p.OcultarSinVerbo && !p.PuedeAccion(m.Modulo, "asentar")
 	f.Requisitos = p.Requisitos
 	f.BuscarRelacion = p.buscarRelacion
 	p.conectarAltas(f)
@@ -338,6 +379,12 @@ func (p *Pantalla) engancharFicha(f *Ficha) {
 		p.avisar(ui.AvisoInfo, p.t("form.copiedId"))
 	}
 	f.AlDescargar = func(que string) { p.descargar(f, que) }
+	if p.Salida.PDF {
+		f.AlPDF = func() { p.pdfFactura(f) }
+	}
+	if p.Salida.Enviar {
+		f.AlEnviar = func() { p.enviarFactura(f) }
+	}
 	f.AlRecordar = func() { p.dialogoRecordatorio(f) }
 	f.AlPlanear = func() {
 		f.Planificando = !f.Planificando
@@ -354,6 +401,9 @@ func (p *Pantalla) engancharFicha(f *Ficha) {
 	f.AlReenviarVF = func() { p.reenviarVF(f) }
 	f.AlIA = func() { p.rellenarIA(f) }
 	f.AlRequisitos = func() { f.VerRequisitos = !f.VerRequisitos; p.Repintar() }
+	if p.ComprobarVIES != nil && f.Modelo.Clave == ModeloContacto && tieneCampo(f.Modelo, "nif") {
+		f.ComprobarVIES = func() { p.comprobarVIESFicha(f) }
+	}
 	if p.ElegirFicheros != nil {
 		f.AlSubir = func() {
 			if f.Registro == nil || f.SubiendoDoc {

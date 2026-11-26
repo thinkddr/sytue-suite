@@ -8,7 +8,7 @@ package altavoz
 import "git.sytue.eu/sytue/one/apps/fyne/llamada"
 
 // Sistema es el hueco de js/wasm: miniaudio es cgo y ese destino no tiene tarjeta (ver
-// llamada_js.go).
+// llamada_sin.go).
 type Sistema struct{ Micro, Altavoz string }
 
 var _ llamada.Dispositivo = Sistema{}

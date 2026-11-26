@@ -116,6 +116,21 @@ type App struct {
 	// elegido, cuando ya no se va a subir (sesion.SoltarElegido); nil, no hay copias.
 	SoltarCopia func(ruta string)
 
+	// Lo de Sytue Office, la edición local (PLAN-EDICION-LOCAL §6.10). Todo es opcional:
+	// a cero, la app es la de siempre.
+	//
+	// Importar sustituye a la pantalla «Subir» (el carril, el botón flotante y los de
+	// Inicio): en local no hay servicio al que subir, se elige un fichero del equipo.
+	Importar func()
+	// MandosVer son botones de más junto a los de la página de un vídeo (convertir, abrir
+	// con el reproductor del sistema, publicar…).
+	MandosVer func(api.CastVideo) []fyne.CanvasObject
+	// SinComentarios quita el panel de comentarios de la página de un vídeo.
+	SinComentarios bool
+	// AvisoVer es el texto del reproductor cuando el vídeo aún no se puede ver; "" (o
+	// nil), el de siempre según el estado.
+	AvisoVer func(api.CastVideo) string
+
 	lanzar func(func())
 	// enLaInterfaz es `fyne.Do`: lleva al hilo de la interfaz lo que llega de otras
 	// rutinas. Es un campo por los tests: el driver de pruebas de Fyne ejecuta `fyne.Do`
@@ -486,6 +501,15 @@ func (a *App) Ir(r Ruta) {
 	a.pintar()
 }
 
+// irSubir va a «Subir», o a Importar si la app la tiene (la edición local).
+func (a *App) irSubir() {
+	if a.Importar != nil {
+		a.Importar()
+		return
+	}
+	a.Ir(RutaSubir)
+}
+
 func (a *App) irSeccion(s Seccion) {
 	switch s {
 	case SecInicio:
@@ -495,7 +519,7 @@ func (a *App) irSeccion(s Seccion) {
 	case SecEmitir:
 		a.Ir(RutaEmitir)
 	case SecSubir:
-		a.Ir(RutaSubir)
+		a.irSubir()
 	case SecModeracion:
 		a.Ir(RutaModeracion)
 	}
@@ -591,8 +615,8 @@ func (a *App) pintar() {
 	if a.ruta == RutaInicio && a.dentro() {
 		// «Subir» es el «+» flotante (`BotonFlotante` de Marco.tsx, `fab` en Inicio), abajo
 		// a la derecha y en todos los anchos: la acción de crear de Cast, como «Redactar»
-		// en Mail. La cabecera de Inicio ya no lo repite.
-		fab := ui.NuevoBotonFlotante(a.v.Traduce("nav.upload"), func() { a.Ir(RutaSubir) })
+		// en Mail. La cabecera de Inicio ya no lo repite. En Sytue Office importa (irSubir).
+		fab := ui.NuevoBotonFlotante(a.v.Traduce("nav.upload"), a.irSubir)
 		capa := container.New(ui.CapaFlotante{}, fab)
 		// Con el cajón abierto no se ve: el velo del cajón tapa la página, y el botón
 		// quedaba encima de los dos (visto en el emulador).
@@ -795,7 +819,7 @@ func (a *App) pantallaInicio() fyne.CanvasObject {
 	vacia := d.Texto == "" && len(d.Mios)+len(d.EnDirecto)+len(d.Compartidos)+len(d.Organizacion) == 0
 	v := a.vistaDe(a.ini.estadoCarga, !a.ini.pedidos, a.ini.pedidos && vacia, a.pedirInicio)
 	d.AlAbrir = a.abrir
-	d.AlSubir = func() { a.Ir(RutaSubir) }
+	d.AlSubir = a.irSubir
 	d.AlEmitir = func() { a.Ir(RutaEmitir) }
 	return PantallaInicio(v, d)
 }
@@ -889,11 +913,16 @@ func (a *App) pedirCanal(mas bool) {
 func (a *App) pantallaCanal() fyne.CanvasObject {
 	c := a.can
 	v := a.vistaDe(c.estadoCarga, !c.pedidos, c.pedidos && len(c.canal.Videos) == 0, func() { a.pedirCanal(false) })
-	return PantallaCanal(v, Canal{
+	d := Canal{
 		Org: c.org, Nombre: c.canal.Name, Videos: c.canal.Videos, HayMas: c.mas, CargandoMas: c.cargando && c.pedidos,
 		AlMas: func() { a.pedirCanal(true) }, AlAbrir: a.abrir,
 		AlDenunciar: func() { a.AbrirDenuncia(api.CastNewReport{Kind: api.CastReportChannel, Org: c.org}, "") },
-	})
+	}
+	// Sin moderación en el carril (Sytue Office) no hay a quién denunciar el canal.
+	if !a.v.Tiene(SecModeracion) {
+		d.AlDenunciar = nil
+	}
+	return PantallaCanal(v, d)
 }
 
 // ---- Los pósters ----

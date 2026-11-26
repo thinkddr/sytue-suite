@@ -10,7 +10,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"git.sytue.eu/sytue/one/services/syerp/internal/domain"
+	domain "git.sytue.eu/sytue/one/apps/nucleo/erp/dominio"
 	"git.sytue.eu/sytue/one/services/syerp/internal/verifactu"
 )
 
@@ -22,23 +22,6 @@ import (
 // y su IVA. Por eso, al emitirse, la cabecera tiene que ser la suma de las
 // líneas, y una simplificada tiene que poder serlo. Eso vale con o sin
 // VERI*FACTU: una factura que no cuadra está mal aunque no se envíe a nadie.
-
-// limiteSimplificada es el tope de una factura simplificada: 3.000 €, IVA incluido
-// (RD 1619/2012, art. 4.1, para las ventas al por menor y el resto de su lista).
-//
-// ponytail: el tope general de 400 € depende de la actividad de la organización,
-// que el ERP no sabe; se vigila el de 3.000, que es el de las tiendas.
-const limiteSimplificada = 300000
-
-// regimenesSinSimplificada son los regímenes en los que el RD 1619/2012 (art. 4.3)
-// no deja expedir factura simplificada: la entrega intracomunitaria, lo que no se
-// localiza en España (las ventas a distancia a otro Estado, entre otras) y la
-// inversión del sujeto pasivo, que necesita identificar al cliente.
-var regimenesSinSimplificada = map[string]bool{
-	"iva_entrega_ue": true,
-	"iva_no_sujeta":  true,
-	"iva_inversion":  true,
-}
 
 // LineasDeFactura son las líneas vivas de una factura, en el orden en que se
 // crearon.
@@ -83,43 +66,14 @@ func lineasDeFactura(ctx context.Context, tx pgx.Tx, facturaID string) ([]domain
 
 // cuadreDeFactura comprueba lo que tiene que cumplir una factura al emitirse: que
 // su base y su IVA sean los de sus líneas, si las tiene, y que una simplificada
-// pueda serlo. Devuelve el desglose de las líneas (nada si no tiene).
+// pueda serlo. Devuelve el desglose de las líneas (nada si no tiene). La regla es
+// `dominio.CuadreFactura`, la misma que aplica el ERP de Sytue Office.
 func cuadreDeFactura(ctx context.Context, tx pgx.Tx, f Registro) ([]domain.GrupoIVA, error) {
-	base, err := domain.Centimos(f.Data, "base")
-	if err != nil {
-		return nil, err
-	}
-	iva, err := domain.Centimos(f.Data, "iva")
-	if err != nil {
-		return nil, err
-	}
 	lineas, err := lineasDeFactura(ctx, tx, f.ID)
 	if err != nil {
 		return nil, err
 	}
-	grupos := domain.Desglose(lineas)
-	if len(grupos) > 0 {
-		var bases, cuotas int64
-		for _, g := range grupos {
-			bases += g.Base
-			cuotas += g.Cuota
-		}
-		if bases != base || cuotas != iva {
-			return nil, fmt.Errorf("la base y el IVA de la factura (%s € y %s €) tienen que ser los de sus líneas (%s € y %s €): %w",
-				verifactu.Importe(base), verifactu.Importe(iva), verifactu.Importe(bases), verifactu.Importe(cuotas), domain.ErrDatos)
-		}
-	}
-	if cadenaDe(f.Data["tipo_factura"]) == "F2" {
-		switch {
-		case regimenesSinSimplificada[cadenaDe(f.Data["regimen_iva"])]:
-			return nil, fmt.Errorf("en este régimen de IVA no se puede emitir una factura simplificada (RD 1619/2012, art. 4.3): emite una completa: %w",
-				domain.ErrDatos)
-		case base+iva > limiteSimplificada:
-			return nil, fmt.Errorf("una factura simplificada no puede pasar de 3.000 € con el IVA incluido (RD 1619/2012, art. 4.1): emite una completa: %w",
-				domain.ErrDatos)
-		}
-	}
-	return grupos, nil
+	return domain.CuadreFactura(f.Data, lineas)
 }
 
 // desgloseDeGrupos pasa el desglose de las líneas al de la AEAT: cada tipo es una

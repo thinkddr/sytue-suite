@@ -17,6 +17,26 @@
 # MISMA imagen golang fijada que ya usan los servicios (go.dev) y parte de la
 # imagen de synapse ya espejada (element.io). Ningún canal nuevo: los mismos
 # orígenes bloqueados, en rutas exactas. Ver la cabecera de su catalogo.txt.
+# 2026-11-24: el cliente de buzones externos se mudó de services/integrations/
+# internal/mailbox/cloud.go a apps/nucleo/cuentas/correo/cloud.go (M-01): las
+# cuatro filas cambian de ruta, mismos hosts, sin canal nuevo. Y se empieza a
+# escanear apps/nucleo/ia/proveedor (movido de services/ai/internal/provider, que
+# no se escaneaba): su tabla cerrada BaseURLs es el BYOK que el servicio de IA ya
+# ofrecía a Sytue Web, y Sytue Office toma de ahí sus preajustes. Es un fichero
+# COMPARTIDO con el servidor, así que cuenta aquí y no en
+# conexiones-del-dispositivo.tsv. Ningún flujo nuevo del servidor: se inventaría
+# el que había. (Gemini, que solo usa la edición local, vivió aquí hasta el
+# 2026-11-25: su dirección pasó a apps/nucleo/local/asistente y su fila, a
+# conexiones-del-dispositivo.tsv.)
+# Decisión de la edición local: ADR 0083 (docs/decisions.md#0083).
+# 2026-11-25: apps/fyne/scripts/android-mlkit.py baja al EMPAQUETAR el árbol de ML Kit
+# GenAI (la IA del sistema de Sytue Office en Android) del repositorio Maven de Google
+# (dl.google.com, ya inventariado para el SDK de Android) y de Maven Central
+# (repo1.maven.org). Es ENTRADA de artefactos públicos, cada uno con su sha256 fijado
+# en apps/fyne/android/mlkit/dependencias.tsv; no sale nada nuestro. Rutas exactas.
+# Ver «ML Kit GenAI» en docs/operations.md.
+dl.google.com	apps/fyne/scripts/android-mlkit.py
+repo1.maven.org	apps/fyne/scripts/android-mlkit.py
 eur-lex.europa.eu	scripts/certipdf-compat/ue.py
 online-forms.e-justice.europa.eu	scripts/certipdf-compat/ue.py
 www.sede.fnmt.gob.es	scripts/certipdf-compat/ue.py
@@ -159,25 +179,28 @@ chat.google.com	services/integrations/db/seeds/templates/google-chat-conversatio
 oauth2.googleapis.com	services/integrations/db/seeds/templates/google-chat-conversations.json
 openidconnect.googleapis.com	services/integrations/internal/http/external_chat_grant.go
 slack.com	services/integrations/internal/http/external_chat_slack.go
-gmail.googleapis.com	services/integrations/internal/mailbox/cloud.go
-graph.microsoft.com	services/integrations/internal/mailbox/cloud.go
+gmail.googleapis.com	apps/nucleo/cuentas/correo/cloud.go
+graph.microsoft.com	apps/nucleo/cuentas/correo/cloud.go
 api.login.yahoo.com	services/integrations/internal/http/handlers_external_mail.go
 accounts.google.com	services/integrations/db/seeds/templates/gmail-mail.json
 oauth2.googleapis.com	services/integrations/db/seeds/templates/gmail-mail.json
 login.microsoftonline.com	services/integrations/db/seeds/templates/microsoft-mail.json
 api.login.yahoo.com	services/integrations/db/seeds/templates/yahoo-mail.json
-caldav.calendar.yahoo.com	services/integrations/internal/linkedservices/dav.go
-carddav.address.yahoo.com	services/integrations/internal/linkedservices/dav.go
-graph.microsoft.com	services/integrations/internal/linkedservices/catalog.go
-graph.microsoft.com	services/integrations/internal/linkedservices/client.go
-people.googleapis.com	services/integrations/internal/linkedservices/client.go
+caldav.calendar.yahoo.com	apps/nucleo/cuentas/enlazadas/dav.go
+carddav.address.yahoo.com	apps/nucleo/cuentas/enlazadas/dav.go
+graph.microsoft.com	apps/nucleo/cuentas/enlazadas/catalog.go
+graph.microsoft.com	apps/nucleo/cuentas/enlazadas/client.go
+people.googleapis.com	apps/nucleo/cuentas/enlazadas/client.go
 www.googleapis.com	apps/fyne/scripts/play-publicar.sh
 www.googleapis.com	services/integrations/db/seeds/templates/gmail-mail.json
 www.googleapis.com	services/integrations/db/seeds/templates/google-chat-conversations.json
 www.googleapis.com	services/integrations/db/seeds/templates/google-chat.json
 www.googleapis.com	services/integrations/db/seeds/templates/google-meet.json
-www.googleapis.com	services/integrations/internal/linkedservices/catalog.go
-www.googleapis.com	services/integrations/internal/linkedservices/client.go
-openidconnect.googleapis.com	services/integrations/internal/mailbox/cloud.go
-api.login.yahoo.com	services/integrations/internal/mailbox/cloud.go
+www.googleapis.com	apps/nucleo/cuentas/enlazadas/catalog.go
+www.googleapis.com	apps/nucleo/cuentas/enlazadas/client.go
+openidconnect.googleapis.com	apps/nucleo/cuentas/correo/cloud.go
+api.login.yahoo.com	apps/nucleo/cuentas/correo/cloud.go
 android.googlesource.com	apps/fyne/scripts/android-work-context-test.py
+api.anthropic.com	apps/nucleo/ia/proveedor/provider.go
+api.openai.com	apps/nucleo/ia/proveedor/provider.go
+api.z.ai	apps/nucleo/ia/proveedor/provider.go

@@ -9,6 +9,7 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/widget"
 
 	"git.sytue.eu/sytue/one/apps/fyne/iconos"
@@ -53,6 +54,13 @@ func (p *Pantalla) lista() fyne.CanvasObject {
 
 	altos := []float32{ui.MedidaCabeceraApp(cabecera).Height, AltoBloqueBuscador(p.hayRecuento())}
 	hijos := []fyne.CanvasObject{cabecera, buscador}
+	// Una libreta de solo lectura en su cuenta lo dice antes de la lista (Sytue Office).
+	// Un bloque de ayuda y no una franja de una línea: la frase entera cabe en el panel.
+	if aviso := p.avisoSoloLectura(); aviso != "" {
+		ayuda := ui.NuevaAyudaEnLinea(aviso).ConTono(ui.AyudaInfo)
+		altos = append(altos, ui.AltoAyudaEnLinea(ayuda, p.anchoLista()-2*RellenoBuscador)+RellenoBuscador)
+		hijos = append(hijos, container.New(layout.NewCustomPaddedLayout(0, RellenoBuscador, RellenoBuscador, RellenoBuscador), ayuda))
+	}
 	// La barra de lote sale con algo marcado y red, entre el buscador y la lista.
 	if lote := p.barraLote(); lote != nil {
 		altos = append(altos, ui.MedidaBarraDeLoteEn(lote, p.anchoLista()).Height)
@@ -76,7 +84,7 @@ func (p *Pantalla) lista() fyne.CanvasObject {
 // si los hay, y «Importar / Exportar», que sale siempre.
 func (p *Pantalla) accionesDeLista() []fyne.CanvasObject {
 	var hijos []fyne.CanvasObject
-	if !p.SinConexion && p.EtiquetaActiva != "" && p.nombreEtiqueta() != "" {
+	if p.escribe() && p.EtiquetaActiva != "" && p.nombreEtiqueta() != "" {
 		hijos = append(hijos, p.accionesEtiqueta())
 	}
 	if !p.SinConexion {
@@ -84,7 +92,7 @@ func (p *Pantalla) accionesDeLista() []fyne.CanvasObject {
 			hijos = append(hijos, b)
 		}
 	}
-	if !p.SinConexion && p.Duplicados > 0 {
+	if p.escribe() && p.Duplicados > 0 {
 		hijos = append(hijos, ui.NuevoBoton(p.t("list.reviewDuplicates", i18n.Vars{"count": p.Duplicados}),
 			p.AlRevisarDuplicados).Con(ui.Secundario, ui.TallaSM))
 	}
@@ -141,7 +149,7 @@ func (p *Pantalla) barraLote() *ui.BarraDeLote {
 	destacar.AlPulsar = func() { p.AlLote(LoteDestacar, sel, nil) }
 	quitar.AlPulsar = func() { p.AlLote(LoteQuitarDestacado, sel, nil) }
 	acciones = append(acciones, destacar, quitar)
-	if len(p.Etiquetas) > 0 {
+	if len(p.Etiquetas) > 0 && !p.soloLectura() {
 		for _, x := range []struct {
 			clave string
 			que   AccionLote
@@ -160,6 +168,11 @@ func (p *Pantalla) barraLote() *ui.BarraDeLote {
 			}
 			acciones = append(acciones, b)
 		}
+	}
+	if p.soloLectura() {
+		// En una libreta de solo lectura de su cuenta, solo lo que es de este equipo.
+		return ui.NuevaBarraDeLote(p.t("batch.selected", i18n.Vars{"count": n}), p.t("batch.region", nil),
+			p.t("ui.bulk.clear", nil), acciones, p.AlSoltarMarcados).ConNumero(n)
 	}
 	papelera := boton("batch.toTrash", ui.Peligro)
 	papelera.AlPulsar = func() { p.AlLote(LoteAPapelera, sel, nil) }
@@ -695,7 +708,7 @@ func (p *Pantalla) textosDeVacio() ui.TextosEstado {
 		t.RotuloAccion, t.Accion = p.t("list.clearFilter", nil), p.AlLimpiarFiltro
 	default:
 		t.Descripcion = p.t("list.emptyBook", nil)
-		if !p.SinConexion {
+		if p.escribe() {
 			// El único vacío cuyo botón es PRIMARIO y con su «+»: crear, no limpiar.
 			t.RotuloAccion, t.Accion = p.t("nav.newContact", nil), p.AlCrearContacto
 			t.Primaria = true

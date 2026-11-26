@@ -27,20 +27,21 @@ func Nuevo(io.ReadSeeker, llamada.Dispositivo) (*Reproductor, error) {
 	return nil, errors.New("video: sin reproductor en js")
 }
 
-func (r *Reproductor) Arrancar()                 {}
-func (r *Reproductor) Duracion() time.Duration   { return 0 }
-func (r *Reproductor) Tamano() (ancho, alto int) { return 0, 0 }
-func (r *Reproductor) Posicion() time.Duration   { return 0 }
-func (r *Reproductor) Pausado() bool             { return true }
-func (r *Reproductor) Terminado() bool           { return false }
-func (r *Reproductor) Err() error                { return nil }
-func (r *Reproductor) Reproducir()               {}
-func (r *Reproductor) Pausar()                   {}
-func (r *Reproductor) Alternar()                 {}
-func (r *Reproductor) Buscar(time.Duration)      {}
-func (r *Reproductor) Volumen(float64)           {}
-func (r *Reproductor) Silenciar(bool)            {}
-func (r *Reproductor) Silenciado() bool          { return false }
-func (r *Reproductor) Cerrar()                   {}
-func (r *Reproductor) Velocidad() float64        { return 1 }
-func (r *Reproductor) PonerVelocidad(float64)    {}
+func (r *Reproductor) Arrancar()                                     {}
+func (r *Reproductor) Duracion() time.Duration                       { return 0 }
+func (r *Reproductor) Tamano() (ancho, alto int)                     { return 0, 0 }
+func (r *Reproductor) Posicion() time.Duration                       { return 0 }
+func (r *Reproductor) Pausado() bool                                 { return true }
+func (r *Reproductor) Terminado() bool                               { return false }
+func (r *Reproductor) Err() error                                    { return nil }
+func (r *Reproductor) Reproducir()                                   {}
+func (r *Reproductor) Pausar()                                       {}
+func (r *Reproductor) Alternar()                                     {}
+func (r *Reproductor) Buscar(time.Duration)                          {}
+func (r *Reproductor) Volumen(float64)                               {}
+func (r *Reproductor) Silenciar(bool)                                {}
+func (r *Reproductor) Silenciado() bool                              { return false }
+func (r *Reproductor) Cerrar()                                       {}
+func (r *Reproductor) Velocidad() float64                            { return 1 }
+func (r *Reproductor) PonerVelocidad(float64)                        {}
+func (r *Reproductor) UltimoFotograma() (image.Image, time.Duration) { return nil, 0 }

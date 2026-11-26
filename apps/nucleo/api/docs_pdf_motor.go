@@ -121,6 +121,9 @@ func (p *PDF) RenderPNG(ctx context.Context, doc PDFFichero, paginas string, esc
 // Un tramo que no existe es un 404 con la forma de los del servicio, así que quien lo
 // recibe lo trata igual que un fichero borrado: la página «no encontrada».
 func (p *PDF) PorRuta(ctx context.Context, ruta string) (File, error) {
+	if r, ok := p.pathResolver(); ok {
+		return r.FileByPath(ctx, ruta)
+	}
 	tramos := slices.DeleteFunc(strings.Split(ruta, "/"), func(s string) bool { return s == "" })
 	if len(tramos) == 0 {
 		return File{}, noEsta404(ruta)

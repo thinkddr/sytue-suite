@@ -9,7 +9,7 @@ import (
 
 func (p *PDF) localAnnotations(ctx context.Context, fields map[string]string, docs ...PDFFichero) (PDFRespuesta, error) {
 	return p.localSinglePDFEdit(ctx, fields, func(doc *localpdf.PDFDoc) (PDFRespuesta, error) {
-		out, err := localpdf.ApplyAnnotationOperation(doc, localpdf.AnnotationOperationInput{Fields: fields, Author: p.drive.data.PrivateStorageScope().Subject})
+		out, err := localpdf.ApplyAnnotationOperation(doc, localpdf.AnnotationOperationInput{Fields: fields, Author: p.annotationAuthor()})
 		return localPDFResponse("application/pdf", out), err
 	}, docs...)
 }

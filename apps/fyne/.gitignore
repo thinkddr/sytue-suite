@@ -22,3 +22,7 @@
 # `!/*/` también volvería a admitir `.claude/` (los ajustes locales de los agentes, que
 # ignora el .gitignore de la raíz): va después para que gane.
 .claude/
+
+# Los paquetes que deja apps/fyne/scripts/empaquetar.sh (los de una release, o los que
+# instala `./sytue-deploy --mode sytue-office` en sytue-suite). Después de `!/*/`, para que gane.
+/dist/

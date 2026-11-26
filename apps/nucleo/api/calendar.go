@@ -527,6 +527,11 @@ func (c *Calendars) SearchEventsFiltrada(ctx context.Context, texto string, f Fi
 	if c.data != nil && f == (FiltroBusqueda{}) {
 		return c.data.SearchEventsPage(ctx, texto, limite, cursor)
 	}
+	if c.data != nil {
+		if filtro, ok := c.data.(CalendarFiltroData); ok {
+			return filtro.SearchEventsFiltrada(ctx, texto, f, limite, cursor)
+		}
+	}
 	q := url.Values{"q": {texto}}
 	if f.Calendario != "" {
 		q.Set("calendar", f.Calendario)
@@ -609,6 +614,11 @@ func (c *Calendars) SetPartStat(ctx context.Context, evento, partstat string) er
 // y la web, que lee CalDAV, la ve. El UID va en el cuerpo además de en la ruta: uno
 // con forma de UUID se tomaría en la ruta por el id interno.
 func (c *Calendars) ResponderPorUID(ctx context.Context, uid, partstat string) error {
+	if c.data != nil {
+		if porUID, ok := c.data.(CalendarUIDData); ok {
+			return porUID.ResponderPorUID(ctx, uid, partstat)
+		}
+	}
 	cuerpo, err := json.Marshal(map[string]string{"uid": uid, "partstat": partstat})
 	if err != nil {
 		return err
@@ -649,6 +659,25 @@ func (c *Calendars) AmendRecurrence(ctx context.Context, calendario, uid string,
 		return err
 	}
 	return resp.Body.Close()
+}
+
+// DividirSerie es «solo este» (recorte RecorteExcluir) o «este y los siguientes»
+// (RecorteHasta) al guardar una ocurrencia de la serie `uid`: crea `in` como un evento
+// nuevo en `calendario` y recorta la serie en `ocurrencia` (su RECURRENCE-ID). Primero
+// crear, como en la web: un fallo a mitad deja como mucho un duplicado, nunca una
+// pérdida. Un almacén que lo sabe hacer mejor (CalendarSerieData: Sytue Office, que lleva
+// al evento nuevo lo que contestaron los invitados) lo hace él.
+func (c *Calendars) DividirSerie(ctx context.Context, calendario, uid string, ocurrencia time.Time, recorte string, in EventInput) error {
+	if c.data != nil {
+		if d, ok := c.data.(CalendarSerieData); ok {
+			_, err := d.DividirSerie(ctx, calendario, uid, ocurrencia, recorte, in)
+			return err
+		}
+	}
+	if _, err := c.CreateEvent(ctx, calendario, in); err != nil {
+		return err
+	}
+	return c.AmendRecurrence(ctx, calendario, uid, ocurrencia, recorte)
 }
 
 // RefreshSubscription vuelve a leer ahora el .ics de una suscripción.

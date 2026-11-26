@@ -4,11 +4,11 @@ package integrationshttp
 import (
 	"context"
 	"net/url"
-	"regexp"
 	"strings"
 	"time"
 	"unicode/utf8"
 
+	cuentaschat "git.sytue.eu/sytue/one/apps/nucleo/cuentas/chat"
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/services/integrations/internal/connector"
 )
@@ -53,10 +53,12 @@ type externalAction struct {
 	Text      string `json:"text,omitempty"`
 }
 
+// Los identificadores de Slack y de Google Chat que se aceptan viven en el núcleo
+// (`apps/nucleo/cuentas/chat`, RO-01), que también usa Sytue Office.
 var (
-	externalSlackID      = regexp.MustCompile(`^[CDG][A-Z0-9]{2,31}$`)
-	externalSlackTS      = regexp.MustCompile(`^\d{1,20}\.\d{1,10}$`)
-	externalGoogleThread = regexp.MustCompile(`^spaces/[A-Za-z0-9_-]+/threads/[A-Za-z0-9_.-]+$`)
+	externalSlackID      = cuentaschat.IDCanalSlack
+	externalSlackTS      = cuentaschat.TSSlack
+	externalGoogleThread = cuentaschat.NombreHilo
 )
 
 func externalValidCursor(cursor string) bool {
@@ -158,13 +160,8 @@ func externalGraphNext(raw, path string) (string, error) {
 	return cursor, nil
 }
 
-func externalGraphTarget(path, cursor string) string {
-	q := url.Values{"$top": {"20"}}
-	if cursor != "" {
-		q.Set("$skiptoken", cursor)
-	}
-	return roomsGraphAPI + path + "?" + q.Encode()
-}
+// externalGraphPage es cuántos mensajes da cada página de Graph.
+const externalGraphPage = 20
 
 func externalDecodedPath(path string) string {
 	decoded, err := url.PathUnescape(path)

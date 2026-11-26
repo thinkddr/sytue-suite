@@ -29,34 +29,43 @@ type CatalogSnapshot struct {
 }
 
 func loadCatalogEntries(ctx context.Context, reader CatalogReader, expected Scope) (Binding, map[Reference]RecordEntry, error) {
+	binding, entries, _, err := loadCatalogEntriesKnown(ctx, reader, expected, nil)
+	return binding, entries, err
+}
+
+// loadCatalogEntriesKnown es loadCatalogEntries sin volver a validar las entradas de
+// las que same (si no es nil) dice que son una ya validada para expected; devuelve
+// cuáles.
+func loadCatalogEntriesKnown(ctx context.Context, reader CatalogReader, expected Scope, same func(RecordEntry) bool) (Binding, map[Reference]RecordEntry, map[Reference]bool, error) {
 	if err := ctx.Err(); err != nil {
-		return Binding{}, nil, err
+		return Binding{}, nil, nil, err
 	}
 	if reader == nil || !expected.Valid() {
-		return Binding{}, nil, ErrCatalogSource
+		return Binding{}, nil, nil, ErrCatalogSource
 	}
 	binding, err := reader.StorageBindings(ctx)
 	if err != nil {
-		return Binding{}, nil, err
+		return Binding{}, nil, nil, err
 	}
 	if !binding.Valid() || binding.Scope != expected {
-		return Binding{}, nil, ErrCatalogSource
+		return Binding{}, nil, nil, ErrCatalogSource
 	}
 	binding.Rooms = slices.Clone(binding.Rooms)
 	entries := map[Reference]RecordEntry{}
+	known := map[Reference]bool{}
 	for _, room := range binding.Rooms {
-		if err := loadCatalogRoom(ctx, reader, expected, room, entries); err != nil {
-			return Binding{}, nil, err
+		if err := loadCatalogRoom(ctx, reader, expected, room, entries, same, known); err != nil {
+			return Binding{}, nil, nil, err
 		}
 	}
 	current, err := reader.StorageBindings(ctx)
 	if err != nil {
-		return Binding{}, nil, err
+		return Binding{}, nil, nil, err
 	}
 	if !binding.Same(current) {
-		return Binding{}, nil, ErrCatalogSource
+		return Binding{}, nil, nil, ErrCatalogSource
 	}
-	return binding, entries, nil
+	return binding, entries, known, nil
 }
 
 // LoadCatalog shares the complete-room scan used by private application
@@ -82,7 +91,7 @@ func LoadCatalog(ctx context.Context, reader CatalogReader, expected Scope) (Cat
 	return CatalogSnapshot{Binding: binding, Entries: entries, Heads: heads}, nil
 }
 
-func loadCatalogRoom(ctx context.Context, reader CatalogReader, scope Scope, room string, entries map[Reference]RecordEntry) error {
+func loadCatalogRoom(ctx context.Context, reader CatalogReader, scope Scope, room string, entries map[Reference]RecordEntry, same func(RecordEntry) bool, known map[Reference]bool) error {
 	cursor := ""
 	seen := map[string]bool{}
 	for {
@@ -103,7 +112,9 @@ func loadCatalogRoom(ctx context.Context, reader CatalogReader, scope Scope, roo
 			if len(entry.Record.Payload) > MaxRecordBytes {
 				return ErrRecord
 			}
-			if err := ValidateCatalogEntry(entry, scope); err != nil {
+			if same != nil && same(entry) {
+				known[entry.Reference] = true
+			} else if err := ValidateCatalogEntry(entry, scope); err != nil {
 				return err
 			}
 			entries[entry.Reference] = cloneCatalogEntry(entry)

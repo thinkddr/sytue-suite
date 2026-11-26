@@ -93,11 +93,38 @@ type Pantalla struct {
 	// PuedeGestionarRecursos es `user.roles` con admin u owner: solo entonces sale el
 	// botón de salas y recursos.
 	PuedeGestionarRecursos bool
+	// SinPersonas oculta lo que es de otras personas: «Invitaciones», «Compartidos
+	// conmigo», compartir un calendario, invitar desde el formulario y las salas y
+	// recursos. Es la edición sin cuenta (Sytue Office), que no tiene a quién. Falso:
+	// todo como siempre.
+	SinPersonas bool
+	// Invitar, si no es nil y SinPersonas está puesto, vuelve a poner los invitados en el
+	// formulario de los eventos de un calendario de una cuenta (Sytue Office:
+	// invitarlocal.go), con el autocompletado de la libreta y la ocupación de los
+	// invitados en «buscar un hueco». nil: como siempre.
+	Invitar *Invitar
+	// PistaEnlace, si no está vacía, cambia la sala de Sytue Rooms del formulario por un
+	// campo libre para el enlace de la reunión (Meet, Teams, Zoom…), con esta pista
+	// debajo. Vacía: la sala de Rooms, como siempre.
+	PistaEnlace string
+	// Reunion, si no es nil y hay PistaEnlace, pone bajo ese campo el botón que crea la
+	// reunión con el proveedor del calendario elegido (Sytue Office, reunionlocal.go):
+	// Meet en Google, Teams en Microsoft o la cuenta de mensajería que la cree. nil, el
+	// campo libre como siempre.
+	Reunion *Reunion
+	// Cuentas agrupa los calendarios sincronizados con cuentas externas (Sytue Office,
+	// A-12): cada cuenta sale en su sección, debajo de «Mis calendarios», con su nombre
+	// y «Sincronizar ahora»; los de solo lectura llevan su insignia. nil, como siempre.
+	Cuentas []GrupoCuenta
 	// Importar es «Trae tus calendarios» (`ui.ImportarDatos`), en el pie del menú; nil,
 	// el pie se queda vacío.
 	Importar *ui.ImportarDatos
 	// AlServiciosVinculados abre las cuentas y calendarios vivos de otros proveedores.
 	AlServiciosVinculados func()
+
+	// alCrearEnCuenta abre el formulario de un calendario nuevo en la cuenta de un
+	// GrupoCuenta con CrearCalendario; lo pone la App.
+	alCrearEnCuenta func(GrupoCuenta)
 
 	// peticiones son las franjas de «Pedir acceso de edición» de los compartidos de
 	// lector, por calendario; delAviso, el calendario propio del aviso de una petición,
@@ -363,10 +390,14 @@ func (p *Pantalla) cabecera() *CabeceraVista {
 	invitaciones := nuevoBotonInvitaciones(p.t("header.invitations", nil), p.Invitaciones,
 		p.t("header.pending", i18n.Vars{"count": p.Invitaciones}), p.AlVerInvitaciones)
 
-	derecha := []fyne.CanvasObject{buscar, p.nuevaCampana(), invitaciones, NuevoGrupoVista(p.t("view.label", nil), [4]string{
+	derecha := []fyne.CanvasObject{buscar, p.nuevaCampana(), invitaciones}
+	if p.SinPersonas {
+		derecha = derecha[:2]
+	}
+	derecha = append(derecha, NuevoGrupoVista(p.t("view.label", nil), [4]string{
 		p.t("view.month", nil), p.t("view.week", nil),
 		p.t("view.day", nil), p.t("view.agenda", nil),
-	}, p.Vista, p.cambiarVista)}
+	}, p.Vista, p.cambiarVista))
 	return NuevaCabeceraVista(p.Titulo(), izquierda, derecha)
 }
 

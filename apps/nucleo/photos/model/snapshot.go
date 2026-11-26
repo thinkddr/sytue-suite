@@ -35,31 +35,44 @@ type Row struct {
 // AssetRow describes the stored metadata, before EXIF orientation is applied.
 // JSON is retained separately so reading a view cannot lose a column.
 type AssetRow struct {
-	ID             string          `json:"id"`
-	Tenant         string          `json:"tenant"`
-	Owner          string          `json:"owner_sub"`
-	DriveID        string          `json:"drive_file_id"`
-	Name           string          `json:"name"`
-	MediaType      string          `json:"media_type"`
-	Bytes          int64           `json:"bytes"`
-	Width          int             `json:"width"`
-	Height         int             `json:"height"`
-	Orientation    int             `json:"orientation"`
-	TakenAt        *time.Time      `json:"taken_at"`
-	UploadedAt     time.Time       `json:"uploaded_at"`
-	Camera         string          `json:"camera"`
-	Lens           string          `json:"lens"`
-	Favorite       bool            `json:"favorite"`
-	Description    string          `json:"description"`
-	Tags           []string        `json:"tags"`
-	Latitude       *float64        `json:"latitude"`
-	Longitude      *float64        `json:"longitude"`
-	Embedding      []float32       `json:"embedding"`
-	EmbeddingModel string          `json:"embedding_model"`
-	DeletedAt      *time.Time      `json:"deleted_at"`
-	CreatedAt      time.Time       `json:"created_at"`
-	UpdatedAt      time.Time       `json:"updated_at"`
-	PrivateMedia   json.RawMessage `json:"private_media,omitempty"`
+	ID             string     `json:"id"`
+	Tenant         string     `json:"tenant"`
+	Owner          string     `json:"owner_sub"`
+	DriveID        string     `json:"drive_file_id"`
+	Name           string     `json:"name"`
+	MediaType      string     `json:"media_type"`
+	Bytes          int64      `json:"bytes"`
+	Width          int        `json:"width"`
+	Height         int        `json:"height"`
+	Orientation    int        `json:"orientation"`
+	TakenAt        *time.Time `json:"taken_at"`
+	UploadedAt     time.Time  `json:"uploaded_at"`
+	Camera         string     `json:"camera"`
+	Lens           string     `json:"lens"`
+	Favorite       bool       `json:"favorite"`
+	Description    string     `json:"description"`
+	Tags           []string   `json:"tags"`
+	Latitude       *float64   `json:"latitude"`
+	Longitude      *float64   `json:"longitude"`
+	Embedding      []float32  `json:"embedding"`
+	EmbeddingModel string     `json:"embedding_model"`
+	DeletedAt      *time.Time `json:"deleted_at"`
+	// PurgedAt es cuándo se borró para siempre de la papelera (Purgar): la fila sigue
+	// en el historial del motor, que no tiene recolector, pero la galería ya no la ve.
+	PurgedAt     *time.Time      `json:"purged_at,omitempty"`
+	CreatedAt    time.Time       `json:"created_at"`
+	UpdatedAt    time.Time       `json:"updated_at"`
+	PrivateMedia json.RawMessage `json:"private_media,omitempty"`
+	// PrivateExternal es un original que vive FUERA del almacén (un fichero de una
+	// carpeta del equipo enlazado sin copiarlo, FO-09), en vez de PrivateMedia. Solo lo
+	// escribe Sytue Office.
+	PrivateExternal json.RawMessage `json:"private_external,omitempty"`
+	// DurationMs es la duración de un vídeo, en milisegundos (FO-09).
+	DurationMs int64 `json:"duration_ms,omitempty"`
+	// OriginalSHA256 es la huella del original de una foto purgada que soltó su
+	// original (Repository.LiberarAlPurgar): así no se vuelve a importar lo que la
+	// persona borró para siempre.
+	OriginalSHA256 string `json:"original_sha256,omitempty"`
 }
 
 func parsedUUID(value string) uuid.UUID { id, _ := uuid.Parse(value); return id }
@@ -87,6 +100,11 @@ type AlbumRow struct {
 	UpdatedAt       time.Time       `json:"updated_at"`
 	DeletedAt       *time.Time      `json:"deleted_at,omitempty"`
 	PrivateMembers  json.RawMessage `json:"private_members,omitempty"`
+	// Origin es de dónde vino el álbum, si vino de fuera («sytue:<id>», el de un álbum
+	// traído de una copia de «Tus datos» a Sytue Office): así traerlo otra vez lo
+	// reconoce aunque se haya renombrado. Vacío en los demás (y siempre en la conectada,
+	// que nunca lo escribe).
+	Origin string `json:"origin,omitempty"`
 }
 
 type EditRow struct {

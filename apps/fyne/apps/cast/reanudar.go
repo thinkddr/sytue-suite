@@ -108,6 +108,15 @@ var carpetaReanudar = ajustes.Carpeta
 
 const ficheroReanudar = "cast-reanudar.json"
 
+// CarpetaReanudar cambia dónde se guarda «seguir donde lo dejé». Sytue Office la pone en
+// su propia carpeta de ajustes, para no compartir nada con la edición conectada
+// (R-CONVIVE). Se llama una vez, al arrancar.
+func CarpetaReanudar(f func() (string, error)) {
+	if f != nil {
+		carpetaReanudar = f
+	}
+}
+
 // leerTodos son los puntos de todas las personas del fichero; vacío si no se puede.
 func leerTodos() map[string]Puntos {
 	dir, err := carpetaReanudar()

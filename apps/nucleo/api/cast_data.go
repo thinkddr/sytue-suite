@@ -43,3 +43,18 @@ func (c *Cast) WithPrivateData(data CastData) (*Cast, error) {
 	}
 	return &Cast{c: privateDataClient(c.c, ErrPrivateCastOperation), pub: privateDataClient(c.pub, ErrPrivateCastOperation), raiz: privateDataClient(c.raiz, ErrPrivateCastOperation), data: data}, nil
 }
+
+// CastExploreData es OPCIONAL: un CastData que además tiene su propia portada y sus
+// canales. La cumple la videoteca de Sytue Office (`local/videoteca`), donde «publicado»
+// es un estado local que enseña el vídeo en la portada de ESA app en ESE equipo (D-26).
+// El repositorio cifrado no la cumple, y entonces Explore y Channel siguen cerrados.
+type CastExploreData interface {
+	Explore(ctx context.Context, cursor string, limite int) (CastExplore, error)
+	Channel(ctx context.Context, org, cursor string) (CastChannel, error)
+}
+
+// NewPrivateCast es un Cast sin transporte HTTP, enchufado solo a data: lo que data no
+// atiende falla con ErrPrivateCastOperation sin abrir ninguna conexión.
+func NewPrivateCast(data CastData) (*Cast, error) {
+	return NewCast("", nil, nil).WithPrivateData(data)
+}

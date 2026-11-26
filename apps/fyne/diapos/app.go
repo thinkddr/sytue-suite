@@ -50,6 +50,9 @@ type App struct {
 	// AbrirArchivo es «Abrir un archivo» del menú Archivo y de la portada; lo pone el
 	// binario, que es quien sabe abrir el selector y convertir.
 	AbrirArchivo *editor.AbrirArchivo
+	// Fichero son «Guardar» y «Guardar como…» en un fichero del disco: solo la edición
+	// local (editor.Fichero). nil: no salen.
+	Fichero *editor.Fichero
 	// Carpeta es dónde se dejan las descargas; nil, la del sistema.
 	Carpeta func() (string, error)
 	// EnlaceDoc y EnlacePublico escriben las direcciones de la web que copia «Compartir»,
@@ -357,6 +360,7 @@ func (a *App) archivo(ab *abierta, id string, escribe bool) {
 		srv.HacerCopia(api.Document{ID: id, Kind: api.DocSlides, Title: ctx.Titulo}, a.guardarAntes(ab),
 			func(d api.Document) { a.AbrirID(d.ID, d.Title) }, listo)
 	}
+	a.Fichero.Enganchar(ctx, id, func() func() error { return a.guardarAntes(ab) })
 	if escribe {
 		ctx.GuardarVersion = func(etiqueta string) { srv.GuardarVersion(id, etiqueta) }
 		ctx.RestaurarVersion = func(v api.DocVersion) {

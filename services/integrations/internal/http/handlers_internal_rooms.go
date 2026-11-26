@@ -4,20 +4,17 @@
 package integrationshttp
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
-	"io"
 	"net/http"
 	"net/url"
-	"regexp"
-	"strconv"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/google/uuid"
 
+	cuentaschat "git.sytue.eu/sytue/one/apps/nucleo/cuentas/chat"
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/platform/pkg/hubnotify"
 	"git.sytue.eu/sytue/one/platform/pkg/log"
@@ -43,7 +40,9 @@ const (
 	maxRoomsDestinations    = 500
 )
 
-var roomsSpaceName = regexp.MustCompile(`^spaces/[A-Za-z0-9_-]+$`)
+// Las comprobaciones de los nombres de Google Chat y de los canales de Teams, y la del
+// enlace de Meet, viven en el núcleo (`apps/nucleo/cuentas/chat`, RO-01).
+var roomsSpaceName = cuentaschat.NombreEspacio
 
 func esPlantillaDeRooms(key string) bool {
 	return key == tmplSlackRooms || key == tmplTeamsRooms || key == tmplGoogleChat || key == tmplGoogleMeet || externalChatTemplate(key)
@@ -152,52 +151,64 @@ func (h *Handlers) InternalRoomsMeeting(w http.ResponseWriter, r *http.Request) 
 
 // roomsProviderJSON usa siempre el runtime con SSRF, política, auditoría y auth
 // del vault. Un error del proveedor nunca devuelve su cuerpo ni una URL secreta.
+//
+// El transporte es el de los clientes de mensajería del núcleo
+// (`apps/nucleo/cuentas/chat`, RO-01), sin token propio: lo inyecta el runtime. Lo usan
+// también las integraciones que no son de mensajería (correo, WhatsApp).
 func roomsProviderJSON(ctx context.Context, rt connector.Runtime, method, target string, body, out any) error {
-	var reader io.Reader = http.NoBody
-	if body != nil {
-		encoded, err := json.Marshal(body)
-		if err != nil {
-			return httpx.ErrInternal
-		}
-		reader = bytes.NewReader(encoded)
-	}
-	req, err := http.NewRequestWithContext(ctx, method, target, reader)
-	if err != nil {
-		return httpx.ErrInternal
-	}
-	req.Header.Set("Accept", "application/json")
-	if body != nil {
-		req.Header.Set("Content-Type", "application/json")
-	}
-	res, err := rt.HTTP.Do(req)
-	if err != nil {
-		return httpx.NewError(http.StatusBadGateway, "rooms_provider_unreachable", "The connected app could not be reached.")
-	}
-	defer res.Body.Close()
-	if res.StatusCode < 200 || res.StatusCode >= 300 {
-		if res.StatusCode == http.StatusUnauthorized || res.StatusCode == http.StatusForbidden {
-			return httpx.NewError(http.StatusUnprocessableEntity, "rooms_provider_permission", "The connected account cannot access this destination. Check its permissions or reconnect it.")
-		}
-		if res.StatusCode == http.StatusTooManyRequests {
-			seconds, parseErr := strconv.Atoi(res.Header.Get("Retry-After"))
-			if parseErr != nil || seconds < 1 {
-				seconds = 60
-			}
-			if seconds > 86400 {
-				seconds = 86400
-			}
-			return httpx.NewError(http.StatusTooManyRequests, "external_rate_limited", "The connected app is busy. Try again shortly.").WithParams(map[string]any{"retry_after_seconds": seconds})
-		}
-		return httpx.NewError(http.StatusBadGateway, "rooms_provider_rejected", "The connected app did not accept the request.")
-	}
-	if out == nil {
-		_, _ = io.Copy(io.Discard, io.LimitReader(res.Body, 1<<20))
+	return roomsProviderError(cuentaschat.PedirJSON(ctx, rt.HTTP, method, target, body, out, roomsProviderMax))
+}
+
+// roomsProviderMax es lo más que se lee de una respuesta de un proveedor.
+const roomsProviderMax = 1 << 20
+
+// Los clientes del núcleo sobre el runtime de la pasarela: sin token (lo pone el
+// runtime desde el vault) y con el límite de respuesta de aquí.
+func roomsGraph(rt connector.Runtime) *cuentaschat.Graph {
+	return &cuentaschat.Graph{Base: roomsGraphAPI, HTTP: rt.HTTP, Limite: roomsProviderMax}
+}
+
+func roomsGoogleChat(rt connector.Runtime) *cuentaschat.GoogleChat {
+	return &cuentaschat.GoogleChat{Base: strings.TrimSuffix(roomsChatAPI, "/"), HTTP: rt.HTTP, Limite: roomsProviderMax}
+}
+
+func roomsMeet(rt connector.Runtime) *cuentaschat.Meet {
+	return &cuentaschat.Meet{Base: strings.TrimSuffix(roomsMeetAPI, "/spaces"), HTTP: rt.HTTP, Limite: roomsProviderMax}
+}
+
+func roomsSlack(rt connector.Runtime) *cuentaschat.Slack {
+	return &cuentaschat.Slack{Base: externalSlackAPI, HTTP: rt.HTTP, Limite: roomsProviderMax}
+}
+
+// roomsProviderError traduce el error de un cliente del núcleo al de la pasarela, sin el
+// cuerpo del proveedor ni la dirección.
+func roomsProviderError(err error) error {
+	if err == nil {
 		return nil
 	}
-	if err := json.NewDecoder(io.LimitReader(res.Body, 1<<20)).Decode(out); err != nil {
+	var slackErr *cuentaschat.ErrSlack
+	switch {
+	case errors.As(err, &slackErr):
+		return slackStatus{Error: slackErr.Codigo}.check()
+	case errors.Is(err, cuentaschat.ErrEntrada):
+		return httpx.ErrBadRequest
+	case errors.Is(err, cuentaschat.ErrRespuesta):
 		return httpx.NewError(http.StatusBadGateway, "rooms_provider_response", "The connected app returned an unreadable response.")
 	}
-	return nil
+	switch status := cuentaschat.Estado(err); status {
+	case 0:
+		return httpx.NewError(http.StatusBadGateway, "rooms_provider_unreachable", "The connected app could not be reached.")
+	case http.StatusUnauthorized, http.StatusForbidden:
+		return httpx.NewError(http.StatusUnprocessableEntity, "rooms_provider_permission", "The connected account cannot access this destination. Check its permissions or reconnect it.")
+	case http.StatusTooManyRequests:
+		seconds := int(cuentaschat.Espera(err) / time.Second)
+		if seconds < 1 {
+			seconds = 60
+		}
+		return httpx.NewError(http.StatusTooManyRequests, "external_rate_limited", "The connected app is busy. Try again shortly.").WithParams(map[string]any{"retry_after_seconds": min(seconds, 86400)})
+	default:
+		return httpx.NewError(http.StatusBadGateway, "rooms_provider_rejected", "The connected app did not accept the request.")
+	}
 }
 
 func listRoomsDestinations(ctx context.Context, conn connector.Instance, rt connector.Runtime) ([]roomsDestination, error) {
@@ -240,8 +251,8 @@ func listGoogleRooms(ctx context.Context, rt connector.Runtime) ([]roomsDestinat
 		if pageToken != "" {
 			q.Set("pageToken", pageToken)
 		}
-		if err := roomsProviderJSON(ctx, rt, http.MethodGet, roomsChatAPI+"spaces?"+q.Encode(), nil, &out); err != nil {
-			return nil, err
+		if err := roomsGoogleChat(rt).Pedir(ctx, http.MethodGet, "spaces?"+q.Encode(), nil, &out); err != nil {
+			return nil, roomsProviderError(err)
 		}
 		for _, space := range out.Spaces {
 			if !roomsSpaceName.MatchString(space.Name) {
@@ -279,8 +290,8 @@ func listGraphRooms(ctx context.Context, rt connector.Runtime, target string) ([
 			Value []graphRoom `json:"value"`
 			Next  string      `json:"@odata.nextLink"` //nolint:tagliatelle // contrato de Graph
 		}
-		if err := roomsProviderJSON(ctx, rt, http.MethodGet, target, nil, &out); err != nil {
-			return nil, err
+		if err := roomsGraph(rt).Pedir(ctx, http.MethodGet, target, nil, &out); err != nil {
+			return nil, roomsProviderError(err)
 		}
 		for _, item := range out.Value {
 			items = append(items, item)
@@ -329,11 +340,7 @@ func listTeamsRooms(ctx context.Context, rt connector.Runtime) ([]roomsDestinati
 	return items, nil
 }
 
-func validRoomsTeamsID(remote string) bool {
-	team, channel, ok := strings.Cut(remote, "/")
-	_, err := uuid.Parse(team)
-	return ok && err == nil && channel != "" && len(channel) <= 512 && !strings.ContainsAny(channel, "/?#\r\n\x00")
-}
+func validRoomsTeamsID(remote string) bool { return cuentaschat.IDCanalTeamsValido(remote) }
 
 func validSlackRoomsWebhook(raw string) bool {
 	u, err := url.Parse(raw)
@@ -356,31 +363,27 @@ func sendRoomsMessage(ctx context.Context, conn connector.Instance, rt connector
 		if !roomsSpaceName.MatchString(remote) {
 			return httpx.ErrBadRequest.WithMessage("Invalid Google Chat space.")
 		}
-		return roomsProviderJSON(ctx, rt, http.MethodPost, roomsChatAPI+remote+"/messages", map[string]string{"text": text}, nil)
+		return roomsProviderError(roomsGoogleChat(rt).Pedir(ctx, http.MethodPost, remote+"/messages", map[string]string{"text": text}, nil))
 	case tmplTeamsRooms:
 		if !validRoomsTeamsID(remote) {
 			return httpx.ErrBadRequest.WithMessage("Invalid Teams channel.")
 		}
-		team, channel, _ := strings.Cut(remote, "/")
-		target := roomsGraphAPI + "/teams/" + url.PathEscape(team) + "/channels/" + url.PathEscape(channel) + "/messages"
-		return roomsProviderJSON(ctx, rt, http.MethodPost, target, map[string]any{"body": map[string]string{"contentType": "text", "content": text}}, nil)
+		path, err := cuentaschat.RutaMensajesTeams(remote, "")
+		if err != nil {
+			return httpx.ErrBadRequest.WithMessage("Invalid Teams channel.")
+		}
+		return roomsProviderError(roomsGraph(rt).Pedir(ctx, http.MethodPost, path, cuentaschat.CuerpoTexto(text), nil))
 	default:
 		return httpx.ErrBadRequest.WithMessage("This app does not receive channel messages.")
 	}
 }
 
 func createRoomsMeeting(ctx context.Context, rt connector.Runtime) (string, error) {
-	var out struct {
-		URI string `json:"meetingUri"` //nolint:tagliatelle // contrato de Google Meet
-	}
-	if err := roomsProviderJSON(ctx, rt, http.MethodPost, roomsMeetAPI, map[string]any{}, &out); err != nil {
-		return "", err
-	}
-	u, err := url.Parse(out.URI)
-	if err != nil || u.Scheme != "https" || u.Host != "meet.google.com" || u.User != nil || len(u.Path) < 2 {
+	u, err := roomsMeet(rt).Crear(ctx)
+	if errors.Is(err, cuentaschat.ErrEnlace) {
 		return "", httpx.NewError(http.StatusBadGateway, "rooms_meeting_response", "Google Meet did not return a valid meeting link.")
 	}
-	return u.String(), nil
+	return u, roomsProviderError(err)
 }
 
 // La URL del webhook autoriza a publicar: solo vive en el vault cifrado. Los

@@ -120,7 +120,7 @@ func (p *Photos) miniatura(ctx context.Context, id string) ([]byte, error) {
 
 // verLaFoto le enseña la miniatura al modelo con esa instrucción. `medium` y no `none`:
 // en visión, razonar menos se traga la mitad de lo que hay en la foto.
-func (p *Photos) verLaFoto(ctx context.Context, ia *IA, id, accion, instruccion, contexto, idioma string) (string, error) {
+func (p *Photos) verLaFoto(ctx context.Context, ia Asistente, id, accion, instruccion, contexto, idioma string) (string, error) {
 	img, err := p.miniatura(ctx, id)
 	if err != nil {
 		return "", err
@@ -133,7 +133,7 @@ func (p *Photos) verLaFoto(ctx context.Context, ia *IA, id, accion, instruccion,
 
 // Describir le pide a Sytue AI la descripción y las etiquetas de una foto, en la lengua
 // de la sesión (acaban en su `alt`). NO las guarda: eso es SetDescription.
-func (p *Photos) Describir(ctx context.Context, ia *IA, id, idioma string) (descripcion string, etiquetas []string, err error) {
+func (p *Photos) Describir(ctx context.Context, ia Asistente, id, idioma string) (descripcion string, etiquetas []string, err error) {
 	texto, err := p.verLaFoto(ctx, ia, id, "describir-foto", instruccionDescribir(idioma), "", idioma)
 	if err != nil {
 		return "", nil, err
@@ -147,7 +147,7 @@ func (p *Photos) Describir(ctx context.Context, ia *IA, id, idioma string) (desc
 
 // Preguntar contesta una pregunta sobre la foto. La respuesta NO se guarda: es una
 // conversación sobre la foto, no un dato suyo.
-func (p *Photos) Preguntar(ctx context.Context, ia *IA, id, pregunta, idioma string) (string, error) {
+func (p *Photos) Preguntar(ctx context.Context, ia Asistente, id, pregunta, idioma string) (string, error) {
 	pregunta = strings.TrimSpace(pregunta)
 	if pregunta == "" || utf8.RuneCountInString(pregunta) > TopePregunta {
 		return "", errors.New("api: la pregunta está vacía o es demasiado larga")
@@ -165,7 +165,7 @@ func (p *Photos) Preguntar(ctx context.Context, ia *IA, id, pregunta, idioma str
 // TerminosRelacionados son otras formas de decir lo que alguien buscó, para ampliar una
 // búsqueda que no encontró nada. Es una llamada de TEXTO y sin razonar: cuesta una
 // fracción de describir una foto. Sin lista usable devuelve vacío, y no se amplía.
-func TerminosRelacionados(ctx context.Context, ia *IA, consulta, idioma string) ([]string, error) {
+func TerminosRelacionados(ctx context.Context, ia Asistente, consulta, idioma string) ([]string, error) {
 	consulta = strings.TrimSpace(consulta)
 	if consulta == "" || utf8.RuneCountInString(consulta) > 100 {
 		return nil, nil
@@ -198,7 +198,7 @@ type EdicionIA struct {
 
 // EditarConIA pide a Sytue AI los ajustes de revelado para un preajuste (`accion`, una
 // clave de PreajustesIA) o una petición libre, o las dos.
-func (p *Photos) EditarConIA(ctx context.Context, ia *IA, id, accion, instruccion, idioma string) (EdicionIA, error) {
+func (p *Photos) EditarConIA(ctx context.Context, ia Asistente, id, accion, instruccion, idioma string) (EdicionIA, error) {
 	instruccion = strings.TrimSpace(instruccion)
 	var partes []string
 	if d, ok := PreajustesIA[accion]; ok {

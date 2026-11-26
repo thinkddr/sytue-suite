@@ -4,11 +4,12 @@
 package domain
 
 import (
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/teambition/rrule-go"
+
+	"git.sytue.eu/sytue/one/apps/nucleo/notes/model"
 )
 
 // Reminder es el recordatorio de UNA persona sobre una nota (0014).
@@ -43,29 +44,9 @@ type ReminderInput struct {
 // BYMINUTE ni BYSECOND: la hora es la del vencimiento, y con ellos un FREQ=DAILY
 // sonaba cada pocos minutos.
 func (in *ReminderInput) Normalize() error {
-	in.RRule = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(in.RRule), "RRULE:"))
-	in.TZID = strings.TrimSpace(in.TZID)
-	if in.TZID == "" {
-		in.TZID = "UTC"
-	}
-	if in.DueAt.IsZero() || len(in.TZID) > 64 || in.AfterDays < 0 || in.AfterDays > 365 ||
-		(in.RRule != "" && in.AfterDays > 0) || len(in.RRule) > 200 {
-		return ErrInvalidInput
-	}
-	if _, err := time.LoadLocation(in.TZID); err != nil {
-		return ErrInvalidInput
-	}
-	if in.RRule != "" {
-		if strings.ContainsAny(in.RRule, "\r\n") || strings.Contains(strings.ToUpper(in.RRule), "DTSTART") {
-			return ErrInvalidInput
-		}
-		opt, err := rrule.StrToROption(in.RRule)
-		if err != nil || opt.Freq > rrule.DAILY || len(opt.Byhour) > 0 || len(opt.Byminute) > 0 || len(opt.Bysecond) > 0 {
-			return ErrInvalidInput
-		}
-	}
-	in.DueAt = in.DueAt.UTC().Truncate(time.Minute)
-	return nil
+	var err error
+	in.RRule, in.TZID, in.DueAt, err = model.NormalizarRecordatorio(in.RRule, in.TZID, in.DueAt, in.AfterDays)
+	return err
 }
 
 // Repite dice si el recordatorio vuelve a sonar.

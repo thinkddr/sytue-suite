@@ -13,10 +13,10 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"git.sytue.eu/sytue/one/apps/nucleo/erp/banca"
+	"git.sytue.eu/sytue/one/apps/nucleo/erp/obligaciones"
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/platform/pkg/validation"
-	"git.sytue.eu/sytue/one/services/syerp/internal/banca"
-	"git.sytue.eu/sytue/one/services/syerp/internal/obligaciones"
 	"git.sytue.eu/sytue/one/services/syerp/internal/store"
 )
 

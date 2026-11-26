@@ -11,12 +11,12 @@ import (
 	"strings"
 	"time"
 
+	"git.sytue.eu/sytue/one/apps/nucleo/erp/ia"
 	"git.sytue.eu/sytue/one/platform/pkg/authn"
 	"git.sytue.eu/sytue/one/platform/pkg/basesconn"
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/platform/pkg/log"
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
-	"git.sytue.eu/sytue/one/services/syerp/internal/ia"
 	"git.sytue.eu/sytue/one/services/syerp/internal/store"
 )
 

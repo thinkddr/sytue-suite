@@ -12,9 +12,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"git.sytue.eu/sytue/one/apps/nucleo/office/plantillas"
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/services/docs/internal/domain"
-	"git.sytue.eu/sytue/one/services/docs/internal/plantillas"
 )
 
 // BLOQUES REUTILIZABLES: los de Sytue (catálogo común, plantillas.ListarBloques) y los de

@@ -79,3 +79,22 @@ func IANoConfigurada(err error) bool {
 	var e *Error
 	return errors.As(err, &e) && e.Status == http.StatusServiceUnavailable && e.Code() == "ai_not_configured"
 }
+
+// Asistente es quien contesta una petición de IA: `*IA` (Sytue AI con la sesión) o la IA
+// que la persona configure en Sytue Office (PLAN-EDICION-LOCAL.md §5.7). Las pantallas lo
+// reciben con esta interfaz y no con el cliente concreto, para que una edición sin
+// servidor les dé el suyo.
+type Asistente interface {
+	Asistir(context.Context, PeticionIA) (string, error)
+}
+
+var _ Asistente = (*IA)(nil)
+
+// AsistenteFunc hace de una función un Asistente.
+type AsistenteFunc func(context.Context, PeticionIA) (string, error)
+
+// Asistir llama a f.
+func (f AsistenteFunc) Asistir(ctx context.Context, q PeticionIA) (string, error) { return f(ctx, q) }
+
+// FuncionAsistente es el mismo AsistenteFunc con el nombre que usa Contacts.
+type FuncionAsistente = AsistenteFunc

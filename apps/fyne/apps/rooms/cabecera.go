@@ -98,6 +98,12 @@ type Cabecera struct {
 	AlAbrirPanel  func(string)
 	AlVerArchivos func()
 	AlLlamar      func()
+	// SinLlamar quita «Llamar» y su filete: lo pide quien no tiene llamadas (Sytue
+	// Office). Con el valor cero la cabecera es la de siempre.
+	SinLlamar bool
+	// RotuloLlamar cambia el texto de «Llamar» (Sytue Office: «Reunión de Microsoft
+	// Teams», que crea el enlace de una reunión del proveedor). Vacío, «Llamar».
+	RotuloLlamar string
 	// AlMenu es la hamburguesa de la ventana estrecha, que saca el carril como cajón
 	// (`md:hidden` en la web, «equivale a atrás a la lista»); nil, no se pinta.
 	AlMenu func()
@@ -206,7 +212,7 @@ func (c *Cabecera) montar(v tema.Variante) {
 	}
 
 	c.acciones = c.construirAcciones(v)
-	c.llamar = ui.NuevoBoton(t.T("call.call", nil), c.AlLlamar).Con(ui.Primario, ui.TallaSM)
+	c.llamar = ui.NuevoBoton(c.rotuloLlamar(), c.AlLlamar).Con(ui.Primario, ui.TallaSM)
 	c.llamar.Glifo = dibujo(glifoVideo, GlifoCabecera, "on-primary", v)
 	c.llamar.TamIcono = GlifoCabecera
 	c.llamar.Inerte = c.SinConexion
@@ -214,7 +220,7 @@ func (c *Cabecera) montar(v tema.Variante) {
 	// esconde su rótulo y no lo vuelve a enseñar si después se le quita (ver
 	// colocarReducida), y «Llamar» se quedaba en una caja vacía al ensancharse.
 	c.llamar.SoloIcono = c.reducidaVisible
-	c.llamar.Rotulo = t.T("call.call", nil)
+	c.llamar.Rotulo = c.rotuloLlamar()
 
 	c.menu = nil
 	if c.Estrecha && !c.menuYaVisible && c.AlMenu != nil && c.Movil == nil {
@@ -317,7 +323,9 @@ func (c *Cabecera) montarReducida() {
 		controles = append(controles, b)
 	}
 	controles = append(controles, c.acciones...)
-	controles = append(controles, c.llamar)
+	if !c.SinLlamar {
+		controles = append(controles, c.llamar)
+	}
 	c.reducida = ui.NuevaTiraDeslizable(LadoAccionCabecera, HuecoAcciones, controles...)
 	c.reducida.AnchoPropio = true
 	c.reducida.Hide()
@@ -443,11 +451,15 @@ func (r *cabeceraRenderer) Layout(t fyne.Size) {
 	// Las acciones, desde la derecha: primero «Llamar», su filete y luego los botones
 	// en orden inverso, para que el sobrante se lo quede el bloque de texto.
 	der := t.Width - CanalonCabecera
-	mLlamar := c.llamar.MinSize()
-	der -= mLlamar.Width
-	c.llamar.Move(fyne.NewPos(der, (t.Height-mLlamar.Height)/2))
-	c.llamar.Resize(mLlamar)
-	if c.Estrecha {
+	if c.SinLlamar {
+		c.llamar.Hide()
+	} else {
+		mLlamar := c.llamar.MinSize()
+		der -= mLlamar.Width
+		c.llamar.Move(fyne.NewPos(der, (t.Height-mLlamar.Height)/2))
+		c.llamar.Resize(mLlamar)
+	}
+	if c.Estrecha || c.SinLlamar {
 		c.filete.Hide()
 	} else {
 		c.filete.Show()
@@ -530,9 +542,20 @@ func (c *Cabecera) colocarReducida(t fyne.Size) bool {
 	return true
 }
 
+// rotuloLlamar es «Llamar» o el que se le haya puesto.
+func (c *Cabecera) rotuloLlamar() string {
+	if c.RotuloLlamar != "" {
+		return c.RotuloLlamar
+	}
+	return c.T.T("call.call", nil)
+}
+
 func (c *Cabecera) anchoMinimo() float32 {
 	llamar := ui.MedidaBotonCon(c.llamar.Texto, c.llamar.Talla, 0, 1, false, GlifoCabecera)
 	ancho := 2*CanalonCabecera + LadoMarcaCanal + 2*HuecoCabecera + llamar.Width
+	if c.SinLlamar {
+		ancho -= llamar.Width
+	}
 	if c.disparador != nil {
 		ancho += DisparadorSobra()
 	}
@@ -545,7 +568,7 @@ func (c *Cabecera) anchoMinimo() float32 {
 	for _, b := range c.acciones {
 		ancho += b.MinSize().Width + HuecoAcciones
 	}
-	if !c.Estrecha {
+	if !c.Estrecha && !c.SinLlamar {
 		ancho += 2*tema.Espacio(1) + tema.Borde + HuecoAcciones
 	}
 	return ancho

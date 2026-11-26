@@ -206,3 +206,40 @@ The wizard asks for the domain, registry, PostgreSQL, S3 and the initial owner, 
 run in order: push the images to your registry, create the databases,
 apply the Secrets, install the chart and create the owner. Details and variable
 reference: [`docs/operations.md`](docs/operations.md#13-prod-en-scaleway-terraform--helm).
+
+---
+
+<a id="9-sytue-office"></a>
+## 9. Sytue Office: the apps on your computer, no server
+
+Sytue Office is the local edition of the native apps: Docus, Calcus, Diapos, CertiPDF, Drive,
+Mail, Calendar, Contacts, Notepads, Photos, Bases, Rooms, Cast, ERP and the Hub. No account, no
+server, no Docker: everything lives in `~/Sytue Office`, in the clear, and it only goes online
+for what you set up (a mail or calendar account, a cloud drive, an AI provider).
+
+**On Linux or macOS**, build and install it from this repository:
+
+```bash
+./sytue-deploy --mode sytue-office
+```
+
+You need **Go 1.21 or newer** (it downloads the exact version the apps ask for by itself),
+`git` and `python3`. On **Linux**, also a C compiler, `pkg-config`, `xz` and the desktop headers:
+if any are missing, the wizard prints the `apt-get` or `dnf` command that installs them. Cast,
+the Hub, Photos and Rooms also need the PipeWire 0.3.65+ headers (Debian 12, Ubuntu 23.04 or
+newer); without them the wizard installs the other apps and says so. On **macOS**, the Xcode
+command line tools (`xcode-select --install`).
+
+- `--office-apps docus,calcus,mail` installs only those apps; `--yes` skips the questions.
+- On Linux the apps go to `~/.local` and show up in the applications menu as «Sytue … Office»
+  (`PREFIJO=/another/dir` puts them elsewhere). On macOS, to `~/Applications`.
+- The packages it builds stay in `apps/fyne/dist/`. To remove the apps on Linux, unpack that
+  `.tar.xz` and run its `instalar.sh --quitar`.
+
+**On Windows**, or without building: every release of this repository attaches the Sytue Office
+packages — `sytue-office-linux-<arch>.tar.xz` (with its `instalar.sh`), the Windows installer, the
+macOS `.dmg` and, per app, an Android AAB and universal APK — with a `SHA256SUMS` file. They are
+**unsigned** (no Authenticode, Developer ID or Play upload key here): check each file against
+`SHA256SUMS`. They are built by [`.github/workflows/office.yml`](.github/workflows/office.yml) when a
+release is published.
+

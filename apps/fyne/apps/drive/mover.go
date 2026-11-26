@@ -67,6 +67,11 @@ type selectorCarpeta struct {
 	carpetas []Elemento
 	fallo    bool
 	moviendo bool
+	// En Sytue Office, con varias unidades (el disco y las nubes): origen es la unidad de
+	// lo que se mueve ("" el disco), unidad la que se mira y enUnidades que se mira la
+	// lista de unidades, por encima de sus raíces. En la conectada, todo vacío.
+	origen, unidad string
+	enUnidades     bool
 
 	cuerpo    *fyne.Container
 	confirmar *ui.Boton
@@ -79,6 +84,14 @@ func (s *selectorCarpeta) destino() string {
 		return s.ruta[n-1].ID
 	}
 	return s.raiz
+}
+
+// nombreDestino es el nombre de la carpeta elegida, o el de su unidad si es su raíz.
+func (s *selectorCarpeta) nombreDestino() string {
+	if n := len(s.ruta); n > 0 {
+		return s.ruta[n-1].Nombre
+	}
+	return s.p.nombreUnidad(s.unidad)
 }
 
 // rutaDestino es el camino de la carpeta elegida, como lo escribe la web: `/` es la raíz.
@@ -104,9 +117,22 @@ func EsMismaCarpeta(origen, destino string) bool {
 	return padre == destino
 }
 
-// pedirMover abre el selector sobre la raíz.
+// pedirMover abre el selector sobre la raíz de la unidad del elemento.
 func (p *Pantalla) pedirMover(el Elemento) {
-	p.abrirSelector(&selectorCarpeta{p: p, el: el}, p.tr.T("move.title", i18n.Vars{"name": el.Nombre}))
+	p.abrirSelector(p.enSuUnidad(&selectorCarpeta{p: p, el: el}, el), p.tr.T("move.title", i18n.Vars{"name": el.Nombre}))
+}
+
+// enSuUnidad empieza el selector en la raíz de la unidad de el (en la conectada, y en el
+// disco, la raíz de siempre, que se pide al cargar).
+func (p *Pantalla) enSuUnidad(s *selectorCarpeta, el Elemento) *selectorCarpeta {
+	s.origen = p.unidadDe(el.ID)
+	s.unidad, s.raiz = s.origen, s.origen
+	return s
+}
+
+// conUnidades dice si «Mover a…» puede llevar a otra unidad (Sytue Office con nubes).
+func (p *Pantalla) conUnidades() bool {
+	return p.EnEquipo != nil && p.EnEquipo.UnidadDe != nil && p.EnEquipo.MoverEntreUnidades != nil && len(p.lateral.Unidades) > 0
 }
 
 // pedirMoverLote es «Mover» de la barra de selección.
@@ -115,7 +141,7 @@ func (p *Pantalla) pedirMoverLote() {
 	if len(sel) == 0 {
 		return
 	}
-	s := &selectorCarpeta{p: p, lote: sel, aqui: p.rutaAqui()}
+	s := p.enSuUnidad(&selectorCarpeta{p: p, lote: sel, aqui: p.rutaAqui()}, sel[0])
 	p.abrirSelector(s, p.tr.T("files.batch.moveTitle", i18n.Vars{"count": len(sel)}))
 }
 
@@ -167,13 +193,54 @@ func (s *selectorCarpeta) ir(nivel int, hija *Elemento) {
 	go s.cargar()
 }
 
+// aUnidades sube a la lista de unidades: el disco y cada nube.
+func (s *selectorCarpeta) aUnidades() {
+	s.enUnidades, s.ruta, s.carpetas, s.fallo = true, nil, nil, false
+	s.pintar()
+	go s.cargar()
+}
+
+// elegirUnidad entra en la raíz de una unidad de la lista.
+func (s *selectorCarpeta) elegirUnidad(raiz Elemento) {
+	s.enUnidades, s.ruta, s.carpetas, s.fallo = false, nil, nil, false
+	s.unidad, s.raiz = s.p.unidadDe(raiz.ID), raiz.ID
+	s.pintar()
+	go s.cargar()
+}
+
+// cargarUnidades da la lista de unidades: «Mi unidad» (su raíz se pide) y las nubes.
+func (s *selectorCarpeta) cargarUnidades() {
+	ctx, cancelar := s.p.ctx()
+	defer cancelar()
+	var nubes []UnidadEquipo
+	fyne.DoAndWait(func() { nubes = slices.Clone(s.p.lateral.Unidades) })
+	raiz, err := s.p.svc.Root(ctx)
+	lista := make([]Elemento, 0, 1+len(nubes))
+	lista = append(lista, Elemento{ID: raiz.ID, Nombre: s.p.tr.T("nav.myDrive", nil), Carpeta: true})
+	for _, u := range nubes {
+		lista = append(lista, Elemento{ID: u.ID, Nombre: u.Nombre, Carpeta: true})
+	}
+	enHilo(func() {
+		if !s.enUnidades {
+			return
+		}
+		s.carpetas, s.fallo = lista, err != nil
+		s.pintar()
+	})
+}
+
 // cargar pide las subcarpetas del destino. Las carpetas llegan enteras en la primera
 // página —solo los ficheros se paginan—, así que no hace falta seguir el cursor.
 func (s *selectorCarpeta) cargar() {
+	var destino string
+	var enUnidades bool
+	fyne.DoAndWait(func() { destino, enUnidades = s.destino(), s.enUnidades })
+	if enUnidades {
+		s.cargarUnidades()
+		return
+	}
 	ctx, cancelar := s.p.ctx()
 	defer cancelar()
-	var destino string
-	fyne.DoAndWait(func() { destino = s.destino() })
 	if destino == "" {
 		raiz, err := s.p.svc.Root(ctx)
 		if err != nil {
@@ -230,6 +297,16 @@ func (s *selectorCarpeta) mover() {
 	s.confirmar.Cargando = true
 	s.confirmar.Refresh()
 	destino, el, p := s.destino(), s.el, s.p
+	if s.unidad != s.origen {
+		// A otra unidad: copiar, comprobar y quitar el origen, con su progreso.
+		els := s.lote
+		if els == nil {
+			els = []Elemento{el}
+		}
+		s.d.Cerrar()
+		p.moverEntreUnidades(els, destino, s.nombreDestino())
+		return
+	}
 	if s.lote != nil {
 		s.moverLote(destino)
 		return
@@ -291,8 +368,15 @@ func (s *selectorCarpeta) moverLote(destino string) {
 	}()
 }
 
-// noHaceNada es mover a la carpeta donde ya está (o, en lote, a la que se mira).
+// noHaceNada es mover a la carpeta donde ya está (o, en lote, a la que se mira). En la
+// lista de unidades no hay carpeta; en otra unidad, siempre hace algo.
 func (s *selectorCarpeta) noHaceNada() bool {
+	if s.enUnidades {
+		return true
+	}
+	if s.unidad != s.origen {
+		return false
+	}
 	if s.lote != nil {
 		return s.rutaDestino() == s.aqui
 	}
@@ -303,22 +387,46 @@ func (s *selectorCarpeta) noHaceNada() bool {
 func (s *selectorCarpeta) pintar() {
 	v := s.p.variante()
 	t := s.p.tr
-	nombres := make([]string, 0, 1+len(s.ruta))
-	nombres = append(nombres, t.T("nav.myDrive", nil))
+	nombres := make([]string, 0, 2+len(s.ruta))
+	// Con varias unidades, encima de su raíz está la lista de unidades («Ubicaciones»).
+	unidades := s.p.conUnidades()
+	if unidades {
+		nombres = append(nombres, t.T("nav.locations", nil))
+	}
+	if !s.enUnidades {
+		nombres = append(nombres, s.p.nombreUnidad(s.unidad))
+	}
 	for _, c := range s.ruta {
 		nombres = append(nombres, c.Nombre)
 	}
-	migas := ui.NuevasMigas(t.T("move.destinationNav", nil), nombres, func(i int) { s.ir(i-1, nil) })
+	migas := ui.NuevasMigas(t.T("move.destinationNav", nil), nombres, func(i int) {
+		if unidades {
+			if i == 0 {
+				s.aUnidades()
+				return
+			}
+			i--
+		}
+		s.ir(i-1, nil)
+	})
 	migas.Estilo = ui.MigasEnDialogo
 
 	linea := t.T("move.noop", nil)
 	if s.lote != nil {
 		linea = t.T("files.batch.here", nil)
 	}
+	if s.enUnidades {
+		linea = t.T("move.destinationNav", nil)
+	}
 	if !s.noHaceNada() {
 		donde := s.rutaDestino()
-		if donde == "/" {
-			donde = t.T("nav.myDrive", nil)
+		switch {
+		case unidades && donde == "/":
+			donde = s.p.nombreUnidad(s.unidad)
+		case unidades:
+			donde = s.p.nombreUnidad(s.unidad) + " › " + strings.TrimPrefix(donde, "/")
+		case donde == "/":
+			donde = s.p.nombreUnidad(s.unidad)
 		}
 		linea = t.T("move.destination", i18n.Vars{"path": donde})
 	}
@@ -351,6 +459,10 @@ func (s *selectorCarpeta) caja(v tema.Variante) fyne.CanvasObject {
 		filas := make([]fyne.CanvasObject, 0, len(s.carpetas))
 		for _, c := range s.carpetas {
 			carpeta := c
+			if s.enUnidades {
+				filas = append(filas, nuevaFilaMover(carpeta.Nombre, func() { s.elegirUnidad(carpeta) }))
+				continue
+			}
 			filas = append(filas, nuevaFilaMover(carpeta.Nombre, func() { s.ir(0, &carpeta) }))
 		}
 		dentro = container.NewVScroll(container.New(ui.Columna{}, filas...))

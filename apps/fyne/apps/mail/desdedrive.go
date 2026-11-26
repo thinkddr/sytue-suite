@@ -10,6 +10,7 @@ import (
 
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
+	"git.sytue.eu/sytue/one/apps/nucleo/eml"
 )
 
 // # Llegar al redactor desde otra app
@@ -36,8 +37,18 @@ const topeDrive = 20
 // antes a nombre y enlace con el token de quien abre, en paralelo y dejando fuera los que
 // ya no existen o no puede ver. Si no se resuelve NINGUNO, no se abre un redactor vacío
 // fingiendo que funcionó: se dice que no se pudo (`compose.driveIntentFailed`).
+//
+// Los adjuntos con sus bytes (Sytue Office: lo que otra app de este equipo deja para
+// Mail) van al borrador como los del equipo; si el enlace pedía alguno que no se pudo
+// recoger, se dice (`compose.attachFailed`) y el redactor se abre con lo demás.
 func (b *Buzon) RedactarDesde(r api.Redactar) {
 	br := Borrador{Para: r.Para, Asunto: r.Asunto, Cuerpo: ConFirma(r.Cuerpo, b.firma, false)}
+	for _, a := range r.Adjuntos {
+		br.Adjuntos = append(br.Adjuntos, eml.Adjunto{Nombre: a.Nombre, Tipo: a.Tipo, Datos: a.Datos})
+	}
+	if r.SinAdjuntar > 0 {
+		b.avisar(ui.AvisoPeligro, "compose.attachFailed", nil)
+	}
 	if len(r.Drive) == 0 {
 		b.abrirRedactor(br)
 		return

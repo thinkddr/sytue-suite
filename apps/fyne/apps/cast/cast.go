@@ -21,16 +21,19 @@ package cast
 import (
 	"errors"
 	"fmt"
+	"slices"
+	"strings"
 	"time"
 
 	"fyne.io/fyne/v2"
 
 	"git.sytue.eu/sytue/one/apps/fyne/apps/photos"
 	"git.sytue.eu/sytue/one/apps/fyne/catalogos"
+	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
-	"git.sytue.eu/sytue/one/apps/nucleo/auth"
+	"git.sytue.eu/sytue/one/apps/nucleo/autorizacion"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 )
 
@@ -88,10 +91,41 @@ type Vista struct {
 	AlEntrar func()
 	// AlReintentar es el botón de los estados de fallo. nil: no se ofrece.
 	AlReintentar func()
+	// Secciones son los destinos del carril que se enseñan; nil, todos. Sytue Office
+	// (la edición local) no tiene directo ni moderación (PLAN-EDICION-LOCAL §6.10).
+	Secciones []Seccion
+	// Propios son textos que sustituyen a los del catálogo (Sytue Office: «Importar»
+	// en vez de «Subir», «Borrador» en vez de «No listado»…). Devuelve el texto, con
+	// sus `{variables}`, y si lo tiene; un texto vacío quita la pieza donde la pantalla
+	// sabe quitarla (las visualizaciones). nil: el catálogo, como siempre.
+	Propios func(clave string) (string, bool)
+	// Destinos son entradas de más en el carril, tras las de Secciones (Sytue Office:
+	// «Colecciones»). Vacío: el carril de siempre.
+	Destinos []Destino
 }
+
+// Destino es una entrada propia del carril.
+type Destino struct {
+	Rotulo string
+	Icono  iconos.Icono
+	Al     func()
+}
+
+// Tiene dice si la sección se enseña.
+func (v Vista) Tiene(s Seccion) bool { return v.Secciones == nil || slices.Contains(v.Secciones, s) }
 
 // Traduce es el `t()` de la web.
 func (v Vista) Traduce(clave string, vars ...i18n.Vars) string {
+	if v.Propios != nil {
+		if s, ok := v.Propios(clave); ok {
+			if len(vars) > 0 {
+				for k, x := range vars[0] {
+					s = strings.ReplaceAll(s, "{"+k+"}", fmt.Sprint(x))
+				}
+			}
+			return s
+		}
+	}
 	if len(vars) > 0 {
 		return v.T.T(clave, vars[0])
 	}
@@ -109,7 +143,7 @@ func (v Vista) ahora() time.Time {
 func estadoDeFallo(err error) Estado {
 	var e *api.Error
 	switch {
-	case errors.Is(err, auth.ErrLoginRequired), errors.As(err, &e) && e.Status == 401:
+	case errors.Is(err, autorizacion.ErrLoginRequired), errors.As(err, &e) && e.Status == 401:
 		return SinSesion
 	case errors.As(err, &e) && (e.Status == 403 || e.Status == 404):
 		return SinPermiso

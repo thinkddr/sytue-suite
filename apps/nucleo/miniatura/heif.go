@@ -160,28 +160,45 @@ func propiedadesDe(ipma []byte, elemento uint32) []int {
 			}
 			id, b = binary.BigEndian.Uint32(b), b[4:]
 		}
-		if len(b) < 1 {
+		indices, resto, ok := indicesIpma(b, anchos)
+		if !ok {
 			return nil
 		}
-		cuantas := int(b[0])
-		b = b[1:]
-		indices := make([]int, 0, cuantas)
-		for range cuantas {
-			if anchos == 1 {
-				if len(b) < 2 {
-					return nil
-				}
-				indices, b = append(indices, int(binary.BigEndian.Uint16(b)&0x7fff)), b[2:]
-			} else {
-				if len(b) < 1 {
-					return nil
-				}
-				indices, b = append(indices, int(b[0]&0x7f)), b[1:]
-			}
-		}
+		b = resto
 		if id == elemento {
 			return indices
 		}
 	}
 	return nil
+}
+
+// indicesIpma lee de `b` la lista de índices de propiedades de un elemento de `ipma`: un
+// byte con cuántos y cada índice de 7 bits o, con `anchos` a 1, de 15. Devuelve lo que
+// queda de `b` y false si el fichero está cortado o miente.
+func indicesIpma(b []byte, anchos byte) ([]int, []byte, bool) {
+	if len(b) < 1 {
+		return nil, nil, false
+	}
+	cuantas := int(b[0])
+	b = b[1:]
+	// Cada índice ocupa al menos un byte: si el fichero dice más de los que quedan, no se
+	// reserva memoria por lo que dice (CodeQL, go/uncontrolled-allocation-size).
+	if cuantas > len(b) {
+		return nil, nil, false
+	}
+	indices := make([]int, 0, cuantas)
+	for range cuantas {
+		if anchos == 1 {
+			if len(b) < 2 {
+				return nil, nil, false
+			}
+			indices, b = append(indices, int(binary.BigEndian.Uint16(b)&0x7fff)), b[2:]
+			continue
+		}
+		if len(b) < 1 {
+			return nil, nil, false
+		}
+		indices, b = append(indices, int(b[0]&0x7f)), b[1:]
+	}
+	return indices, b, true
 }

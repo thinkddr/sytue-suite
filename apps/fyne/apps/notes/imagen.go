@@ -78,12 +78,23 @@ func (p *Pantalla) cargarImagen(url string) {
 // cuerpoImagen es el `<img>`: el marco a lo ancho con la imagen contenida. Mientras
 // llega, el marco sin contenido (los 2 px de su borde, como la web); si no llega, su
 // `alt` —el título de la nota— con el icono de imagen rota delante, como el navegador.
+//
+// La de Sytue Office lleva la imagen DENTRO (un adjunto, sin `data.url`, N-06): se
+// decodifica aquí, sin red (ficheros_locales.go). La de una dirección no se pide sola:
+// se carga a petición y queda dentro también (imagen_url.go).
 func (t *Tarjeta) cuerpoImagen(v tema.Variante) fyne.CanvasObject {
 	n := t.nota
-	if !esWeb(n.URL) || t.Imagen == nil {
+	var r imagenRemota
+	switch a, ok := imagenIncrustada(n); {
+	case ok && t.ImagenAdjunta != nil:
+		r = t.ImagenAdjunta(a)
+	case esWeb(n.URL) && t.SinBajar:
+		return t.cuerpoSinBajar(v)
+	case esWeb(n.URL) && t.Imagen != nil:
+		r = t.Imagen(n.URL)
+	default:
 		return container.New(&altoFijo{})
 	}
-	r := t.Imagen(n.URL)
 	if r.lista && r.err != nil {
 		return container.New(altRoto{}, Glifo(ImagenD, LadoImagenRota, "text-subtle", v),
 			ui.NuevoParrafo(n.Titulo, tema.TextoBase, ui.Normal, "text-muted", v))

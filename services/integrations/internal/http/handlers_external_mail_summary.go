@@ -12,11 +12,11 @@ import (
 	"sync"
 	"time"
 
+	linkedservices "git.sytue.eu/sytue/one/apps/nucleo/cuentas/enlazadas"
 	"git.sytue.eu/sytue/one/platform/pkg/authn"
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/platform/pkg/log"
 	"git.sytue.eu/sytue/one/services/integrations/internal/domain"
-	"git.sytue.eu/sytue/one/services/integrations/internal/linkedservices"
 	"git.sytue.eu/sytue/one/services/integrations/internal/mailbox"
 )
 

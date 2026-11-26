@@ -51,6 +51,18 @@ The same wizard installs the suite in four ways:
 | **Single container** | `docker run --privileged … sytue-suite` ([`deploy/todo-en-uno`](deploy/todo-en-uno/Dockerfile)) | The same as the single server, but in **one container and one volume** (Docker inside Docker) |
 | **Cluster** | `./sytue-deploy --mode helm` | Kubernetes with your registry, PostgreSQL and S3 ([`docs/operations.md` §1.3](docs/operations.md#13-despliegue-en-kubernetes-con-helm-avanzado)) |
 
+**Sytue Office: just the apps, no server.** The same wizard also builds and installs
+**Sytue Office**, the local edition of the native apps (Docus, Calcus, Diapos, CertiPDF, Drive,
+Mail, Calendar, Contacts, Notepads, Photos, Bases, Rooms, Cast, ERP and the Hub): no account and
+no server, with your files in `~/Sytue Office`, in the clear. On Linux or macOS:
+
+```bash
+./sytue-deploy --mode sytue-office
+```
+
+Each release also carries unsigned Sytue Office packages for Linux, Windows, macOS and Android.
+See [`QUICKSTART.md` § 9](QUICKSTART.md#9-sytue-office).
+
 On the server and in the single container you also choose **who uses it**: `--usuarios uno`
 (only your account, no public sign-up) or `--usuarios varios` (a team: you invite people from
 Sytue Admin and, with `--registro-abierto`, anyone can create an account). You can change it

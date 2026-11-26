@@ -6376,6 +6376,48 @@ the password: Argon2id at 64 MiB makes it expensive, but a weak password is stil
 Whoever forgets the password and has no other verified device or passkey can only
 reset (Rooms) and loses the encrypted history, as before 0081.
 
+<a id="0083"></a>
+
+## 0083 — Local edition (Sytue Office): the native apps whole on the device, with no account, no own encryption and no Sytue servers
+
+`accepted` · 2026-11-24 · native apps, local edition, network, privacy, supply chain · a separate
+mode next to [0048](#0048), which does not change · code in `apps/fyne/cmd-local/`,
+`apps/fyne/local/`, `apps/nucleo/local/` and `apps/fyne/scripts/empaquetar.sh`
+(`SYTUE_ARBOL=cmd-local`)
+
+**Context.** The owner asked for a version of **only the Fyne apps** for macOS, iOS, Windows,
+Linux and Android, **with no sign-in and no encryption**, optional API keys for the AI, **every
+feature working offline** and no connections to the web; Mail and Calendar as clients of external
+accounts, Rooms as a client of Matrix, Slack, Teams and Google Chat, and Cast as a private video
+gallery. "No connections" and "connect Outlook" only fit one way: **the app never talks to Sytue
+or anyone on its own; only to what the person configures**, and freshly installed it opens no
+connection at all. The full plan is [`apps/fyne/PLAN-EDICION-LOCAL.md`](../apps/fyne/PLAN-EDICION-LOCAL.md);
+what is done, app by app, [`apps/fyne/SYTUE-OFFICE.md`](../apps/fyne/SYTUE-OFFICE.md).
+
+**Decision.**
+
+1. **Rules, each with its guard test.** _R-ADITIVA_: the connected apps (`apps/fyne/cmd/*`) do
+   not change behaviour; shared code only gains additions. _R-RED_: a binary of the edition
+   contacts no host the person has not configured (no telemetry, no updater, never falls back to
+   the web); everything goes through one network gatekeeper that denies by default. _R-NO-COPIAR_:
+   what the server did and the device now needs (mail, DAV, Graph, Slack, AI providers, Bases and
+   ERP logic) moves to `apps/nucleo` and both use it. _R-CONVIVE_: different identifiers, schemes,
+   executables and data folders, so both editions install side by side.
+2. **The same screens, other back ends.** Each `cmd-local/<app>` mounts the screens of the connected
+   app over local implementations: records in the clear (`local/almacen`), documents as files
+   (`local/biblioteca`), Drive over real folders (`local/archivos`), Mail over `.eml` files with an
+   SQLite index and IMAP/SMTP, Calendar and Contacts synchronised with DAV, Google and Graph, the ERP
+   in SQLite, and the PDF engine on the device.
+3. **Packaged like the connected apps**, by the same `empaquetar.sh` with `SYTUE_ARBOL=cmd-local`.
+
+**Consequences.** A second tree of entry points to keep building and testing (the CI does it with
+the `edicionlocal` tag); the data is in the clear on the person's disk, which is the point and is
+said in the app; without servers there is no sync between the person's devices, no collaboration
+and no push notifications with the app closed.
+
+**Rejected alternative.** A local "server" on the device behind the existing clients: it would
+open ports, need its own account and keep the session code the edition is meant to drop.
+
 <a id="0084"></a>
 
 <a id="0084--el-inicio-de-sesión-de-sytue-id-desbloquea-el-cifrado-de-todas-las-apps"></a>
@@ -8107,7 +8149,6 @@ proof is an HMAC, which the server cannot verify.
      - Make sure mail arriving for a retired Matrix account before it moves is not lost (for
        example, deferring its SMTP delivery with a 4xx until the handover, which the sender
        retries). Not done: today it stays unreadable in the queue.
-
 
 **Consequences.**
 

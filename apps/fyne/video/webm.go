@@ -24,6 +24,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"image"
 	"io"
 	"math"
 	"sort"
@@ -77,6 +78,7 @@ const (
 // Los códecs que se descodifican.
 const (
 	CodecVP9  = "V_VP9"
+	CodecVP8  = "V_VP8"
 	CodecOpus = "A_OPUS"
 )
 
@@ -111,6 +113,11 @@ type Paquete struct {
 	Tiempo time.Duration
 	Clave  bool
 	Datos  []byte
+
+	// Lo que trae ya descodificado un descodificador del sistema (sistema.go): la
+	// imagen de un fotograma o el PCM (mono, 48 kHz) de un trozo de audio.
+	imagen image.Image
+	pcm    []int16
 }
 
 // puntoCue es un punto de búsqueda: en `tiempo` empieza un Cluster en `pos` (relativa al

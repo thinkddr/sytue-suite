@@ -39,7 +39,7 @@ func TestAndroidWorkContextUsesCanonicalGoIdentityAndScope(t *testing.T) {
 	for _, v := range fixture.Cases {
 		t.Run(v.Name, func(t *testing.T) {
 			identity := IdentitySnapshot{Issuer: v.Issuer, Client: v.Client, Subject: v.Subject, Organization: v.Organization}
-			if string(identity.contextoSesion()) != v.Context || identity.IdentidadSesion() != v.Identity {
+			if string(identity.ContextoSesion()) != v.Context || identity.IdentidadSesion() != v.Identity {
 				t.Fatal("Android fixture changed canonical Go session identity")
 			}
 			header, err := storage.EncodeScopeHeader(v.Scope)

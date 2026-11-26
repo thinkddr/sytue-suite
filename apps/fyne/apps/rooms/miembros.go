@@ -4,6 +4,7 @@
 package rooms
 
 import (
+	"cmp"
 	"errors"
 	"image/color"
 	"net/http"
@@ -40,7 +41,14 @@ type Miembro struct {
 	Externo    bool
 	// Presencia es la que sabe el Hub; sin ella el avatar va sin punto.
 	Presencia ui.Presencia
+	// NombreSinCuenta es el de la persona cuando Nombre lleva su cuenta detrás («Luis ·
+	// @ana:servidor», en Sytue Office con varias cuentas): de él salen las iniciales y el
+	// color del avatar. Vacío, Nombre (lo de siempre).
+	NombreSinCuenta string
 }
+
+// NombreDePersona es el nombre de la persona, sin su cuenta detrás: el de su avatar.
+func (m Miembro) NombreDePersona() string { return cmp.Or(m.NombreSinCuenta, m.Nombre) }
 
 // FiltrarMiembros es `filterMembers`: por nombre o por identificador, sin mayúsculas.
 func FiltrarMiembros(lista []Miembro, q string) []Miembro {
@@ -494,7 +502,7 @@ func MedidaFilaMiembro() fyne.Size {
 func (f *FilaMiembro) CreateRenderer() fyne.WidgetRenderer {
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	f.fondo = canvas.NewRectangle(color.NRGBA{})
-	f.avatar = ui.NuevoAvatar(f.Miembro.Nombre).Con(ui.AvatarSM)
+	f.avatar = ui.NuevoAvatar(f.Miembro.NombreDePersona()).Con(ui.AvatarSM)
 	f.avatar.Presencia = f.Miembro.Presencia
 	f.nombre = ui.Texto(f.Miembro.Nombre, tema.TextoSM, ui.SemiNegrita, tema.Color("text", v))
 	f.tu = ui.Texto(" "+f.Tu, tema.TextoSM, ui.Normal, tema.Color("text-subtle", v))

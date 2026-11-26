@@ -19,6 +19,10 @@ require (
 	git.wow.st/gmp/jni v0.0.0-20210610011705-34026c7e22d0
 	github.com/BurntSushi/toml v1.6.0
 	github.com/coder/websocket v1.8.15
+	github.com/emersion/go-imap/v2 v2.0.0-beta.8
+	github.com/emersion/go-sasl v0.0.0-20241020182733-b788ff22d5a6
+	github.com/emersion/go-smtp v0.25.1
+	github.com/fsnotify/fsnotify v1.10.1
 	github.com/fyne-io/oksvg v0.2.1-0.20260918172519-a9af55fa95d9
 	github.com/gen2brain/avif v0.6.0
 	github.com/gen2brain/malgo v0.11.26
@@ -68,9 +72,9 @@ require (
 	github.com/dennwc/iters v1.2.2 // indirect
 	github.com/ebitengine/purego v0.10.1 // indirect
 	github.com/emersion/go-ical v0.0.0-20250609112844-439c63cef608 // indirect
+	github.com/emersion/go-message v0.18.2 // indirect
 	github.com/emersion/go-vcard v0.1.0 // indirect
 	github.com/frostbyte73/core v0.1.1 // indirect
-	github.com/fsnotify/fsnotify v1.10.1 // indirect
 	github.com/fyne-io/gl-js v0.2.1-0.20260315212741-029c47fd27e8 // indirect
 	github.com/fyne-io/glfw-js v0.4.0 // indirect
 	github.com/fyne-io/image v0.1.1 // indirect

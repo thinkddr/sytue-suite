@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 Daniel Delgado Ramos
 
+// La copia con la app cerrada es de la edición conectada: la lanza la sesión de la
+// suite. Sytue Office no la registra, y así su binario no enlaza `sesion` (C-04).
+
+//go:build !edicionlocal
+
 package photos
 
 import (

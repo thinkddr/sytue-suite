@@ -24,7 +24,7 @@ import (
 	"git.sytue.eu/sytue/one/apps/fyne/editor/docus/rico"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
-	"git.sytue.eu/sytue/one/apps/nucleo/auth"
+	"git.sytue.eu/sytue/one/apps/nucleo/autorizacion"
 	"git.sytue.eu/sytue/one/apps/nucleo/coedicion"
 	"git.sytue.eu/sytue/one/apps/nucleo/ficheros"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
@@ -90,6 +90,9 @@ type App struct {
 	// AbrirArchivo es «Abrir un archivo» del menú Archivo; lo pone el binario, que es
 	// quien tiene el `cargar` de «Abrir con» y el selector del sistema. nil: no sale.
 	AbrirArchivo *editor.AbrirArchivo
+	// Fichero son «Guardar» y «Guardar como…» en un fichero del disco: solo la edición
+	// local (editor.Fichero). nil: no salen.
+	Fichero *editor.Fichero
 	// carpeta es dónde se dejan las descargas; las pruebas la cambian por una temporal.
 	carpeta func() (string, error)
 	// actor identifica esta sesión en el CRDT, como el `crypto.randomUUID()` de cada
@@ -97,7 +100,7 @@ type App struct {
 	actor string
 	// Reclamos dice quién ha entrado, para firmar las marcas del control de cambios
 	// (`setTrackAuthor` de EditorApp.tsx). Lo pone el binario; nil, la reserva de la web.
-	Reclamos func(context.Context) (auth.Reclamos, error)
+	Reclamos func(context.Context) (autorizacion.Reclamos, error)
 }
 
 // abierto es el documento que hay en el editor: su contexto y su folio.
@@ -409,6 +412,7 @@ func (a *App) cargar(ab *abierto) {
 			a.servicio().HacerCopia(api.Document{ID: ab.id, Kind: ctx.Tipo.Kind(), Title: ctx.Titulo}, a.guardarAntesDeCopiar(ab),
 				func(d api.Document) { a.AbrirID(d.ID, d.Title) }, listo)
 		}
+		a.Fichero.Enganchar(ctx, ab.id, func() func() error { return a.guardarAntesDeCopiar(ab) })
 		if rol == "owner" {
 			ctx.Actividad = func(listo func([]api.DocActividad, error)) { a.servicio().Actividad(ab.id, listo) }
 		}

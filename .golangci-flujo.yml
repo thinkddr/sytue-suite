@@ -1,0 +1,74 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Daniel Delgado Ramos
+#
+# EL ANÁLISIS DE FLUJO DE DATOS DE LA CASA, SIN CODEQL (`make seguridad-flujo`).
+#
+# Sigue una entrada de quien usa el servicio (una petición, un fichero subido) hasta
+# un uso peligroso: la consulta SQL, la orden, la ruta, la URL a la que se llama, el
+# HTML, el log, el correo, la plantilla, la deserialización o la redirección. Es lo
+# que CodeQL hace en sytue-suite, con las reglas de taint de gosec (G701-G710):
+#
+#   G701 SQL · G702 orden · G703 ruta · G704 SSRF · G705 XSS · G706 log
+#   G707 SMTP · G708 plantilla · G709 deserialización · G710 redirección abierta
+#
+# Por qué no CodeQL aquí: no tiene paquete para Linux ARM64 (los runners son
+# `sytue-arm64`), y en un repositorio privado su informe necesita GitHub Advanced
+# Security. gosec ya va en `golangci-lint`, fijado en versions.env: nada nuevo que
+# descargar ni que añadir a la cadena de suministro.
+#
+# SOLO CUENTA LO NUEVO, como CodeQL en un pull request: `make seguridad-flujo` pasa
+# `--new-from-merge-base` contra `main`, así que avisa de lo que introduce la rama y
+# no de lo que ya había. G704, G705 y G710 dan decenas de falsos positivos en el
+# código existente (proxies, OIDC y webhooks que arman la URL desde configuración de
+# confianza), y por eso `.golangci.yml` las deja fuera. Aquí entran, pero solo sobre
+# el código que cambia: un aviso nuevo se arregla o se justifica en su línea con
+# `//nolint:gosec // G70x: por qué`, como el resto de excepciones de gosec.
+version: "2"
+run:
+  modules-download-mode: readonly
+  tests: true
+  allow-parallel-runners: true
+  build-tags:
+    - goolm
+output:
+  formats:
+    text:
+      path: stdout
+linters:
+  default: none
+  enable:
+    - gosec
+  settings:
+    gosec:
+      severity: low
+      confidence: low
+      includes:
+        - G701
+        - G702
+        - G703
+        - G704
+        - G705
+        - G706
+        - G707
+        - G708
+        - G709
+        - G710
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      # Las pruebas arman a propósito entradas hostiles; lo mismo que en .golangci.yml.
+      - linters:
+          - gosec
+        path: _test\.go
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

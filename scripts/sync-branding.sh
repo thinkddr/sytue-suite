@@ -206,8 +206,10 @@ for m in "$root"/branding/marks/*.svg; do
   cp -f "$m" "$fyne_marcas/"
 done
 # Y los ICONOS DEL SISTEMA de cada app de Fyne (su `Icon.png`), con el contorno del
-# selector: ver el propio guion.
+# selector: ver el propio guion. Después, los de Sytue Office, que salen de esos con la
+# marca de la edición.
 "$root/scripts/gen-iconos-fyne.sh"
+"$root/scripts/gen-iconos-fyne.sh" office
 # Y las ILUSTRACIONES, por lo mismo. Van enteras —las trece, `hero-suite` incluida—
 # porque el conjunto es el de `branding/illustrations` y el guardián compara la carpeta,
 # no una lista escrita a mano: una ilustración nueva se copia sola.

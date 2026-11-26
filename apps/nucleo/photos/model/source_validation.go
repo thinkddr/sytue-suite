@@ -33,11 +33,16 @@ func SourceValidationRow(scope storage.Scope, row Row) (Row, error) {
 			Orientation  int             `json:"orientation"`
 			UploadedAt   time.Time       `json:"uploaded_at"`
 			PrivateMedia json.RawMessage `json:"private_media,omitempty"`
+			// Lo de Sytue Office (FO-09, LiberarAlPurgar): vacío en la conectada, así que
+			// la proyección de sus filas no cambia.
+			PrivateExternal json.RawMessage `json:"private_external,omitempty"`
+			OriginalSHA256  string          `json:"original_sha256,omitempty"`
+			PurgedAt        *time.Time      `json:"purged_at,omitempty"`
 		}
 		if err := json.Unmarshal(row.JSON, &asset); err != nil {
 			return Row{}, err
 		}
-		if len(asset.PrivateMedia) == 0 {
+		if len(asset.PrivateMedia) == 0 && len(asset.PrivateExternal) == 0 {
 			asset.Name = ""
 		}
 		value = asset

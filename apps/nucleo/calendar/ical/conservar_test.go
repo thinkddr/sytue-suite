@@ -51,11 +51,18 @@ func TestCarryOverNoInventaNiDuplica(t *testing.T) {
 	if err != nil || strings.Count(out, "BEGIN:VALARM") != 1 || !strings.Contains(out, "TRIGGER:-PT5M") {
 		t.Fatalf("se han mezclado recordatorios nuevos y viejos: %v\n%s", err, out)
 	}
-	// Otra regla u otra hora: las excepciones apuntarían a ocurrencias que ya no existen.
+	// La misma regla a otra hora es la serie movida: sus excepciones se mueven con ella
+	// (antes se perdían; ver TestMoverLaSerieMueveSusExcepciones). Con otra regla
+	// apuntarían a ocurrencias que ya no existen: no van.
 	otraHora := strings.Replace(sinRecordatorios, "DTSTART:20260701T090000Z", "DTSTART:20260701T110000Z", 1)
 	out, err = CarryOver(otraHora, seriesWithOverride, false)
-	if err != nil || strings.Contains(out, "RECURRENCE-ID") || strings.Count(out, "BEGIN:VALARM") != 1 {
+	if err != nil || !strings.Contains(out, "RECURRENCE-ID:20260715T110000Z") || strings.Count(out, "BEGIN:VALARM") != 1 {
 		t.Fatalf("con la serie movida: %v\n%s", err, out)
+	}
+	otraRegla := strings.Replace(sinRecordatorios, "BYDAY=WE", "BYDAY=TH", 1)
+	out, err = CarryOver(otraRegla, seriesWithOverride, false)
+	if err != nil || strings.Contains(out, "RECURRENCE-ID") || strings.Count(out, "BEGIN:VALARM") != 1 {
+		t.Fatalf("con otra regla: %v\n%s", err, out)
 	}
 	// Un recurso guardado ilegible no bloquea la edición.
 	if out, err := CarryOver(sinRecordatorios, "esto no es iCalendar", false); err != nil || out != sinRecordatorios {

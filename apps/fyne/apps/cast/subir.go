@@ -166,7 +166,7 @@ func zonaSoltar(v Vista, d Subir) fyne.CanvasObject {
 	borde := ui.NuevoBordeDiscontinuo(2, tema.RadioMD, token)
 	glifo := iconos.Trazo(iconos.Subir, 28, "text-subtle", v.Variante).Objeto()
 	// En el teléfono no se arrastra nada: el recuadro dice de dónde sale el vídeo, y el
-	// botón abre la galería (sesion.tiposMovil).
+	// botón abre la galería (anfitrion.tiposMovil).
 	clave := "upload.drop"
 	if v.Movil {
 		clave = "upload.drive.other"

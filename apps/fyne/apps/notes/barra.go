@@ -92,6 +92,14 @@ type Barra struct {
 	// AlMoverCuaderno es «Mover cuaderno a…» del abierto. Nil: no sale (sin red, de
 	// lectura, un día del diario o sin permiso para cambiarlo de padre).
 	AlMoverCuaderno func()
+	// AlImagenLocal es «Añadir una imagen del equipo…» (Sytue Office, N-06), con su
+	// rótulo. Nil: no sale.
+	AlImagenLocal     func()
+	RotuloImagenLocal string
+	// AlImagenURL es «Añadir una imagen de una dirección web…» (Sytue Office,
+	// imagen_url.go), con su rótulo. Nil: no sale.
+	AlImagenURL     func()
+	RotuloImagenURL string
 	AlNuevaNota     func()
 	AlDesbloquear   func()
 	AlBloquear      func()
@@ -281,6 +289,12 @@ func (b *Barra) menuMas() *ui.Menu {
 		}
 	}
 	es = append(es, ui.NuevoSeparadorMenu())
+	if b.AlImagenLocal != nil {
+		es = append(es, ui.NuevoElementoMenu(b.RotuloImagenLocal, iconos.Ninguno, func() { llamar0(b.AlImagenLocal) }))
+	}
+	if b.AlImagenURL != nil {
+		es = append(es, ui.NuevoElementoMenu(b.RotuloImagenURL, iconos.Ninguno, func() { llamar0(b.AlImagenURL) }))
+	}
 	if b.AlCompartir != nil {
 		es = append(es, ui.NuevoElementoMenu(t("sharePeople.open", nil), iconos.Ninguno, func() { llamar0(b.AlCompartir) }))
 	}

@@ -140,7 +140,8 @@ func localPDFResponse(contentType string, out []byte) PDFRespuesta {
 type localRoute func(p *PDF, ctx context.Context, fields map[string]string, parts []PDFParte, docs ...PDFFichero) (PDFRespuesta, error)
 
 // localRoutes son las rutas del motor que el Drive privado hace en local; las
-// demás (reconocer texto, pedir firma) contestan ErrPrivatePDFOperation.
+// demás (pedir firma) contestan ErrPrivatePDFOperation. Reconocer texto solo con el
+// reconocedor del dispositivo que pone Sytue Office (ConLocal); sin él, tampoco.
 var localRoutes = map[string]localRoute{
 	"/pdf/form": (*PDF).localForm,
 	"/pdf/annotate": func(p *PDF, ctx context.Context, fields map[string]string, _ []PDFParte, docs ...PDFFichero) (PDFRespuesta, error) {
@@ -166,6 +167,9 @@ var localRoutes = map[string]localRoute{
 	},
 	"/pdf/attachment": func(p *PDF, ctx context.Context, fields map[string]string, _ []PDFParte, docs ...PDFFichero) (PDFRespuesta, error) {
 		return p.localAttachment(ctx, fields, docs...)
+	},
+	"/pdf/ocr": func(p *PDF, ctx context.Context, fields map[string]string, _ []PDFParte, docs ...PDFFichero) (PDFRespuesta, error) {
+		return p.localOCR(ctx, fields, docs...)
 	},
 	"/pdf/content": func(p *PDF, ctx context.Context, fields map[string]string, _ []PDFParte, docs ...PDFFichero) (PDFRespuesta, error) {
 		if len(docs) != 1 {

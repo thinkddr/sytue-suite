@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"strings"
 
+	"git.sytue.eu/sytue/one/apps/nucleo/erp/ia"
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
-	"git.sytue.eu/sytue/one/services/syerp/internal/ia"
 )
 
 // personaEquipo es quien puede llevar una tarea: el selector de responsable.

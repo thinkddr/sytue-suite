@@ -27,10 +27,10 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
+	"git.sytue.eu/sytue/one/apps/nucleo/erp/catalogo"
+	domain "git.sytue.eu/sytue/one/apps/nucleo/erp/dominio"
 	"git.sytue.eu/sytue/one/platform/pkg/pg"
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
-	"git.sytue.eu/sytue/one/services/syerp/internal/catalogo"
-	"git.sytue.eu/sytue/one/services/syerp/internal/domain"
 )
 
 // Store agrupa el acceso a datos de SyERP.

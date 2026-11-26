@@ -6,10 +6,9 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
-	"time"
 
+	cuentaschat "git.sytue.eu/sytue/one/apps/nucleo/cuentas/chat"
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/services/integrations/internal/connector"
 )
@@ -41,12 +40,15 @@ func externalSlackUserToken(tok tokenResponse) (tokenResponse, error) {
 	return tok, nil
 }
 
+// externalSlackAPI es la Web API de Slack; el cliente es el del núcleo
+// (`apps/nucleo/cuentas/chat`, RO-01), el mismo que usa Sytue Office.
+const externalSlackAPI = "https://slack.com/api"
+
+// slackStatus traduce el `error` de una respuesta `ok: false` (el [cuentaschat.ErrSlack]
+// del cliente) al error de la pasarela.
 type slackStatus struct {
-	OK               bool   `json:"ok"`
-	Error            string `json:"error"`
-	ResponseMetadata struct {
-		Cursor string `json:"next_cursor"`
-	} `json:"response_metadata"`
+	OK    bool   `json:"ok"`
+	Error string `json:"error"`
 }
 
 func (s slackStatus) check() error {
@@ -67,27 +69,17 @@ func (s slackStatus) check() error {
 
 func externalSlackChannels(ctx context.Context, rt connector.Runtime, cursor string) (externalChannelPage, error) {
 	var out struct {
-		slackStatus
-		Channels []struct {
-			ID      string `json:"id"`
-			Name    string `json:"name"`
-			User    string `json:"user"`
-			Private bool   `json:"is_private"`
-			IM      bool   `json:"is_im"`
-			MPIM    bool   `json:"is_mpim"`
-		} `json:"channels"`
+		Channels []cuentaschat.CanalSlack `json:"channels"`
+		Meta     cuentaschat.MetaSlack    `json:"response_metadata"`
 	}
 	q := url.Values{"types": {"public_channel,private_channel,mpim,im"}, "exclude_archived": {"true"}, "limit": {"100"}}
 	if cursor != "" {
 		q.Set("cursor", cursor)
 	}
-	if err := roomsProviderJSON(ctx, rt, http.MethodGet, "https://slack.com/api/conversations.list?"+q.Encode(), nil, &out); err != nil {
-		return externalChannelPage{}, err
+	if err := roomsSlack(rt).Consultar(ctx, "conversations.list", q, &out); err != nil {
+		return externalChannelPage{}, roomsProviderError(err)
 	}
-	if err := out.check(); err != nil {
-		return externalChannelPage{}, err
-	}
-	page := externalChannelPage{Items: []externalChannel{}, NextCursor: out.ResponseMetadata.Cursor}
+	page := externalChannelPage{Items: []externalChannel{}, NextCursor: out.Meta.Siguiente}
 	for _, channel := range out.Channels {
 		if !externalSlackID.MatchString(channel.ID) {
 			continue
@@ -96,7 +88,7 @@ func externalSlackChannels(ctx context.Context, rt connector.Runtime, cursor str
 		if channel.Private {
 			kind = "private"
 		}
-		if channel.IM || channel.MPIM {
+		if channel.IM || channel.Mpim {
 			kind = "direct"
 		}
 		name := channel.Name
@@ -111,28 +103,14 @@ func externalSlackChannels(ctx context.Context, rt connector.Runtime, cursor str
 	return page, nil
 }
 
-type slackMessage struct {
-	TS      string `json:"ts"`
-	User    string `json:"user"`
-	Bot     string `json:"bot_id"`
-	Text    string `json:"text"`
-	Thread  string `json:"thread_ts"`
-	Replies int    `json:"reply_count"`
-	Edited  *struct {
-		TS string `json:"ts"`
-	} `json:"edited"`
-}
+type slackMessage = cuentaschat.MensajeSlack
 
 func externalSlackMessage(msg slackMessage, remote, self string) externalMessage {
-	secs, fraction, _ := strings.Cut(msg.TS, ".")
-	unix, _ := strconv.ParseInt(secs, 10, 64)
-	fraction = (fraction + "000000000")[:9]
-	nanos, _ := strconv.ParseInt(fraction, 10, 64)
 	author := msg.User
 	if author == "" {
-		author = msg.Bot
+		author = msg.BotID
 	}
-	return externalMessage{ID: msg.TS, RemoteID: remote, AuthorID: author, Text: msg.Text, CreatedAt: time.Unix(unix, nanos).UTC(), ThreadID: msg.Thread, ReplyCount: msg.Replies, Edited: msg.Edited != nil, Owned: self != "" && msg.User == self}
+	return externalMessage{ID: msg.TS, RemoteID: remote, AuthorID: author, Text: msg.Text, CreatedAt: cuentaschat.HoraSlack(msg.TS), ThreadID: msg.ThreadTS, ReplyCount: msg.ReplyCount, Edited: msg.Edited != nil, Owned: self != "" && msg.User == self}
 }
 
 func externalSlackMessages(ctx context.Context, conn connector.Instance, rt connector.Runtime, remote, cursor, thread string) (externalMessagePage, error) {
@@ -149,16 +127,13 @@ func externalSlackMessages(ctx context.Context, conn connector.Instance, rt conn
 		q.Set("ts", thread)
 	}
 	var out struct {
-		slackStatus
-		Messages []slackMessage `json:"messages"`
+		Messages []slackMessage        `json:"messages"`
+		Meta     cuentaschat.MetaSlack `json:"response_metadata"`
 	}
-	if err := roomsProviderJSON(ctx, rt, http.MethodGet, "https://slack.com/api/"+method+"?"+q.Encode(), nil, &out); err != nil {
-		return externalMessagePage{}, err
+	if err := roomsSlack(rt).Consultar(ctx, method, q, &out); err != nil {
+		return externalMessagePage{}, roomsProviderError(err)
 	}
-	if err := out.check(); err != nil {
-		return externalMessagePage{}, err
-	}
-	page := externalMessagePage{Items: []externalMessage{}, NextCursor: out.ResponseMetadata.Cursor}
+	page := externalMessagePage{Items: []externalMessage{}, NextCursor: out.Meta.Siguiente}
 	for _, message := range out.Messages {
 		if externalSlackTS.MatchString(message.TS) {
 			page.Items = append(page.Items, externalSlackMessage(message, remote, conn.Config["_external_user_id"]))
@@ -176,15 +151,11 @@ func externalSlackSend(ctx context.Context, conn connector.Instance, rt connecto
 		body["thread_ts"] = in.ThreadID
 	}
 	var out struct {
-		slackStatus
 		TS      string       `json:"ts"`
 		Message slackMessage `json:"message"`
 	}
-	if err := roomsProviderJSON(ctx, rt, http.MethodPost, "https://slack.com/api/chat.postMessage", body, &out); err != nil {
-		return externalMessage{}, err
-	}
-	if err := out.check(); err != nil {
-		return externalMessage{}, err
+	if err := roomsSlack(rt).Publicar(ctx, "chat.postMessage", body, &out); err != nil {
+		return externalMessage{}, roomsProviderError(err)
 	}
 	out.Message.TS = out.TS
 	if out.Message.Text == "" {
@@ -203,9 +174,5 @@ func externalSlackAction(ctx context.Context, rt connector.Runtime, in externalA
 		method = "chat.update"
 		body["text"] = in.Text
 	}
-	var out slackStatus
-	if err := roomsProviderJSON(ctx, rt, http.MethodPost, "https://slack.com/api/"+method, body, &out); err != nil {
-		return err
-	}
-	return out.check()
+	return roomsProviderError(roomsSlack(rt).Publicar(ctx, method, body, nil))
 }

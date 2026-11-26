@@ -178,7 +178,7 @@ test('lo que hornea cada bloque del editor pasa intacto', () => {
 });
 
 test('las plantillas del servicio pasan intactas', () => {
-  const raiz = '../../../../../services/docs/internal/plantillas/';
+  const raiz = '../../../../../apps/nucleo/office/plantillas/';
   let vistas = 0;
   for (const carpeta of ['modelos/', 'bloques/']) {
     const dir = fileURLToPath(new URL(raiz + carpeta, import.meta.url));

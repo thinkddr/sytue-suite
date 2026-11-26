@@ -184,6 +184,9 @@ type Barra struct {
 	Trabajando bool
 	// DesdeDrive cambia el rótulo de la salida: vuelve a la carpeta y no al Hub.
 	DesdeDrive bool
+	// SinPedirFirma quita «Pedir firma»: sin servidor no hay a quién mandarle la petición
+	// (la edición local).
+	SinPedirFirma bool
 	// PanelAbierto es el `aria-expanded` del botón del cajón.
 	PanelAbierto bool
 	// Titulo es el nombre del documento, delante de las pestañas: no se decía en
@@ -482,10 +485,12 @@ func (b *Barra) bandaDeGrupos() fyne.CanvasObject {
 	// qué se le puede hacer— y, la última, la censura: son los pasos con que se cierra un
 	// documento antes de enviarlo.
 	if b.activa == PestFirmar {
+		firmas := []fyne.CanvasObject{b.botonDialogo("pdf.menu.sign", DialogoFirmar)}
+		if !b.SinPedirFirma {
+			firmas = append(firmas, b.botonDialogo("pdf.menu.requestSignature", DialogoPedirFirma))
+		}
 		grupos = append(grupos,
-			editor.NuevoGrupo(b.t("pdf.panel.signatures"),
-				b.botonDialogo("pdf.menu.sign", DialogoFirmar),
-				b.botonDialogo("pdf.menu.requestSignature", DialogoPedirFirma)),
+			editor.NuevoGrupo(b.t("pdf.panel.signatures"), firmas...),
 			editor.NuevoGrupo(b.t("pdf.ribbon.group.security"),
 				b.botonDialogo("pdf.menu.protect", DialogoProteger)))
 	}

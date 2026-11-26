@@ -31,11 +31,13 @@ import (
 	"time"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/ajustes"
+	"git.sytue.eu/sytue/one/apps/nucleo/autorizacion"
 	"git.sytue.eu/sytue/one/apps/nucleo/recoverywrap"
 )
 
-// ErrLoginRequired: no queda nada que renovar; hay que volver a pasar por Sytue ID.
-var ErrLoginRequired = errors.New("auth: hace falta iniciar sesión")
+// ErrLoginRequired: no queda nada que renovar; hay que volver a pasar por Sytue ID. Es
+// el de `nucleo/autorizacion`, que el cliente `api` mira sin enlazar la sesión.
+var ErrLoginRequired = autorizacion.ErrLoginRequired
 
 // guardado es lo ÚNICO que llega al almacén seguro del sistema —el llavero en el
 // escritorio, el Keystore en Android, el Keychain en iOS—: el refresh token y de quién
@@ -728,7 +730,7 @@ func (s *Session) LogoutConTestigoConLimpieza(ctx context.Context, store *Almace
 	if err != nil {
 		return err
 	}
-	identity := IdentitySnapshot{store.emisor, store.cliente, persisted.Subject, organizacionDe(persisted)}
+	identity := IdentitySnapshot{Issuer: store.emisor, Client: store.cliente, Subject: persisted.Subject, Organization: organizacionDe(persisted)}
 	if persisted.Refresh == "" || identity.IdentidadSesion() != witness.Acceso.Identidad {
 		return ErrTrabajoSesion
 	}

@@ -56,6 +56,22 @@ func inputEvent(in api.EventInput, uid string) (event.Event, error) {
 }
 
 func editedData(in api.EventInput, uid, old string, sequence int) (string, error) {
+	return edicion{}.datos(in, uid, old, sequence)
+}
+
+// edicion son las opciones de Sytue Office al escribir un evento desde el formulario
+// (Repository.ConservarForma y Repository.SerieALasExcepciones); su valor cero es lo de
+// siempre.
+type edicion struct {
+	forma, serie bool
+}
+
+func (r *Repository) edicion() edicion {
+	return edicion{forma: r.ConservarForma, serie: r.SerieALasExcepciones}
+}
+
+// datos es el recurso que sustituye a `old` con lo que manda el formulario (`in`).
+func (o edicion) datos(in api.EventInput, uid, old string, sequence int) (string, error) {
 	ev, err := inputEvent(in, uid)
 	if err != nil {
 		return "", err
@@ -71,11 +87,43 @@ func editedData(in api.EventInput, uid, old string, sequence int) (string, error
 			return "", err
 		}
 	}
+	if o.forma {
+		// Antes de CarryOver: la regla escrita como estaba sigue siendo «la misma serie».
+		if data, err = calendarical.ConservarForma(data, old); err != nil {
+			return "", err
+		}
+	}
 	data, err = calendarical.CarryOver(data, old, in.Reminders != nil)
 	if err != nil {
 		return "", err
 	}
+	if o.serie {
+		if data, err = calendarical.LlevarALasExcepciones(data, old); err != nil {
+			return "", err
+		}
+	}
 	return calendarical.PreserveExtensions(data, old)
+}
+
+// sinPisarRespuestas es editedData con Repository.ConservarRespuestas: `in` se hizo con lo
+// que se leyó al abrir el formulario y `old` es lo que hay ahora en el almacén. Lo que
+// contestaron los invitados mientras tanto se queda (ical.ConservarRespuestas) y la
+// SEQUENCE (`secuencia` es la de ahora) sube solo si cambia lo que ven los invitados.
+func (o edicion) sinPisarRespuestas(in api.EventInput, uid, old string, secuencia int) (string, error) {
+	data, err := o.datos(in, uid, old, secuencia+1)
+	if err == nil {
+		data, err = calendarical.ConservarRespuestas(data, old)
+	}
+	if err != nil || strings.TrimSpace(old) == "" || calendarical.CambiaLaInvitacion(data, old) {
+		return data, err
+	}
+	// Ni fechas, ni título, ni quiénes: la misma versión para los invitados. Una respuesta
+	// suya a esta versión que aún esté de camino se sigue aplicando.
+	data, err = o.datos(in, uid, old, secuencia)
+	if err != nil {
+		return "", err
+	}
+	return calendarical.ConservarRespuestas(data, old)
 }
 
 func (r *Repository) CreateEvent(ctx context.Context, calendar string, in api.EventInput) (api.Event, error) {
@@ -86,32 +134,43 @@ func (r *Repository) CreateEvent(ctx context.Context, calendar string, in api.Ev
 		Calendar string
 		Input    api.EventInput
 	}{calendar, in}, func(s *model.Snapshot) (model.Aggregate, error) {
-		if _, err := ownCalendar(s, calendar, true); err != nil {
-			return model.Aggregate{}, err
-		}
-		uid := in.UID
-		if uid == "" {
-			uid = uuid.NewString() + "@sytue"
-		}
-		if len(uid) > 4096 || strings.ContainsAny(uid, "\r\n\x00") {
-			return model.Aggregate{}, event.ErrInvalidEvent
-		}
-		data, err := editedData(in, uid, "", 0)
-		if err != nil {
-			return model.Aggregate{}, err
-		}
-		id := uuid.NewString()
-		now := time.Now().UTC()
-		row, err := newRow(r.scope, "object", id, map[string]any{"calendar_id": calendar, "uid": uid, "resource_name": uuid.NewString() + ".ics", "component": "VEVENT", "data": data, "size_bytes": len(data), "etag": uuid.NewString(), "sequence_no": 0, "created_at": now, "updated_at": now})
-		if err != nil {
-			return model.Aggregate{}, err
-		}
-		return r.reproject(model.Aggregate{Version: 1, Scope: r.scope, Kind: "object_state", ID: id, Rows: []model.Row{row}}, data, now)
+		return r.crearObjeto(s, calendar, in, nil)
 	})
 	if err != nil {
 		return api.Event{}, err
 	}
 	return aggregateEvent(change, "")
+}
+
+// crearObjeto es el objeto nuevo de CreateEvent en el calendario propio `calendar`;
+// `ajustar`, si no es nil, retoca su iCalendar antes de guardarlo.
+func (r *Repository) crearObjeto(s *model.Snapshot, calendar string, in api.EventInput, ajustar func(string) (string, error)) (model.Aggregate, error) {
+	if _, err := ownCalendar(s, calendar, true); err != nil {
+		return model.Aggregate{}, err
+	}
+	uid := in.UID
+	if uid == "" {
+		uid = uuid.NewString() + "@sytue"
+	}
+	if len(uid) > 4096 || strings.ContainsAny(uid, "\r\n\x00") {
+		return model.Aggregate{}, event.ErrInvalidEvent
+	}
+	data, err := editedData(in, uid, "", 0)
+	if err != nil {
+		return model.Aggregate{}, err
+	}
+	if ajustar != nil {
+		if data, err = ajustar(data); err != nil {
+			return model.Aggregate{}, err
+		}
+	}
+	id := uuid.NewString()
+	now := time.Now().UTC()
+	row, err := newRow(r.scope, "object", id, map[string]any{"calendar_id": calendar, "uid": uid, "resource_name": uuid.NewString() + ".ics", "component": "VEVENT", "data": data, "size_bytes": len(data), "etag": uuid.NewString(), "sequence_no": 0, "created_at": now, "updated_at": now})
+	if err != nil {
+		return model.Aggregate{}, err
+	}
+	return r.reproject(model.Aggregate{Version: 1, Scope: r.scope, Kind: "object_state", ID: id, Rows: []model.Row{row}}, data, now)
 }
 
 func (r *Repository) UpdateEvent(ctx context.Context, id string, in api.EventInput) (api.Event, error) {
@@ -145,7 +204,12 @@ func (r *Repository) UpdateEvent(ctx context.Context, id string, in api.EventInp
 				}
 			}
 		}
-		data, err := editedData(in, ev.UID, old, ev.SequenceNo+1)
+		var data string
+		if r.ConservarRespuestas {
+			data, err = r.edicion().sinPisarRespuestas(in, ev.UID, old, ev.SequenceNo)
+		} else {
+			data, err = r.edicion().datos(in, ev.UID, old, ev.SequenceNo+1)
+		}
 		if err != nil {
 			return a, err
 		}
@@ -438,7 +502,8 @@ func (r *Repository) AmendRecurrence(ctx context.Context, calendar, uid string, 
 			if err != nil {
 				return a, err
 			}
-			data, err = calendarical.AmendMasterRecurrence(data, occurrence, calendarical.AmendMode(mode))
+			data, err = calendarical.RecortarSerie(data, occurrence, calendarical.AmendMode(mode),
+				calendarical.OpcionesRecorte{SinExcepciones: r.ConservarRespuestas, ComoElInicio: r.ConservarForma})
 			if err != nil {
 				return a, err
 			}
@@ -447,6 +512,77 @@ func (r *Repository) AmendRecurrence(ctx context.Context, calendar, uid string, 
 		return model.Aggregate{}, missing()
 	})
 	return err
+}
+
+// serieGuardada es el iCalendar del objeto con ese UID en el calendario, tal como está
+// ahora; "" si no lo hay.
+func serieGuardada(s *model.Snapshot, calendar, uid string) (string, error) {
+	for _, row := range s.Rows() {
+		if row.Kind != "object" || s.Deleted(row) {
+			continue
+		}
+		var value event.CalendarObject
+		if json.Unmarshal(row.JSON, &value) != nil {
+			return "", model.ErrSnapshot
+		}
+		if value.CalendarID.String() == calendar && value.UID == uid {
+			return objectData(row)
+		}
+	}
+	return "", nil
+}
+
+// DividirSerie es «solo este» (RecorteExcluir) o «este y los siguientes» (RecorteHasta)
+// al guardar una ocurrencia de la serie `uid` (api.CalendarSerieData): crea `in` como un
+// evento nuevo y recorta la serie en `occurrence`. Con ConservarRespuestas (Sytue
+// Office), lo que contestaron los invitados mientras el formulario estaba abierto —a esa
+// ocurrencia o a la serie— se lee al guardar y va al evento nuevo
+// (`ical.DividirConRespuestas`), y el recorte quita las excepciones de lo que sale de la
+// serie. Sin la opción, CreateEvent y AmendRecurrence, como siempre.
+func (r *Repository) DividirSerie(ctx context.Context, calendar, uid string, occurrence time.Time, mode string, in api.EventInput) (api.Event, error) {
+	if !r.ConservarRespuestas {
+		creado, err := r.CreateEvent(ctx, calendar, in)
+		if err != nil {
+			return creado, err
+		}
+		return creado, r.AmendRecurrence(ctx, calendar, uid, occurrence, mode)
+	}
+	if in.Send {
+		return api.Event{}, ErrPrivateIngress
+	}
+	if occurrence.IsZero() || mode != api.RecorteExcluir && mode != api.RecorteHasta {
+		return api.Event{}, invalid()
+	}
+	change, err := r.mutate(ctx, "split_series", struct {
+		Calendar, UID string
+		Occurrence    time.Time
+		Mode          string
+		Input         api.EventInput
+	}{calendar, uid, occurrence, mode, in}, func(s *model.Snapshot) (model.Aggregate, error) {
+		guardado, err := serieGuardada(s, calendar, uid)
+		if err != nil {
+			return model.Aggregate{}, err
+		}
+		return r.crearObjeto(s, calendar, in, func(data string) (string, error) {
+			if r.ConservarForma {
+				// Lo que no cambió respecto de la serie (los invitados, el lugar, el
+				// STATUS que no traía…), escrito como en ella.
+				var err error
+				if data, err = calendarical.ConservarForma(data, guardado); err != nil {
+					return "", err
+				}
+			}
+			return calendarical.DividirConRespuestas(data, guardado, occurrence, mode == api.RecorteHasta, r.SerieALasExcepciones)
+		})
+	})
+	if err != nil {
+		return api.Event{}, err
+	}
+	creado, err := aggregateEvent(change, "")
+	if err != nil {
+		return creado, err
+	}
+	return creado, r.AmendRecurrence(ctx, calendar, uid, occurrence, mode)
 }
 
 func validReminderInput(minutes *[]int) bool {

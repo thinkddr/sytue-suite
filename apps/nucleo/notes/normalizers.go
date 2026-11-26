@@ -35,7 +35,9 @@ func normalizeNotebookInput(input api.NotebookInput) (api.NotebookInput, error) 
 	return normalized, err
 }
 
-func normalizeNoteInput(input api.NoteInput, legacyEncrypted bool) (api.NoteInput, error) {
+// normalizeNoteInput sanea y valida la nota; con local (NewLocal), el cuerpo conserva
+// los enlaces a ficheros de este equipo.
+func normalizeNoteInput(input api.NoteInput, legacyEncrypted, local bool) (api.NoteInput, error) {
 	if input.Visibility == "inherit" {
 		input.Visibility = ""
 	}
@@ -47,7 +49,11 @@ func normalizeNoteInput(input api.NoteInput, legacyEncrypted bool) (api.NoteInpu
 	if err = json.Unmarshal(encoded, &checked); err != nil {
 		return input, ErrSource
 	}
-	if err := checked.Normalize(legacyEncrypted); err != nil {
+	normalize := checked.Normalize
+	if local {
+		normalize = checked.NormalizeConFicheros
+	}
+	if err := normalize(legacyEncrypted); err != nil {
 		return input, err
 	}
 	encoded, err = json.Marshal(checked)

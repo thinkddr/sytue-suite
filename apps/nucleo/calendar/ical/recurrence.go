@@ -38,6 +38,28 @@ const (
 // recurso re-serializado. Solo muta el maestro (el VEVENT sin RECURRENCE-ID);
 // preserva el resto verbatim vía go-ical.
 func AmendMasterRecurrence(icalData string, recurrenceID time.Time, mode AmendMode) (string, error) {
+	return RecortarSerie(icalData, recurrenceID, mode, OpcionesRecorte{})
+}
+
+// OpcionesRecorte son lo que pide Sytue Office al recortar una serie (sin ninguna,
+// AmendMasterRecurrence). El servicio de Calendar, y con él la edición conectada, recorta
+// con ComoElInicio.
+type OpcionesRecorte struct {
+	// SinExcepciones quita también las excepciones (RECURRENCE-ID) de lo recortado: la
+	// de la ocurrencia que se quita o las de las ocurrencias desde la del corte. Si no,
+	// se quedaban sueltas apuntando a ocurrencias que la serie ya no genera, y Calendar
+	// las seguía enseñando (`event.ExpandEvents` enseña cada excepción): «solo este» o
+	// «este y los siguientes» dejaban la ocurrencia dos veces —la suelta y la excepción
+	// que creó mientras tanto la respuesta de un invitado— y borrar desde una dejaba las
+	// cambiadas.
+	SinExcepciones bool
+	// ComoElInicio escribe la EXDATE nueva como el DTSTART del maestro —en la hora de su
+	// zona, con su TZID—, no en UTC.
+	ComoElInicio bool
+}
+
+// RecortarSerie es AmendMasterRecurrence con las [OpcionesRecorte].
+func RecortarSerie(icalData string, recurrenceID time.Time, mode AmendMode, o OpcionesRecorte) (string, error) {
 	cal, err := ical.NewDecoder(strings.NewReader(icalData)).Decode()
 	if err != nil {
 		return "", fmt.Errorf("ical: decodificar serie: %w", err)
@@ -50,7 +72,7 @@ func AmendMasterRecurrence(icalData string, recurrenceID time.Time, mode AmendMo
 
 	switch mode {
 	case AmendExclude:
-		addExDate(master, recurrenceID, allDay)
+		addExDate(master, recurrenceID, allDay, o.ComoElInicio)
 	case AmendUntil:
 		if err := capRRuleUntil(master, recurrenceID, allDay); err != nil {
 			return "", err
@@ -58,12 +80,37 @@ func AmendMasterRecurrence(icalData string, recurrenceID time.Time, mode AmendMo
 	default:
 		return "", fmt.Errorf("ical: modo de recorte desconocido: %q", mode)
 	}
+	if o.SinExcepciones {
+		quedan := cal.Children[:0]
+		for _, c := range cal.Children {
+			if !excepcionRecortada(c, recurrenceID, mode == AmendUntil) {
+				quedan = append(quedan, c)
+			}
+		}
+		cal.Children = quedan
+	}
 
 	var buf bytes.Buffer
 	if err := ical.NewEncoder(&buf).Encode(cal); err != nil {
 		return "", fmt.Errorf("ical: re-serializar serie: %w", err)
 	}
 	return buf.String(), nil
+}
+
+// excepcionRecortada dice si c es la excepción de la ocurrencia `rid` o, con `desde`,
+// la de una ocurrencia que empieza en `rid` o después.
+func excepcionRecortada(c *ical.Component, rid time.Time, desde bool) bool {
+	if c.Name != ical.CompEvent || c.Props.Get(ical.PropRecurrenceID) == nil {
+		return false
+	}
+	t, _, err := PropertyTime(c.Props, ical.PropRecurrenceID)
+	if err != nil {
+		return false
+	}
+	if desde {
+		return !t.Before(rid)
+	}
+	return t.Equal(rid)
 }
 
 // masterComponent devuelve el VEVENT maestro (sin RECURRENCE-ID) del recurso, o
@@ -88,16 +135,38 @@ func componentAllDay(c *ical.Component) bool {
 
 // addExDate añade un EXDATE con `recurrenceID` al maestro, conservando cualquier
 // EXDATE previo (RFC 5545 permite varias propiedades EXDATE). Casa el tipo de
-// valor con el DTSTART (DATE para día completo; DATE-TIME UTC si no).
-func addExDate(master *ical.Component, recurrenceID time.Time, allDay bool) {
+// valor con el DTSTART (DATE para día completo; DATE-TIME UTC si no, o con
+// `comoElInicio`, en la hora de la zona del DTSTART si la trae).
+func addExDate(master *ical.Component, recurrenceID time.Time, allDay, comoElInicio bool) {
 	p := ical.NewProp(ical.PropExceptionDates)
-	if allDay {
+	switch {
+	case allDay:
 		p.Value = fmtICalDate(recurrenceID)
 		p.Params.Set(ical.ParamValue, "DATE")
-	} else {
+	case comoElInicio && zonaDelInicio(master) != nil:
+		p = fechasComoElInicio(ical.PropExceptionDates, master.Props.Get(ical.PropDateTimeStart), []time.Time{recurrenceID})
+	default:
 		p.Value = fmtICalUTC(recurrenceID)
 	}
 	master.Props.Add(p)
+}
+
+// zonaDelInicio es la zona del DTSTART del maestro si es una hora local con un TZID que
+// se conoce; nil si no.
+func zonaDelInicio(master *ical.Component) *time.Location {
+	p := master.Props.Get(ical.PropDateTimeStart)
+	if p == nil || strings.HasSuffix(strings.TrimSpace(p.Value), "Z") {
+		return nil
+	}
+	tz := strings.TrimSpace(p.Params.Get(ical.ParamTimezoneID))
+	if tz == "" {
+		return nil
+	}
+	loc, err := time.LoadLocation(tz)
+	if err != nil {
+		return nil
+	}
+	return loc
 }
 
 // capRRuleUntil reescribe el RRULE del maestro fijando UNTIL justo antes de

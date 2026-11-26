@@ -76,6 +76,16 @@ type fuenteMedida struct {
 	esperado time.Duration
 }
 
+// Name es la ruta del fichero si la fuente es uno del equipo (la videoteca de Sytue
+// Office): con ella, lo que no es WebM lo puede abrir un descodificador del sistema
+// (video.RegistrarSistema). "" si no lo es.
+func (m *fuenteMedida) Name() string {
+	if n, ok := m.Fuente.(interface{ Name() string }); ok {
+		return n.Name()
+	}
+	return ""
+}
+
 func (m *fuenteMedida) Read(p []byte) (int, error) {
 	t := time.Now()
 	n, err := m.Fuente.Read(p)

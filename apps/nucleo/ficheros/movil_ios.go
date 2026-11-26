@@ -235,6 +235,9 @@ static void sytue_elegir_ios(const char *exts_csv) {
 // «Archivos». No pide permiso a la fototeca: la persona elige y el sistema da copias. Cada
 // foto se copia a una carpeta propia dentro de la temporal, con su nombre original
 // («IMG_0001.HEIC»), porque el fichero que da el sistema desaparece al volver del aviso.
+// Con `sytue_fotos_videos` ofrece también los vídeos (Photos los importa) y los copia igual.
+static BOOL sytue_fotos_videos = NO;
+
 @interface SytueFotosDelegate : NSObject <PHPickerViewControllerDelegate>
 @end
 
@@ -250,7 +253,7 @@ static void sytue_elegir_ios(const char *exts_csv) {
 		NSString *tipo = nil;
 		for (NSString *t in p.registeredTypeIdentifiers) {
 			UTType *u = [UTType typeWithIdentifier:t];
-			if (u && [u conformsToType:UTTypeImage]) {
+			if (u && ([u conformsToType:UTTypeImage] || (sytue_fotos_videos && [u conformsToType:UTTypeMovie]))) {
 				tipo = t;
 				break;
 			}
@@ -289,7 +292,8 @@ static void sytue_elegir_ios(const char *exts_csv) {
 
 static SytueFotosDelegate *sytue_fotos_del = nil;
 
-static void sytue_elegir_fotos_ios(void) {
+static void sytue_elegir_fotos_ios(int videos) {
+	sytue_fotos_videos = videos != 0;
 	dispatch_async(dispatch_get_main_queue(), ^{
 		UIViewController *root = sytue_top_view_controller();
 		if (!root) {
@@ -297,7 +301,9 @@ static void sytue_elegir_fotos_ios(void) {
 			return;
 		}
 		PHPickerConfiguration *conf = [[PHPickerConfiguration alloc] init];
-		conf.filter = [PHPickerFilter imagesFilter];
+		conf.filter = sytue_fotos_videos
+			? [PHPickerFilter anyFilterMatchingSubfilters:@[[PHPickerFilter imagesFilter], [PHPickerFilter videosFilter]]]
+			: [PHPickerFilter imagesFilter];
 		conf.selectionLimit = 0; // sin tope, como `multiple`
 		// El original (HEIC, RAW), no una conversión a JPEG.
 		conf.preferredAssetRepresentationMode = PHPickerConfigurationAssetRepresentationModeCurrent;
@@ -338,15 +344,20 @@ func elegirMovilNativo(extensiones []string) ([]string, error) {
 	return rutas, nil
 }
 
-// elegirFotosNativo es [EnFotos] en iOS: el selector de la app Fotos. Comparte el canal
-// con el de documentos (los dos vuelven por `sytue_elegir_ios_retorno`), y por eso no se
-// pueden abrir dos a la vez.
-func elegirFotosNativo() ([]string, error) {
+// elegirFotosNativo es [EnFotos] en iOS: el selector de la app Fotos, con los vídeos si
+// alguna de las extensiones es de vídeo ([ConVideos]). Comparte el canal con el de
+// documentos (los dos vuelven por `sytue_elegir_ios_retorno`), y por eso no se pueden
+// abrir dos a la vez.
+func elegirFotosNativo(extensiones []string) ([]string, error) {
 	elegirMu.Lock()
 	ch := make(chan []string, 1)
 	elegirCanal = ch
 	elegirMu.Unlock()
-	C.sytue_elegir_fotos_ios()
+	videos := C.int(0)
+	if ConVideos(extensiones) {
+		videos = 1
+	}
+	C.sytue_elegir_fotos_ios(videos)
 	return <-ch, nil
 }
 

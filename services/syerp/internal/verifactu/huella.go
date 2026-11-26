@@ -21,6 +21,8 @@ import (
 	"strings"
 	"time"
 	_ "time/tzdata" // la hora de Madrid también en una imagen sin zoneinfo
+
+	domain "git.sytue.eu/sytue/one/apps/nucleo/erp/dominio"
 )
 
 // HuellaAlta es la huella de un registro de alta: SHA-256, en hexadecimal y en
@@ -77,14 +79,8 @@ func Importe(centimos int64) string {
 }
 
 // Porcentaje escribe un tipo en centésimas de punto (2100 = 21 %) sin decimales
-// que sobren: «21», «5.5», «0».
-func Porcentaje(centesimas int64) string {
-	if centesimas%100 == 0 {
-		return fmt.Sprintf("%d", centesimas/100)
-	}
-	s := fmt.Sprintf("%d.%02d", centesimas/100, centesimas%100)
-	return strings.TrimSuffix(s, "0")
-}
+// que sobren: «21», «5.5», «0» (dominio.Porcentaje).
+func Porcentaje(centesimas int64) string { return domain.Porcentaje(centesimas) }
 
 // Fecha escribe una fecha como la AEAT: dd-mm-aaaa.
 func Fecha(t time.Time) string { return t.Format("02-01-2006") }

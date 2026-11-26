@@ -29,10 +29,10 @@ import (
 	"git.sytue.eu/sytue/one/platform/pkg/log"
 	"git.sytue.eu/sytue/one/platform/pkg/telemetry"
 
+	provider "git.sytue.eu/sytue/one/apps/nucleo/ia/proveedor"
 	"git.sytue.eu/sytue/one/services/ai/internal/config"
 	aihttp "git.sytue.eu/sytue/one/services/ai/internal/http"
 	"git.sytue.eu/sytue/one/services/ai/internal/presupuesto"
-	"git.sytue.eu/sytue/one/services/ai/internal/provider"
 )
 
 func main() {

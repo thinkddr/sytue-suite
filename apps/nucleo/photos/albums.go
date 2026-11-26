@@ -178,20 +178,29 @@ func (r *Repository) AlbumPhotos(parent context.Context, id string) ([]api.Photo
 	}
 	for _, row := range graph.albums {
 		if row.ID == id && row.DeletedAt == nil {
-			return graph.photos(id), nil
+			return conEstados(graph.photos(id)), nil
 		}
 	}
 	return nil, ErrNotFound
 }
 
 func (r *Repository) CreateAlbum(ctx context.Context, title string) (api.Album, error) {
+	return r.crearAlbum(ctx, title, "")
+}
+
+// crearAlbum crea el álbum; origen, si no está vacío, es de dónde vino (CrearAlbumDe).
+func (r *Repository) crearAlbum(ctx context.Context, title, origen string) (api.Album, error) {
 	title, err := model.TituloDeAlbum(title)
 	if err != nil {
 		return api.Album{}, err
 	}
-	result, err := r.engine.Mutate(ctx, "album-create-v1", title, func(context.Context) (string, string, string, []byte, error) {
+	var input any = title
+	if origen != "" {
+		input = []string{title, origen}
+	}
+	result, err := r.engine.Mutate(ctx, "album-create-v1", input, func(context.Context) (string, string, string, []byte, error) {
 		now := time.Now().UTC()
-		row := model.AlbumRow{ID: uuid.NewString(), Tenant: r.scope.Tenant, Owner: r.scope.Subject, Title: title, CreatedAt: now, UpdatedAt: now}
+		row := model.AlbumRow{ID: uuid.NewString(), Tenant: r.scope.Tenant, Owner: r.scope.Subject, Title: title, CreatedAt: now, UpdatedAt: now, Origin: origen}
 		raw, err := json.Marshal(row)
 		return "album", row.ID, "live", raw, err
 	})

@@ -1,0 +1,9 @@
+﻿id,drive_id,name,content_type,size_bytes,width,height,taken_at,uploaded_at,latitude,longitude,camera,lens,favorite,description,tags
+5f070500-0000-0000-0000-000000000001,d-playa,playa.jpg,image/jpeg,978,96,64,2023-08-15T19:45:00+02:00,2024-01-02T03:04:05Z,36.5298,-6.2924,,,true,Atardecer en la playa,playa; verano
+5f070500-0000-0000-0000-000000000002,d-gato,gato.png,image/png,277,48,48,,2024-01-02T03:04:05Z,,,,,false,'=SUMA(1) gatos,
+5f070500-0000-0000-0000-000000000003,d-nieve,nieve.jpg,image/jpeg,929,64,96,2022-01-10T10:00:00Z,2024-01-02T03:04:05Z,,,Cámara de prueba,,false,,nieve
+5f070500-0000-0000-0000-000000000004,d-clip,clip.mp4,video/mp4,1048,1280,720,,2024-01-02T03:04:05Z,,,,,false,,
+5f070500-0000-0000-0000-000000000005,d-perdida,perdida.jpg,image/jpeg,12345,10,10,,2024-01-02T03:04:05Z,,,,,false,,
+5f070500-0000-0000-0000-000000000006,d-paseo,paseo.webm,video/webm,17428,320,180,,2024-03-04T05:06:07Z,,,,,true,,paseo
+5f070500-0000-0000-0000-000000000007,d-flor,flor.avif,image/avif,825,16,16,2021-05-06T07:08:09Z,2024-01-02T03:04:05Z,,,,,false,Una flor,
+5f070500-0000-0000-0000-000000000008,d-heic,IMG_0001.heic,image/heic,53,40,30,2020-02-03T04:05:06Z,2024-01-02T03:04:05Z,,,,,true,,

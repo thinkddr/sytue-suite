@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
-	"git.sytue.eu/sytue/one/apps/nucleo/contacts/card"
 	"git.sytue.eu/sytue/one/apps/nucleo/storage/records"
 )
 
@@ -43,13 +42,5 @@ func (s *Snapshot) queryPhotoByID(id, etag string) ([]byte, error) {
 	if person.ETag != etag {
 		return nil, queryError(http.StatusPreconditionFailed, "contact_etag_changed")
 	}
-	value, err := card.PhotoDataURI(person.VCard)
-	if err != nil {
-		return nil, err
-	}
-	if value == "" {
-		return nil, queryError(http.StatusNotFound, "private_contact_photo_not_found")
-	}
-	photo, _, err := card.PhotoBytes(value)
-	return photo, err
+	return FotoDeVCard(person.VCard)
 }

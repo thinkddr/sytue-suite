@@ -425,18 +425,27 @@ func (b *Bases) RenameField(ctx context.Context, campo, nombre string) error {
 // la guarda el servicio, que la valida y recalcula la tabla). El tipo del resultado no
 // cambia: el servicio no lo deja cambiar por aquí.
 func (b *Bases) SetFieldFormula(ctx context.Context, campo, formula string) error {
+	if d, ok := b.private.(BasesSchemaData); ok {
+		return d.SetFieldFormula(ctx, campo, formula)
+	}
 	return b.sinCuerpo(ctx, http.MethodPatch, "/fields/"+url.PathEscape(campo), map[string]string{"formula": formula})
 }
 
 // SetFieldChoices sustituye las opciones de un campo de selección, en ese orden. Una
 // opción que se quita no se borra de los registros: se queda como «retirada».
 func (b *Bases) SetFieldChoices(ctx context.Context, campo string, opciones []string) error {
+	if d, ok := b.private.(BasesSchemaData); ok {
+		return d.SetFieldChoices(ctx, campo, opciones)
+	}
 	return b.sinCuerpo(ctx, http.MethodPatch, "/fields/"+url.PathEscape(campo), map[string][]string{"choices": opciones})
 }
 
 // ReorderFields fija el orden de TODOS los campos de una tabla. Si no son exactamente
 // los de la tabla (otra persona añadió o borró uno), el servicio contesta 409.
 func (b *Bases) ReorderFields(ctx context.Context, tabla string, campos []string) error {
+	if d, ok := b.private.(BasesSchemaData); ok {
+		return d.ReorderFields(ctx, tabla, campos)
+	}
 	return b.sinCuerpo(ctx, http.MethodPut, "/tables/"+url.PathEscape(tabla)+"/field-order", map[string][]string{"fields": campos})
 }
 
@@ -483,6 +492,9 @@ func (l BasesLectura) consulta(vista string) url.Values {
 
 // ListRecordsCon es ListRecords con búsqueda y orden de un momento; lo vacío no se manda.
 func (b *Bases) ListRecordsCon(ctx context.Context, tabla, vista, cursor string, limite int, l BasesLectura) (BasesRecordPage, error) {
+	if d, ok := b.private.(BasesQueryData); ok {
+		return d.ListRecordsCon(ctx, tabla, vista, cursor, limite, l)
+	}
 	if b.private != nil {
 		// La búsqueda y el orden de un momento los resuelve el servicio sobre la tabla
 		// en claro; los datos privados no salen del dispositivo para eso.
@@ -588,12 +600,18 @@ func (b *Bases) DeleteRecord(ctx context.Context, registro string, forzar bool) 
 // ListComments son los comentarios de un registro, planos y en orden (los lee quien lee
 // el registro).
 func (b *Bases) ListComments(ctx context.Context, registro string) ([]BasesComment, error) {
+	if d, ok := b.private.(BasesCommentData); ok {
+		return d.ListComments(ctx, registro)
+	}
 	return basesJSON[[]BasesComment](ctx, b, http.MethodGet, "/records/"+url.PathEscape(registro)+"/comments", nil)
 }
 
 // CreateComment comenta un registro (rol comentarista o superior). `padre` no vacío
 // responde a un comentario raíz.
 func (b *Bases) CreateComment(ctx context.Context, registro, cuerpo, padre string) (BasesComment, error) {
+	if d, ok := b.private.(BasesCommentData); ok {
+		return d.CreateComment(ctx, registro, cuerpo, padre)
+	}
 	pedido := map[string]string{"body": cuerpo}
 	if padre != "" {
 		pedido["parent_id"] = padre
@@ -603,6 +621,9 @@ func (b *Bases) CreateComment(ctx context.Context, registro, cuerpo, padre strin
 
 // DeleteComment borra un comentario: quien lo escribió o quien modera.
 func (b *Bases) DeleteComment(ctx context.Context, comentario string) error {
+	if d, ok := b.private.(BasesCommentData); ok {
+		return d.DeleteComment(ctx, comentario)
+	}
 	return b.sinCuerpo(ctx, http.MethodDelete, "/comments/"+url.PathEscape(comentario), nil)
 }
 
@@ -626,6 +647,9 @@ func (b *Bases) CreateView(ctx context.Context, tabla, nombre, tipo string, cfg 
 // UpdateView cambia el nombre y la configuración de una vista guardada. El tipo no se
 // cambia (el servicio no lo admite): de él cuelgan los enlaces de formulario y las conexiones.
 func (b *Bases) UpdateView(ctx context.Context, vista, nombre string, cfg BasesViewConfig) (BasesView, error) {
+	if d, ok := b.private.(BasesSchemaData); ok {
+		return d.UpdateView(ctx, vista, nombre, cfg)
+	}
 	return basesJSON[BasesView](ctx, b, http.MethodPatch, "/views/"+url.PathEscape(vista),
 		map[string]any{"name": nombre, "config": cfg})
 }
@@ -698,7 +722,11 @@ func (b *Bases) RevokePermission(ctx context.Context, base, permiso string) erro
 func (b *Bases) ListAudit(ctx context.Context, base string, antes int64, limite int) ([]BasesAuditEntry, error) {
 	if b.private != nil {
 		// La traza la escribe el servicio sobre las bases en claro: una base privada no
-		// tiene allí ni registros ni traza que enseñar.
+		// tiene allí ni registros ni traza que enseñar. Salvo la que lleve el dispositivo
+		// (Sytue Office, B-06).
+		if d, ok := b.private.(BasesAuditData); ok {
+			return d.ListAudit(ctx, base, antes, limite)
+		}
 		return nil, ErrPrivateBasesOperation
 	}
 	q := url.Values{}
@@ -771,6 +799,9 @@ const MaxBytesCSVBases = 5 << 20
 // UploadAttachment sube un fichero a un campo de adjuntos de un registro. El tipo lo
 // decide el servicio por el contenido, no por la extensión ni por quien sube.
 func (b *Bases) UploadAttachment(ctx context.Context, registro, campo, nombre string, datos []byte) (BasesAttachment, error) {
+	if d, ok := b.private.(BasesAttachmentData); ok {
+		return d.UploadAttachment(ctx, registro, campo, nombre, datos)
+	}
 	var out BasesAttachment
 	resp, err := b.c.Do(ctx, Request{
 		Method: http.MethodPost, Path: "/records/" + url.PathEscape(registro) + "/attachments",
@@ -787,6 +818,9 @@ func (b *Bases) UploadAttachment(ctx context.Context, registro, campo, nombre st
 
 // DownloadAttachment baja un adjunto. Cerrar el cuerpo es cosa de quien llama.
 func (b *Bases) DownloadAttachment(ctx context.Context, registro, adjunto string) (io.ReadCloser, error) {
+	if d, ok := b.private.(BasesAttachmentData); ok {
+		return d.DownloadAttachment(ctx, registro, adjunto)
+	}
 	resp, err := b.c.Do(ctx, Request{Path: "/records/" + url.PathEscape(registro) + "/attachments/" + url.PathEscape(adjunto)})
 	if err != nil {
 		return nil, err
@@ -797,6 +831,9 @@ func (b *Bases) DownloadAttachment(ctx context.Context, registro, adjunto string
 // DownloadThumb baja la miniatura de un adjunto de imagen (la portada de una tarjeta de
 // galería): nunca el original, que puede pesar 20 MB. Cerrar el cuerpo es cosa de quien llama.
 func (b *Bases) DownloadThumb(ctx context.Context, registro, adjunto string) (io.ReadCloser, error) {
+	if d, ok := b.private.(BasesAttachmentData); ok {
+		return d.DownloadThumb(ctx, registro, adjunto)
+	}
 	resp, err := b.c.Do(ctx, Request{Path: "/records/" + url.PathEscape(registro) + "/attachments/" + url.PathEscape(adjunto) + "/thumb"})
 	if err != nil {
 		return nil, err
@@ -806,12 +843,18 @@ func (b *Bases) DownloadThumb(ctx context.Context, registro, adjunto string) (io
 
 // DeleteAttachment borra un adjunto de un registro.
 func (b *Bases) DeleteAttachment(ctx context.Context, registro, adjunto string) error {
+	if d, ok := b.private.(BasesAttachmentData); ok {
+		return d.DeleteAttachment(ctx, registro, adjunto)
+	}
 	return b.sinCuerpo(ctx, http.MethodDelete, "/records/"+url.PathEscape(registro)+"/attachments/"+url.PathEscape(adjunto), nil)
 }
 
 // ImportCSV crea una tabla nueva a partir de un CSV con fila de cabecera (solo el
 // propietario). Devuelve la tabla creada.
 func (b *Bases) ImportCSV(ctx context.Context, base, nombre string, csv []byte) (BasesTable, error) {
+	if d, ok := b.private.(BasesImportData); ok {
+		return d.ImportCSV(ctx, base, nombre, csv)
+	}
 	var out BasesTable
 	resp, err := b.c.Do(ctx, Request{
 		Method: http.MethodPost, Path: "/bases/" + url.PathEscape(base) + "/import",

@@ -2,7 +2,10 @@
 package model
 
 import (
+	"bytes"
 	"encoding/json"
+	"maps"
+	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -81,10 +84,9 @@ func (s *Snapshot) WithIndexes(favorites *FavoriteIndex, trash *TrashIndex) (*Sn
 	if favorites == nil && trash == nil {
 		return s, nil
 	}
-	rows := map[string]Row{}
-	for _, row := range s.Rows() {
-		rows[rowKey(row.Kind, row.ID)] = row
-	}
+	// Las filas comparten los buffers de s, que no cambian nunca: cada cambio de abajo
+	// pone un buffer nuevo, y compose descodifica solo esos.
+	rows := maps.Clone(s.rows)
 	purged := map[string]bool{}
 	for key, row := range rows {
 		if row.Kind != "contact" {
@@ -111,11 +113,71 @@ func (s *Snapshot) WithIndexes(favorites *FavoriteIndex, trash *TrashIndex) (*Sn
 	if err := normalizePurgedMembers(s.scope, rows, purged); err != nil {
 		return nil, err
 	}
-	output := make([]Row, 0, len(rows))
-	for _, row := range rows {
-		output = append(output, row)
+	return compose(s.scope, rows, s.keptLinks(rows))
+}
+
+// IndexesKeep dice si WithIndexes(favorites, trash) dejaría cada fila de change tal
+// cual la trae change, byte a byte, en s, una instantánea ya compuesta con change: sin
+// quitar ninguna, sin reescribir ninguna y sin reescribir otra fila por ellas. Entonces
+// componer change con WithAggregates sobre una instantánea que ya lleva los índices da
+// lo mismo que componerlo antes de aplicarlos. false si no se sabe: quien llama vuelve
+// a componer desde el catálogo.
+func (s *Snapshot) IndexesKeep(change Aggregate, favorites *FavoriteIndex, trash *TrashIndex) bool {
+	if favorites == nil && trash == nil {
+		return true
 	}
-	return NewSnapshot(s.scope, output)
+	rows, kept := s.indexedRows(change, favorites, trash)
+	if !kept {
+		return false
+	}
+	contacts, cards := map[string]bool{}, map[string]bool{}
+	for _, row := range change.Rows {
+		switch row.Kind {
+		case "contact":
+			contacts[row.ID] = true
+		case "card":
+			cards[row.ID] = true
+		}
+	}
+	// Lo que WithIndexes hace en otras filas por otras: un contacto purgado vacía los
+	// miembros que lo nombran, y otro contacto con una tarjeta del cambio la reescribiría
+	// o la quitaría.
+	for key, value := range s.links {
+		switch {
+		case value.kind == "member" && trash != nil && value.contact != "" && trash.Values[value.contact].Purged:
+			if _, mine := rows[key]; mine {
+				return false
+			}
+		case value.kind == "contact" && cards[value.object] && !contacts[value.id]:
+			return false
+		}
+	}
+	return true
+}
+
+// indexedRows son las filas de change, por su clave, tras lo que WithIndexes hace con
+// cada contacto, y si siguen byte a byte como change las trae, sin quitar ninguna.
+func (s *Snapshot) indexedRows(change Aggregate, favorites *FavoriteIndex, trash *TrashIndex) (map[string]Row, bool) {
+	rows := make(map[string]Row, len(change.Rows))
+	for _, row := range change.Rows {
+		row.JSON = slices.Clone(row.JSON)
+		rows[rowKey(row.Kind, row.ID)] = row
+	}
+	for key, row := range rows {
+		if row.Kind != "contact" {
+			continue
+		}
+		removed, err := applyContactIndexes(s.scope, rows, key, row, favorites, trash)
+		if err != nil || removed {
+			return nil, false
+		}
+	}
+	for _, row := range change.Rows {
+		if !bytes.Equal(rows[rowKey(row.Kind, row.ID)].JSON, row.JSON) {
+			return nil, false
+		}
+	}
+	return rows, true
 }
 
 func applyContactIndexes(scope storage.Scope, rows map[string]Row, key string, row Row, favorites *FavoriteIndex, trash *TrashIndex) (bool, error) {

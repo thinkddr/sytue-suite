@@ -184,6 +184,9 @@ type Sala struct {
 	Ficheros       Ficheros
 	adjuntosEpoch  uint64
 	ElegirFicheros func() ([]string, error)
+	// SinPresencia es que nadie reparte presencia (Sytue Office, sin Hub): los directos
+	// no dicen «Sin conexión» de quien no se sabe.
+	SinPresencia bool
 	// AbrirEnlace abre un enlace en el navegador del sistema (las vistas previas).
 	AbrirEnlace func(*url.URL) error
 	// ListarDrive es el selector de la suite en modo Drive (`api.Elegir.Listar`).
@@ -225,6 +228,9 @@ type Sala struct {
 	ctx     context.Context
 	equipo  string
 	canales []api.RoomsChannel
+	// reunionEnCurso: se está creando una reunión de proveedor (reunion_enlace.go); un
+	// segundo clic no crea otra.
+	reunionEnCurso bool
 	// retiradas invalida el deshacer de una acción cuando llega una baja más reciente.
 	retiradas map[string]uint64
 	pend      map[string]api.RoomsUnread
@@ -675,6 +681,39 @@ func (sa *Sala) cargarCanales() {
 	})
 }
 
+// RefrescarCanales vuelve a pedir la lista de canales y la pinta SIN pasar por
+// «Cargando» (los esqueletos), sin volver a escuchar y sin cambiar el canal abierto (sí
+// su cabecera, si cambió): es para cuando el servicio sabe que hay una conversación que
+// no estaba (en Sytue Office, un chat de Teams o un espacio de Google Chat que se abrió
+// en otro sitio). Con la lista cargando no hace nada (la carga la trae); en error, es
+// «Reintentar». Nada de la suite lo llama.
+func (sa *Sala) RefrescarCanales() {
+	l := sa.P.Lateral
+	switch l.EstadoCanales {
+	case Cargando:
+		return // la carga en curso ya la trae
+	case Listo:
+	default:
+		sa.cargarCanales()
+		return
+	}
+	pedir(sa, sa.pedirLista, func(r lista, err error) {
+		if err != nil || l.EstadoCanales != Listo {
+			return
+		}
+		sa.canales = slices.DeleteFunc(r.canales, func(c api.RoomsChannel) bool { return c.Archived })
+		sa.ponerPendientes(r.pend)
+		l.Categorias = l.Categorias[:0]
+		for _, c := range r.categorias {
+			l.Categorias = append(l.Categorias, Categoria{ID: c.ID, Nombre: c.Name, Orden: c.SortOrder, Plegada: c.Collapsed})
+		}
+		// El abierto también puede haber cambiado (el nombre de un directo recién
+		// abierto, que el proveedor sabe mejor que el selector).
+		sa.repintarCanalAbierto()
+		sa.refrescarPresencia()
+	})
+}
+
 func (sa *Sala) ponerPendientes(ps []api.RoomsUnread) {
 	clear(sa.pend)
 	for _, p := range ps {
@@ -769,6 +808,7 @@ func (sa *Sala) canalDe(c api.RoomsChannel) Canal {
 		out.Clase = Privado
 	}
 	sa.presenciaDe(c, &out)
+	out.SinPresencia = sa.SinPresencia
 	out.EnLlamada = sa.llamadasVivas[c.ID]
 	switch c.NotifyLevel {
 	case "mentions":
@@ -1289,6 +1329,7 @@ func (sa *Sala) abrir(c Canal) {
 	// no en una conversación de otra organización.
 	cab := sa.P.Canal.Cabecera
 	cab.PuedeEditarTema, cab.EditandoTema = sa.adminEquipo && c.Clase != Directo && !c.Externo, false
+	sa.prepararReunion(c)
 	sa.P.Abrir(c)
 	sa.cargarFijados(c.ID)
 	if cambia {
@@ -3285,8 +3326,17 @@ func (sa *Sala) AbrirCrearCanal() {
 		f.Refresh()
 		d.Recolocar()
 	}
+	if cc, ok := sa.S.(CuentasCreables); ok {
+		f.RotuloCuentas, f.Cuentas = cc.CuentasParaCrear()
+		if len(f.Cuentas) > 0 {
+			f.Cuenta = f.Cuentas[0].ID
+		}
+	}
 	f.AlCrear = func(nombre, asunto string, privado bool, personas []Persona) {
 		equipo := sa.equipo
+		if f.Cuenta != "" {
+			equipo = f.Cuenta
+		}
 		pedir(sa, func(ctx context.Context) (api.RoomsChannel, error) {
 			return sa.S.CreateChannel(ctx, equipo, nombre, asunto, privado)
 		}, func(canal api.RoomsChannel, err error) {
@@ -3313,6 +3363,13 @@ func (sa *Sala) AbrirCrearCanal() {
 	}
 	sa.crearCanal = f
 	d.Mostrar(c)
+}
+
+// CuentasCreables lo cumple un servicio que junta varias cuentas (el de Sytue Office):
+// «Crear canal» deja elegir en cuál, con el rótulo que dé, y la elegida llega como el
+// equipo de CreateChannel. El servicio de la suite no la cumple: un solo equipo.
+type CuentasCreables interface {
+	CuentasParaCrear() (rotulo string, cuentas []api.RoomsTeam)
 }
 
 // anadirMiembro es la firma de `AddChannelMember`.
@@ -3558,7 +3615,9 @@ func (sa *Sala) AbrirNuevoDirecto() {
 	nd.AlAbrir = func(elegidas []Persona) {
 		ids, nombres := make([]string, 0, len(elegidas)), make([]string, 0, len(elegidas))
 		for _, p := range elegidas {
-			ids, nombres = append(ids, p.ID), append(nombres, p.Nombre)
+			// Sin la cuenta detrás: el directo ya va en la sección de su cuenta, y es el
+			// nombre que le dará ella en cuanto se vuelva a pedir la lista.
+			ids, nombres = append(ids, p.ID), append(nombres, p.NombreDePersona())
 		}
 		pedir(sa, func(ctx context.Context) (api.RoomsChannel, error) {
 			return sa.S.OpenDirect(ctx, equipo, ids)
@@ -3592,7 +3651,7 @@ func (sa *Sala) alimentarSelector(nd *NuevoDirecto) {
 		nd.Equipo = nd.Equipo[:0]
 		for _, m := range ms {
 			if m.Subject != sa.Yo {
-				nd.Equipo = append(nd.Equipo, Persona{ID: m.Subject, Nombre: nombreDe(m.Name, m.Subject)})
+				nd.Equipo = append(nd.Equipo, Persona{ID: m.Subject, Nombre: nombreDe(m.Name, m.Subject), NombreSinCuenta: m.PlainName})
 			}
 		}
 		nd.cambiado()
@@ -3617,7 +3676,7 @@ func (sa *Sala) alimentarSelector(nd *NuevoDirecto) {
 				nd.Caja().PonerTexto("")
 				return
 			}
-			nd.Encontrada(Persona{ID: p.UserID, Nombre: nombreDe(nombre, p.UserID)})
+			nd.Encontrada(Persona{ID: p.UserID, Nombre: nombreDe(nombre, p.UserID), NombreSinCuenta: p.PlainName})
 		})
 	}
 }
@@ -3679,7 +3738,7 @@ func (sa *Sala) nombresRoster() map[string]string {
 }
 
 func miembroDe(m api.RoomsMember) Miembro {
-	return Miembro{ID: m.Subject, Nombre: nombreDe(m.Name, m.Subject), Admin: m.Role == "admin", Externo: m.External}
+	return Miembro{ID: m.Subject, Nombre: nombreDe(m.Name, m.Subject), Admin: m.Role == "admin", Externo: m.External, NombreSinCuenta: m.PlainName}
 }
 
 // pintarRoster lleva el roster a la cabecera y al panel.
@@ -3803,7 +3862,7 @@ func (sa *Sala) abrirMiembros() {
 				return
 			}
 			p.Caja().PonerTexto("")
-			p.AlAnadir(Miembro{ID: per.UserID, Nombre: nombreDe(per.Name, per.UserID), Externo: true})
+			p.AlAnadir(Miembro{ID: per.UserID, Nombre: nombreDe(per.Name, per.UserID), Externo: true, NombreSinCuenta: per.PlainName})
 		})
 	}
 	equipo := sa.equipo

@@ -4,6 +4,7 @@
 package pruebasfyne
 
 import (
+	"encoding/xml"
 	"io/fs"
 	"os/exec"
 	"path/filepath"
@@ -43,6 +44,21 @@ func TestEmpaquetarInstalarShDeLinux(t *testing.T) {
 	guiontest.Escribir(t, empaquetarUnir(b, "share/applications/eu.sytue.uno.desktop"),
 		"[Desktop Entry]\nType=Application\nName=Uno\nExec=sytue-uno %U\nIcon=eu.sytue.uno\nMimeType=x-scheme-handler/sytue-uno;application/pdf;application/vnd.oasis.opendocument.text;application/vnd.apple.pages;\n")
 	guiontest.Escribir(t, empaquetarUnir(b, "share/pixmaps/eu.sytue.uno.png"), "")
+	// Con un shared-mime-info (el de los formatos nativos de Sytue Office): se instala, se
+	// pone al día la base de tipos y --quitar lo quita.
+	mime := empaquetar(t, "mime-office")
+	if mime.Codigo != 0 {
+		t.Fatalf("mime-office falla: %s", mime.Todo())
+	}
+	for _, e := range []string{"docus", "calcus", "diapos"} {
+		if !strings.Contains(mime.Salida, `<glob pattern="*.`+e+`"/>`) {
+			t.Errorf("el shared-mime-info no declara .%s", e)
+		}
+	}
+	if err := xml.Unmarshal([]byte(mime.Salida), new(struct{})); err != nil {
+		t.Errorf("el shared-mime-info no es XML válido: %v", err)
+	}
+	guiontest.Escribir(t, empaquetarUnir(b, "share/mime/packages/sytue-office.xml"), mime.Salida)
 	r := empaquetar(t, "instalar-sh", "Sytue Prueba")
 	if r.Codigo != 0 {
 		t.Fatalf("empaquetar.sh instalar-sh falla: %s", r.Todo())
@@ -58,6 +74,8 @@ func TestEmpaquetarInstalarShDeLinux(t *testing.T) {
 	guiontest.Escribir(t, mimeapps, "[Default Applications]\napplication/pdf=otra.desktop\n")
 	xdg := empaquetarUnir(tmp, "xdg")
 	empaquetarEjecutable(t, empaquetarUnir(xdg, "xdg-mime"), empaquetarXdgMime)
+	mimeDB := empaquetarUnir(tmp, "mime-db.log")
+	empaquetarEjecutable(t, empaquetarUnir(xdg, "update-mime-database"), "#!/bin/sh\necho \"$1\" >>"+mimeDB+"\n")
 	env := []string{"XDG_CONFIG_HOME=" + config, empaquetarConPATH(xdg), "PREFIJO=" + pre}
 	correr := func(args ...string) guiontest.Resultado {
 		t.Helper()
@@ -96,6 +114,12 @@ func TestEmpaquetarInstalarShDeLinux(t *testing.T) {
 	}
 	if r := guiontest.Ejecutar(t, guiontest.Opciones{}, empaquetarUnir(pre, "bin/sytue-uno")); empaquetarJunto(r) != "hola" {
 		t.Error("instalar.sh no deja el programa ejecutable en PREFIJO/bin")
+	}
+	if !empaquetarExiste(empaquetarUnir(pre, "share/mime/packages/sytue-office.xml")) {
+		t.Error("instalar.sh no instala el shared-mime-info del bundle")
+	}
+	if !empaquetarHayLinea(empaquetarLeer(mimeDB), pre+"/share/mime") {
+		t.Error("instalar.sh no pone al día la base de tipos MIME")
 	}
 	desktop := empaquetarLeer(empaquetarUnir(pre, "share/applications/eu.sytue.uno.desktop"))
 	if !empaquetarHayLinea(desktop, "Exec="+pre+"/bin/sytue-uno %U") {

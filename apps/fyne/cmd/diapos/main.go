@@ -138,7 +138,7 @@ func main() {
 	// mismo con el que CertiPDF abre del disco; la web dice `accept="image/*"`.
 	//
 	// En el móvil `ficheros.Elegir` es el selector del sistema que pone la sesión
-	// (`sesion/elegir_movil.go`), con lo elegido ya copiado a una ruta.
+	// (`anfitrion/elegir_movil.go`), con lo elegido ya copiado a una ruta.
 	d.ElegirImagen = func(listo func([]byte, bool)) {
 		editor.ElegirDelSistema(func(rutas []string) {
 			ext := strings.ToLower(filepath.Ext(rutas[0]))

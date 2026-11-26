@@ -14,6 +14,7 @@ package ical
 import (
 	"bytes"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -109,9 +110,9 @@ func eventInputFromICal(evt *ical.Event) (domain.Input, error) {
 	in := domain.Input{
 		UID:            uid,
 		ResourceName:   uid + ".ics",
-		Summary:        propText(evt.Props, ical.PropSummary),
-		Description:    propText(evt.Props, ical.PropDescription),
-		Location:       propText(evt.Props, ical.PropLocation),
+		Summary:        textoDe(evt.Props, ical.PropSummary),
+		Description:    textoDe(evt.Props, ical.PropDescription),
+		Location:       textoDe(evt.Props, ical.PropLocation),
 		Organizer:      cleanCalAddress(propText(evt.Props, ical.PropOrganizer)),
 		OrganizerName:  organizerName(evt.Props),
 		DTStart:        dtstart.UTC(),
@@ -236,8 +237,8 @@ func EncodeEvent(ev domain.Event, method domain.SchedulingMethod) (string, error
 	if err := setRecurrenceRule(p, ev.RRule); err != nil {
 		return "", err
 	}
-	setRecurrenceDates(p, ical.PropRecurrenceDates, ev.RDate, ev.AllDay)
-	setRecurrenceDates(p, ical.PropExceptionDates, ev.ExDate, ev.AllDay)
+	setRecurrenceDates(p, ical.PropRecurrenceDates, ev.RDate)
+	setRecurrenceDates(p, ical.PropExceptionDates, ev.ExDate)
 	if ev.RecurrenceID != nil {
 		p.SetDateTime(ical.PropRecurrenceID, ev.RecurrenceID.UTC())
 		if ev.AllDay {
@@ -245,7 +246,11 @@ func EncodeEvent(ev domain.Event, method domain.SchedulingMethod) (string, error
 		}
 	}
 	if ev.SequenceNo > 0 {
-		p.SetText(ical.PropSequence, fmt.Sprintf("%d", ev.SequenceNo))
+		// SEQUENCE es un INTEGER (RFC 5545 §3.8.7.4): sin el «;VALUE=TEXT» que pondría
+		// SetText, que un cliente estricto rechaza en las invitaciones iTIP.
+		seq := ical.NewProp(ical.PropSequence)
+		seq.Value = strconv.Itoa(ev.SequenceNo)
+		p.Set(seq)
 	}
 	setAttendees(p, ev.Attendees)
 
@@ -281,24 +286,34 @@ func setAttendees(props ical.Props, attendees []domain.Attendee) {
 
 // --- Helpers de propiedades --------------------------------------------------
 
-func setRecurrenceDates(props ical.Props, name string, dates []time.Time, allDay bool) {
-	if len(dates) == 0 {
+// setRecurrenceDates escribe las RDATE o EXDATE del VEVENT como su DTSTART (ya puesto en
+// props): ver fechasComoElInicio.
+func setRecurrenceDates(props ical.Props, name string, dates []time.Time) {
+	inicio := props.Get(ical.PropDateTimeStart)
+	if len(dates) == 0 || inicio == nil {
 		return
 	}
-	values := make([]string, len(dates))
-	for i, value := range dates {
-		if allDay {
-			values[i] = value.UTC().Format("20060102")
-		} else {
-			values[i] = value.UTC().Format("20060102T150405Z")
-		}
+	props.Set(fechasComoElInicio(name, inicio, dates))
+}
+
+// fechasComoElInicio es la propiedad `name` (RDATE, EXDATE) con `fechas` escritas como el
+// DTSTART `inicio` del maestro (enSuForma): en la hora de su zona con su TZID, en UTC, o
+// como fechas (VALUE=DATE) si la serie es de días completos. Es el mismo tipo de valor que
+// el inicio (RFC 5545 §3.8.5.1) y la forma en que las escribe iCloud.
+func fechasComoElInicio(name string, inicio *ical.Prop, fechas []time.Time) *ical.Prop {
+	crudo := strings.TrimSpace(inicio.Value)
+	values := make([]string, len(fechas))
+	for i, t := range fechas {
+		values[i] = enSuForma(t, crudo, inicio)
 	}
 	property := ical.NewProp(name)
-	property.Value = strings.Join(values, ",")
-	if allDay {
-		property.Params.Set(ical.ParamValue, "DATE")
+	for _, param := range []string{ical.ParamValue, ical.ParamTimezoneID} {
+		if v := inicio.Params.Get(param); v != "" {
+			property.Params.Set(param, v)
+		}
 	}
-	props.Set(property)
+	property.Value = strings.Join(values, ",")
+	return property
 }
 
 func setRecurrenceRule(props ical.Props, value string) error {
@@ -332,6 +347,23 @@ func recurrenceRuleValue(props ical.Props) (string, error) {
 
 func PropertyText(props ical.Props, name string) string {
 	return propText(props, name)
+}
+
+// textoDe es el TEXT de una propiedad (RFC 5545 §3.3.11) como lo lee una persona: sin
+// los escapes («\,», «\;», «\n», «\\»). Con propText, el título «Reunión\, equipo» de
+// iCloud se enseñaba con la barra y EncodeEvent la volvía a escapar en cada guardado
+// («Reunión\\\, equipo»), y una descripción con saltos de línea perdía los saltos. Si
+// no se deja leer como texto, lo que pone.
+func textoDe(props ical.Props, name string) string {
+	p := props.Get(name)
+	if p == nil {
+		return ""
+	}
+	t, err := p.Text()
+	if err != nil {
+		return strings.TrimSpace(p.Value)
+	}
+	return strings.TrimSpace(t)
 }
 
 func propText(props ical.Props, name string) string {
@@ -373,6 +405,10 @@ func PropertyTimes(props ical.Props, name string) []time.Time {
 
 // propTimes parsea una propiedad multivaluada de fechas (RDATE/EXDATE), separada
 // por comas, en sus instantes UTC. Ignora valores no parseables.
+//
+// Una hora local con TZID (`EXDATE;TZID=Europe/Madrid:20261201T100000`, como las escribe
+// iCloud) es esa hora EN esa zona: leída como UTC no casaba con la ocurrencia y la que se
+// quitó seguía saliendo. Las que acaban en Z y las fechas (VALUE=DATE) no cambian.
 func propTimes(props ical.Props, name string) []time.Time {
 	values := props[name]
 	if len(values) == 0 {
@@ -380,9 +416,19 @@ func propTimes(props ical.Props, name string) []time.Time {
 	}
 	var out []time.Time
 	for i := range values {
+		var zona *time.Location
+		if tz := strings.TrimSpace(values[i].Params.Get(ical.ParamTimezoneID)); tz != "" {
+			zona = domain.LoadLocationCached(tz)
+		}
 		for _, raw := range strings.Split(values[i].Value, ",") {
 			raw = strings.TrimSpace(raw)
 			if raw == "" {
+				continue
+			}
+			if zona != nil && len(raw) == 15 { // hora local, sin Z
+				if t, err := time.ParseInLocation("20060102T150405", raw, zona); err == nil {
+					out = append(out, t.UTC())
+				}
 				continue
 			}
 			if t, err := parseICalRaw(raw); err == nil {

@@ -139,12 +139,17 @@ func sameAtomicEntries(a, b map[Reference]RecordEntry) bool {
 	}
 	for ref, entry := range a {
 		other, ok := b[ref]
-		x, y := entry.Record, other.Record
-		if !ok || entry.Reference != ref || other.Reference != ref || x.Version != y.Version || x.Scope != y.Scope || x.ObjectID != y.ObjectID || x.RevisionID != y.RevisionID || x.Role != y.Role || !slices.Equal(x.Previous, y.Previous) || !bytes.Equal(x.Payload, y.Payload) {
+		if !ok || entry.Reference != ref || !sameRecordEntry(entry, other) {
 			return false
 		}
 	}
 	return true
+}
+
+// sameRecordEntry dice si a y b son el mismo registro en la misma referencia.
+func sameRecordEntry(a, b RecordEntry) bool {
+	x, y := a.Record, b.Record
+	return a.Reference == b.Reference && x.Version == y.Version && x.Scope == y.Scope && x.ObjectID == y.ObjectID && x.RevisionID == y.RevisionID && x.Role == y.Role && slices.Equal(x.Previous, y.Previous) && bytes.Equal(x.Payload, y.Payload)
 }
 
 func sameAtomicVersions(a, b []ObjectVersion) bool {

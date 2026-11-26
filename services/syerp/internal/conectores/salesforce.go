@@ -9,6 +9,8 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+
+	importarcsv "git.sytue.eu/sytue/one/apps/nucleo/erp/importar"
 )
 
 // Mapeo declara qué objeto de Salesforce alimenta qué modelo de SyERP y cómo se
@@ -243,55 +245,6 @@ func celda(crudo json.RawMessage, esDinero bool) (valor any, hay bool, err error
 	return nil, false, fmt.Errorf("valor no admitido")
 }
 
-// CentimosDeDecimal convierte "1234.56" en 123456 SIN pasar por float64.
-//
-// Con `strconv.ParseFloat` y una multiplicación, importes perfectamente normales
-// se van un céntimo: 1234.56*100 da 123455.99999999999 en binario, y truncar da
-// 123455. Un céntimo por factura, en miles de facturas, es un descuadre que
-// aparece meses después y no se sabe de dónde sale.
-func CentimosDeDecimal(s string) (int64, error) {
-	s = strings.TrimSpace(s)
-	if s == "" {
-		return 0, nil
-	}
-	negativo := false
-	switch s[0] {
-	case '-':
-		negativo, s = true, s[1:]
-	case '+':
-		s = s[1:]
-	}
-	entera, decimal, _ := strings.Cut(s, ".")
-	if entera == "" {
-		entera = "0"
-	}
-	// Se redondea a dos cifras al MODO COMERCIAL (medio hacia arriba), que es lo
-	// que hace cualquier hoja de cálculo y lo que espera quien mira el total.
-	redondeo := int64(0)
-	if len(decimal) > 2 {
-		if decimal[2] >= '5' {
-			redondeo = 1
-		}
-		decimal = decimal[:2]
-	}
-	for len(decimal) < 2 {
-		decimal += "0"
-	}
-	var total int64
-	for _, r := range entera + decimal {
-		if r < '0' || r > '9' {
-			return 0, fmt.Errorf("%q no es un importe decimal", s)
-		}
-		// 92 billones de euros en céntimos es el techo de int64; por encima, el
-		// dato de entrada está mal y decirlo es mejor que desbordar en silencio.
-		if total > (1<<62)/10 {
-			return 0, fmt.Errorf("importe fuera de rango")
-		}
-		total = total*10 + int64(r-'0')
-	}
-	total += redondeo
-	if negativo {
-		total = -total
-	}
-	return total, nil
-}
+// CentimosDeDecimal lee un decimal canónico («1234.56») en céntimos. Vive en
+// apps/nucleo/erp/importar, que comparte el ERP de Sytue Office.
+func CentimosDeDecimal(s string) (int64, error) { return importarcsv.CentimosDeDecimal(s) }

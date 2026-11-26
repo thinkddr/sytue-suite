@@ -1,0 +1,208 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Daniel Delgado Ramos
+
+// Las traducciones de TextosRespuesta (respuesta_cuenta.go). Un texto nuevo o cambiado va
+// en los 26 idiomas: TestLosTextosDeLaRespuestaCuadran exige las mismas claves y los
+// mismos {huecos} en todos.
+
+package mail
+
+import "git.sytue.eu/sytue/one/apps/nucleo/i18n"
+
+// traduccionesRespuesta son los textos propios de la respuesta por cuenta en los idiomas
+// que no son el español ni el inglés, traducidos del inglés con el trato de los catálogos
+// de la web de cada idioma.
+var traduccionesRespuesta = map[i18n.Locale]map[string]string{
+	"bg": {
+		"respuestaDias":      "Дни между отговорите до един и същ човек",
+		"respuestaDiasPista": "От 1 до 60. Ако някой Ви пише няколко пъти, получава отговора само веднъж в този период.",
+		"respuestaSinFechas": "Пощенският Ви сървър не поддържа дати в автоматичния отговор: той отговаря, докато е включен.",
+		"respuestaBloqueada": "Пощенският Ви сървър вече има включени други правила („{nombre}“), които не могат да се съчетаят с автоматичен отговор, без да се променят. За да не ги развалим, той не се включва оттук: използвайте уебсайта на доставчика си.",
+		"respuestaReglas":    "Правилата Ви на сървъра („{nombre}“) продължават да работят след отговора, а когато го изключите, остават точно както са били.",
+		"respuestaServidor":  "Записва се на пощенския Ви сървър, така че отговаря дори когато това устройство е изключено.",
+	},
+	"cs": {
+		"respuestaDias":      "Dny mezi odpověďmi stejné osobě",
+		"respuestaDiasPista": "Od 1 do 60. Kdo vám napíše vícekrát, dostane odpověď v tomto období jen jednou.",
+		"respuestaSinFechas": "Váš poštovní server nepodporuje data v automatické odpovědi: odpovídá, dokud je zapnutá.",
+		"respuestaBloqueada": "Váš poštovní server už má zapnutá jiná pravidla („{nombre}“), která nelze spojit s automatickou odpovědí, aniž by se změnila. Abychom je nerozbili, odsud se nezapíná: použijte web svého poskytovatele.",
+		"respuestaReglas":    "Vaše pravidla na serveru („{nombre}“) fungují dál po odpovědi, a když ji vypnete, zůstanou přesně tak, jak byla.",
+		"respuestaServidor":  "Ukládá se na váš poštovní server, takže odpovídá, i když je toto zařízení vypnuté.",
+	},
+	"da": {
+		"respuestaDias":      "Dage mellem svar til den samme person",
+		"respuestaDiasPista": "Fra 1 til 60. Den, der skriver til dig flere gange, får kun svaret én gang i den periode.",
+		"respuestaSinFechas": "Din mailserver understøtter ikke datoer i autosvaret: det svarer, så længe det er slået til.",
+		"respuestaBloqueada": "Din mailserver har allerede andre regler slået til (“{nombre}”), som ikke kan kombineres med et autosvar uden at ændre dem. For ikke at ødelægge dem slås det ikke til herfra: brug din udbyders hjemmeside.",
+		"respuestaReglas":    "Dine serverregler (“{nombre}”) virker fortsat efter svaret, og når du slår det fra, er de præcis som før.",
+		"respuestaServidor":  "Det gemmes på din mailserver, så det svarer, selv når denne enhed er slukket.",
+	},
+	"de": {
+		"respuestaDias":      "Tage zwischen Antworten an dieselbe Person",
+		"respuestaDiasPista": "Von 1 bis 60. Wer Ihnen mehrmals schreibt, erhält die Antwort in diesem Zeitraum nur einmal.",
+		"respuestaSinFechas": "Ihr Mailserver unterstützt keine Daten in der automatischen Antwort: Sie antwortet, solange sie eingeschaltet ist.",
+		"respuestaBloqueada": "Ihr Mailserver hat bereits andere Regeln aktiv („{nombre}“), die sich nicht mit einer automatischen Antwort kombinieren lassen, ohne sie zu ändern. Damit sie nicht kaputtgehen, wird sie hier nicht eingeschaltet: Nutzen Sie die Website Ihres Anbieters.",
+		"respuestaReglas":    "Ihre Serverregeln („{nombre}“) funktionieren nach der Antwort weiter, und wenn Sie sie ausschalten, bleiben sie genau so, wie sie waren.",
+		"respuestaServidor":  "Sie wird auf Ihrem Mailserver gespeichert und antwortet daher auch, wenn dieses Gerät ausgeschaltet ist.",
+	},
+	"el": {
+		"respuestaDias":      "Ημέρες μεταξύ απαντήσεων στο ίδιο άτομο",
+		"respuestaDiasPista": "Από 1 έως 60. Όποιος σας γράψει πολλές φορές λαμβάνει την απάντηση μόνο μία φορά σε αυτό το διάστημα.",
+		"respuestaSinFechas": "Ο διακομιστής αλληλογραφίας σας δεν υποστηρίζει ημερομηνίες στην αυτόματη απάντηση: απαντά όσο είναι ενεργοποιημένη.",
+		"respuestaBloqueada": "Ο διακομιστής αλληλογραφίας σας έχει ήδη ενεργούς άλλους κανόνες («{nombre}») που δεν μπορούν να συνδυαστούν με αυτόματη απάντηση χωρίς να αλλάξουν. Για να μην χαλάσουν, δεν ενεργοποιείται από εδώ: χρησιμοποιήστε τον ιστότοπο του παρόχου σας.",
+		"respuestaReglas":    "Οι κανόνες σας στον διακομιστή («{nombre}») συνεχίζουν να λειτουργούν μετά την απάντηση και, όταν την απενεργοποιήσετε, μένουν ακριβώς όπως ήταν.",
+		"respuestaServidor":  "Αποθηκεύεται στον διακομιστή αλληλογραφίας σας, οπότε απαντά ακόμη κι όταν αυτή η συσκευή είναι απενεργοποιημένη.",
+	},
+	"et": {
+		"respuestaDias":      "Päevi vastuste vahel samale inimesele",
+		"respuestaDiasPista": "1 kuni 60. Kes teile mitu korda kirjutab, saab selle aja jooksul vastuse ainult korra.",
+		"respuestaSinFechas": "Teie meiliserver ei toeta automaatvastuses kuupäevi: see vastab seni, kuni on sisse lülitatud.",
+		"respuestaBloqueada": "Teie meiliserveris on juba sisse lülitatud muud reeglid („{nombre}“), mida ei saa automaatvastusega ühendada neid muutmata. Et neid mitte rikkuda, ei lülitata seda siit sisse: kasutage oma teenusepakkuja veebisaiti.",
+		"respuestaReglas":    "Teie serverireeglid („{nombre}“) töötavad pärast vastust edasi ja kui selle välja lülitate, jäävad need täpselt selliseks, nagu nad olid.",
+		"respuestaServidor":  "See salvestatakse teie meiliserverisse, nii et see vastab ka siis, kui see seade on välja lülitatud.",
+	},
+	"fi": {
+		"respuestaDias":      "Päiviä vastausten välillä samalle henkilölle",
+		"respuestaDiasPista": "Väliltä 1–60. Kun joku kirjoittaa sinulle useita kertoja, hän saa vastauksen vain kerran tänä aikana.",
+		"respuestaSinFechas": "Sähköpostipalvelimesi ei tue päivämääriä automaattisessa vastauksessa: se vastaa niin kauan kuin se on päällä.",
+		"respuestaBloqueada": "Sähköpostipalvelimellasi on jo käytössä muita sääntöjä (”{nombre}”), joita ei voi yhdistää automaattiseen vastaukseen muuttamatta niitä. Jotta ne eivät rikkoutuisi, sitä ei oteta käyttöön täältä: käytä palveluntarjoajasi verkkosivustoa.",
+		"respuestaReglas":    "Palvelinsääntösi (”{nombre}”) toimivat edelleen vastauksen jälkeen, ja kun poistat sen käytöstä, ne jäävät täsmälleen ennalleen.",
+		"respuestaServidor":  "Se tallennetaan sähköpostipalvelimellesi, joten se vastaa, vaikka tämä laite olisi sammutettu.",
+	},
+	"fr": {
+		"respuestaDias":      "Jours entre deux réponses à la même personne",
+		"respuestaDiasPista": "De 1 à 60. Une personne qui vous écrit plusieurs fois ne reçoit la réponse qu’une fois pendant cette période.",
+		"respuestaSinFechas": "Votre serveur de messagerie ne prend pas en charge les dates dans la réponse automatique : elle répond tant qu’elle est activée.",
+		"respuestaBloqueada": "Votre serveur de messagerie a déjà d’autres règles actives (« {nombre} ») qui ne peuvent pas être combinées avec une réponse automatique sans les modifier. Pour ne pas les casser, elle n’est pas activée d’ici : utilisez le site web de votre fournisseur.",
+		"respuestaReglas":    "Vos règles du serveur (« {nombre} ») continuent de fonctionner après la réponse et, lorsque vous la désactivez, elles restent exactement comme avant.",
+		"respuestaServidor":  "Elle est enregistrée sur votre serveur de messagerie : elle répond même lorsque cet appareil est éteint.",
+	},
+	"ga": {
+		"respuestaDias":      "Laethanta idir freagraí chuig an duine céanna",
+		"respuestaDiasPista": "Ó 1 go 60. An té a scríobhann chugat níos mó ná uair amháin, ní fhaigheann sé an freagra ach uair amháin sa tréimhse sin.",
+		"respuestaSinFechas": "Ní thacaíonn do fhreastalaí ríomhphoist le dátaí sa fhreagra uathoibríoch: freagraíonn sé fad is atá sé casta air.",
+		"respuestaBloqueada": "Tá rialacha eile gníomhach cheana féin ar do fhreastalaí ríomhphoist (“{nombre}”) nach féidir a chomhcheangal le freagra uathoibríoch gan iad a athrú. Ionas nach mbrisfí iad, ní chastar air é as seo: úsáid suíomh gréasáin do sholáthraí.",
+		"respuestaReglas":    "Leanann do rialacha freastalaí (“{nombre}”) ag obair i ndiaidh an fhreagra, agus nuair a chasann tú as é, fanann siad díreach mar a bhí siad.",
+		"respuestaServidor":  "Sábháiltear é ar do fhreastalaí ríomhphoist, mar sin freagraíonn sé fiú nuair atá an gléas seo múchta.",
+	},
+	"hr": {
+		"respuestaDias":      "Dani između odgovora istoj osobi",
+		"respuestaDiasPista": "Od 1 do 60. Tko vam piše više puta, u tom razdoblju dobiva odgovor samo jednom.",
+		"respuestaSinFechas": "Vaš poslužitelj pošte ne podržava datume u automatskom odgovoru: odgovara dok je uključen.",
+		"respuestaBloqueada": "Vaš poslužitelj pošte već ima uključena druga pravila („{nombre}”) koja se ne mogu kombinirati s automatskim odgovorom bez njihove promjene. Da se ne bi pokvarila, ovdje se ne uključuje: koristite web-stranicu svojeg pružatelja usluge.",
+		"respuestaReglas":    "Vaša pravila na poslužitelju („{nombre}”) nastavljaju raditi nakon odgovora, a kad ga isključite, ostaju točno kakva su bila.",
+		"respuestaServidor":  "Sprema se na vaš poslužitelj pošte pa odgovara čak i kad je ovaj uređaj isključen.",
+	},
+	"hu": {
+		"respuestaDias":      "Napok az ugyanannak a személynek küldött válaszok között",
+		"respuestaDiasPista": "1 és 60 között. Aki többször ír Önnek, ebben az időszakban csak egyszer kapja meg a választ.",
+		"respuestaSinFechas": "Az Ön levelezőszervere nem támogatja a dátumokat az automatikus válaszban: addig válaszol, amíg be van kapcsolva.",
+		"respuestaBloqueada": "Az Ön levelezőszerverén már más szabályok is be vannak kapcsolva („{nombre}”), amelyek nem kombinálhatók automatikus válasszal azok módosítása nélkül. Hogy ne rontsuk el őket, innen nem kapcsoljuk be: használja a szolgáltatója webhelyét.",
+		"respuestaReglas":    "Az Ön szerveren lévő szabályai („{nombre}”) a válasz után is működnek, és amikor kikapcsolja, pontosan úgy maradnak, ahogy voltak.",
+		"respuestaServidor":  "Az Ön levelezőszerverén tárolódik, így akkor is válaszol, ha ez az eszköz ki van kapcsolva.",
+	},
+	"is": {
+		"respuestaDias":      "Dagar á milli svara til sama aðila",
+		"respuestaDiasPista": "Frá 1 til 60. Sá sem skrifar þér oft fær svarið aðeins einu sinni á því tímabili.",
+		"respuestaSinFechas": "Póstþjónninn þinn styður ekki dagsetningar í sjálfvirka svarinu: það svarar á meðan kveikt er á því.",
+		"respuestaBloqueada": "Póstþjónninn þinn er þegar með aðrar reglur virkar („{nombre}“) sem ekki er hægt að sameina sjálfvirku svari án þess að breyta þeim. Til að skemma þær ekki er ekki kveikt á því héðan: notaðu vefsíðu þjónustuaðilans þíns.",
+		"respuestaReglas":    "Þjónsreglurnar þínar („{nombre}“) virka áfram á eftir svarinu og þegar þú slekkur á því verða þær nákvæmlega eins og þær voru.",
+		"respuestaServidor":  "Það er vistað á póstþjóninum þínum svo það svarar jafnvel þegar slökkt er á þessu tæki.",
+	},
+	"it": {
+		"respuestaDias":      "Giorni tra una risposta e l’altra alla stessa persona",
+		"respuestaDiasPista": "Da 1 a 60. Chi ti scrive più volte riceve la risposta una sola volta in quel periodo.",
+		"respuestaSinFechas": "Il tuo server di posta non supporta le date nella risposta automatica: risponde finché è attiva.",
+		"respuestaBloqueada": "Il tuo server di posta ha già altre regole attive («{nombre}») che non si possono combinare con una risposta automatica senza modificarle. Per non romperle, non viene attivata da qui: usa il sito del tuo provider.",
+		"respuestaReglas":    "Le tue regole sul server («{nombre}») continuano a funzionare dopo la risposta e, quando la disattivi, restano esattamente com’erano.",
+		"respuestaServidor":  "Viene salvata sul tuo server di posta, quindi risponde anche quando questo dispositivo è spento.",
+	},
+	"lt": {
+		"respuestaDias":      "Dienos tarp atsakymų tam pačiam asmeniui",
+		"respuestaDiasPista": "Nuo 1 iki 60. Kas jums rašo kelis kartus, per tą laikotarpį atsakymą gauna tik kartą.",
+		"respuestaSinFechas": "Jūsų pašto serveris nepalaiko datų automatiniame atsakyme: jis atsako, kol yra įjungtas.",
+		"respuestaBloqueada": "Jūsų pašto serveryje jau įjungtos kitos taisyklės („{nombre}“), kurių negalima sujungti su automatiniu atsakymu jų nepakeitus. Kad jų nesugadintume, čia jis neįjungiamas: naudokitės savo paslaugų teikėjo svetaine.",
+		"respuestaReglas":    "Jūsų serverio taisyklės („{nombre}“) toliau veikia po atsakymo, o jį išjungus lieka lygiai tokios, kokios buvo.",
+		"respuestaServidor":  "Jis įrašomas jūsų pašto serveryje, todėl atsako net tada, kai šis įrenginys išjungtas.",
+	},
+	"lv": {
+		"respuestaDias":      "Dienas starp atbildēm vienai un tai pašai personai",
+		"respuestaDiasPista": "No 1 līdz 60. Kas jums raksta vairākas reizes, šajā laikā saņem atbildi tikai vienreiz.",
+		"respuestaSinFechas": "Jūsu pasta serveris neatbalsta datumus automātiskajā atbildē: tā atbild, kamēr ir ieslēgta.",
+		"respuestaBloqueada": "Jūsu pasta serverī jau ir ieslēgti citi noteikumi (“{nombre}”), kurus nevar apvienot ar automātisko atbildi, tos nemainot. Lai tos nesabojātu, šeit tā netiek ieslēgta: izmantojiet sava pakalpojumu sniedzēja tīmekļa vietni.",
+		"respuestaReglas":    "Jūsu servera noteikumi (“{nombre}”) turpina darboties pēc atbildes, un, kad to izslēdzat, tie paliek tieši tādi, kādi bija.",
+		"respuestaServidor":  "Tā tiek saglabāta jūsu pasta serverī, tāpēc atbild pat tad, kad šī ierīce ir izslēgta.",
+	},
+	"mt": {
+		"respuestaDias":      "Jiem bejn tweġibiet lill-istess persuna",
+		"respuestaDiasPista": "Minn 1 sa 60. Min jiktiblek diversi drabi jirċievi t-tweġiba darba biss f’dak il-perjodu.",
+		"respuestaSinFechas": "Is-server tal-posta tiegħek ma jappoġġjax dati fit-tweġiba awtomatika: iwieġeb sakemm tkun mixgħula.",
+		"respuestaBloqueada": "Is-server tal-posta tiegħek diġà għandu regoli oħra attivi (“{nombre}”) li ma jistgħux jingħaqdu ma’ tweġiba awtomatika mingħajr ma jinbidlu. Biex ma jinkisrux, ma tinxegħelx minn hawn: uża s-sit web tal-fornitur tiegħek.",
+		"respuestaReglas":    "Ir-regoli tiegħek fis-server (“{nombre}”) ikomplu jaħdmu wara t-tweġiba, u meta titfiha jibqgħu eżatt kif kienu.",
+		"respuestaServidor":  "Tiġi ssejvjata fis-server tal-posta tiegħek, għalhekk twieġeb anke meta dan l-apparat ikun mitfi.",
+	},
+	"nb": {
+		"respuestaDias":      "Dager mellom svar til samme person",
+		"respuestaDiasPista": "Fra 1 til 60. Den som skriver til deg flere ganger, får svaret bare én gang i den perioden.",
+		"respuestaSinFechas": "E-postserveren din støtter ikke datoer i autosvaret: det svarer så lenge det er slått på.",
+		"respuestaBloqueada": "E-postserveren din har allerede andre regler slått på («{nombre}») som ikke kan kombineres med et autosvar uten å endre dem. For ikke å ødelegge dem slås det ikke på herfra: bruk nettstedet til leverandøren din.",
+		"respuestaReglas":    "Serverreglene dine («{nombre}») fortsetter å virke etter svaret, og når du slår det av, er de nøyaktig som før.",
+		"respuestaServidor":  "Det lagres på e-postserveren din, så det svarer selv når denne enheten er slått av.",
+	},
+	"nl": {
+		"respuestaDias":      "Dagen tussen antwoorden aan dezelfde persoon",
+		"respuestaDiasPista": "Van 1 tot 60. Wie je meerdere keren schrijft, krijgt het antwoord in die periode maar één keer.",
+		"respuestaSinFechas": "Je mailserver ondersteunt geen datums in het automatische antwoord: het antwoordt zolang het aanstaat.",
+		"respuestaBloqueada": "Je mailserver heeft al andere regels actief (‘{nombre}’) die niet met een automatisch antwoord kunnen worden gecombineerd zonder ze te wijzigen. Om ze niet stuk te maken, wordt het hier niet ingeschakeld: gebruik de website van je provider.",
+		"respuestaReglas":    "Je serverregels (‘{nombre}’) blijven na het antwoord werken, en als je het uitschakelt, blijven ze precies zoals ze waren.",
+		"respuestaServidor":  "Het wordt op je mailserver opgeslagen, dus het antwoordt ook als dit apparaat uit staat.",
+	},
+	"pl": {
+		"respuestaDias":      "Dni między odpowiedziami do tej samej osoby",
+		"respuestaDiasPista": "Od 1 do 60. Kto pisze do ciebie kilka razy, dostaje odpowiedź tylko raz w tym okresie.",
+		"respuestaSinFechas": "Twój serwer poczty nie obsługuje dat w automatycznej odpowiedzi: odpowiada, dopóki jest włączona.",
+		"respuestaBloqueada": "Twój serwer poczty ma już włączone inne reguły („{nombre}”), których nie da się połączyć z automatyczną odpowiedzią bez ich zmiany. Żeby ich nie zepsuć, nie włącza się jej stąd: skorzystaj ze strony swojego dostawcy.",
+		"respuestaReglas":    "Twoje reguły na serwerze („{nombre}”) działają dalej po odpowiedzi, a gdy ją wyłączysz, zostają dokładnie takie, jakie były.",
+		"respuestaServidor":  "Zapisuje się na twoim serwerze poczty, więc odpowiada nawet wtedy, gdy to urządzenie jest wyłączone.",
+	},
+	"pt": {
+		"respuestaDias":      "Dias entre respostas à mesma pessoa",
+		"respuestaDiasPista": "De 1 a 60. Quem lhe escrever várias vezes recebe a resposta apenas uma vez nesse período.",
+		"respuestaSinFechas": "O seu servidor de correio não suporta datas na resposta automática: responde enquanto estiver ativada.",
+		"respuestaBloqueada": "O seu servidor de correio já tem outras regras ativas («{nombre}») que não podem ser combinadas com uma resposta automática sem as alterar. Para não as estragar, não é ativada a partir daqui: utilize o site do seu fornecedor.",
+		"respuestaReglas":    "As suas regras do servidor («{nombre}») continuam a funcionar depois da resposta e, quando a desativar, ficam exatamente como estavam.",
+		"respuestaServidor":  "É guardada no seu servidor de correio, pelo que responde mesmo quando este dispositivo está desligado.",
+	},
+	"ro": {
+		"respuestaDias":      "Zile între răspunsurile către aceeași persoană",
+		"respuestaDiasPista": "Între 1 și 60. Cine vă scrie de mai multe ori primește răspunsul o singură dată în acea perioadă.",
+		"respuestaSinFechas": "Serverul dumneavoastră de e-mail nu acceptă date în răspunsul automat: răspunde cât timp este activat.",
+		"respuestaBloqueada": "Serverul dumneavoastră de e-mail are deja active alte reguli („{nombre}”) care nu pot fi combinate cu un răspuns automat fără a le modifica. Pentru a nu le strica, nu se activează de aici: folosiți site-ul furnizorului dumneavoastră.",
+		"respuestaReglas":    "Regulile dumneavoastră de pe server („{nombre}”) continuă să funcționeze după răspuns, iar când îl dezactivați rămân exact cum erau.",
+		"respuestaServidor":  "Se salvează pe serverul dumneavoastră de e-mail, deci răspunde chiar și când acest dispozitiv este oprit.",
+	},
+	"sk": {
+		"respuestaDias":      "Dni medzi odpoveďami tej istej osobe",
+		"respuestaDiasPista": "Od 1 do 60. Kto vám napíše viackrát, dostane odpoveď v tomto období iba raz.",
+		"respuestaSinFechas": "Váš poštový server nepodporuje dátumy v automatickej odpovedi: odpovedá, kým je zapnutá.",
+		"respuestaBloqueada": "Váš poštový server už má zapnuté iné pravidlá („{nombre}“), ktoré sa nedajú spojiť s automatickou odpoveďou bez ich zmeny. Aby sme ich nepokazili, odtiaľto sa nezapína: použite webovú stránku svojho poskytovateľa.",
+		"respuestaReglas":    "Vaše pravidlá na serveri („{nombre}“) fungujú ďalej po odpovedi, a keď ju vypnete, zostanú presne také, aké boli.",
+		"respuestaServidor":  "Ukladá sa na váš poštový server, takže odpovedá, aj keď je toto zariadenie vypnuté.",
+	},
+	"sl": {
+		"respuestaDias":      "Dnevi med odgovori isti osebi",
+		"respuestaDiasPista": "Od 1 do 60. Kdor vam piše večkrat, v tem obdobju prejme odgovor samo enkrat.",
+		"respuestaSinFechas": "Vaš poštni strežnik ne podpira datumov v samodejnem odgovoru: odgovarja, dokler je vklopljen.",
+		"respuestaBloqueada": "Vaš poštni strežnik že ima vklopljena druga pravila (»{nombre}«), ki jih ni mogoče združiti s samodejnim odgovorom, ne da bi jih spremenili. Da jih ne bi pokvarili, se tukaj ne vklopi: uporabite spletno mesto svojega ponudnika.",
+		"respuestaReglas":    "Vaša pravila na strežniku (»{nombre}«) delujejo naprej po odgovoru, in ko ga izklopite, ostanejo natanko taka, kot so bila.",
+		"respuestaServidor":  "Shrani se na vaš poštni strežnik, zato odgovarja tudi, ko je ta naprava izklopljena.",
+	},
+	"sv": {
+		"respuestaDias":      "Dagar mellan svar till samma person",
+		"respuestaDiasPista": "Från 1 till 60. Den som skriver till dig flera gånger får svaret bara en gång under den perioden.",
+		"respuestaSinFechas": "Din e-postserver stöder inte datum i autosvaret: det svarar så länge det är på.",
+		"respuestaBloqueada": "Din e-postserver har redan andra regler aktiva (”{nombre}”) som inte kan kombineras med ett autosvar utan att ändra dem. För att inte förstöra dem slås det inte på härifrån: använd din leverantörs webbplats.",
+		"respuestaReglas":    "Dina serverregler (”{nombre}”) fortsätter att fungera efter svaret, och när du stänger av det blir de exakt som de var.",
+		"respuestaServidor":  "Det sparas på din e-postserver, så det svarar även när den här enheten är avstängd.",
+	},
+}

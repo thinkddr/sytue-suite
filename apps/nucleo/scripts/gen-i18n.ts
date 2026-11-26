@@ -92,7 +92,7 @@ const formato: Record<
 > = {};
 // Las monedas del EEE y Suiza que NO son el euro: las que trae el servicio del ERP en
 // `organizacion/paises` y en las obligaciones de cada país
-// (`services/syerp/internal/obligaciones/paises`). Cada una con su patrón en cada idioma
+// (`apps/nucleo/erp/obligaciones/paises`). Cada una con su patrón en cada idioma
 // —en inglés el código va DELANTE («SEK 250.00») y en español detrás («250,00 SEK»)— y
 // sus decimales, que no siempre son dos: la corona islandesa no lleva ninguno.
 const MONEDAS = ['BGN', 'CHF', 'CZK', 'DKK', 'HUF', 'ISK', 'NOK', 'PLN', 'RON', 'SEK'];

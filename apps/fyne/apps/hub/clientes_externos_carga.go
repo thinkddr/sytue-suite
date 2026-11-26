@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
-	"git.sytue.eu/sytue/one/apps/nucleo/auth"
+	"git.sytue.eu/sytue/one/apps/nucleo/autorizacion"
 )
 
 // El asistente externo reutiliza el SDK. Ni los servidores ni las credenciales
@@ -25,8 +25,8 @@ type controlClientesExternos struct {
 	montar       func(context.Context, string) error
 	perfilNativo func(context.Context) (func() error, error)
 	perfil       func(context.Context, string) (string, error)
-	identidad    func() auth.IdentitySnapshot
-	mostrada     auth.IdentitySnapshot
+	identidad    func() autorizacion.IdentitySnapshot
+	mostrada     autorizacion.IdentitySnapshot
 	preparar     func(context.Context) context.Context
 	contexto     context.Context
 	cancelarVida context.CancelFunc
@@ -54,7 +54,7 @@ func nuevoControlClientesExternos(v *Vista) *controlClientesExternos {
 
 // ConAutorizacionClientesExternos captura una intención al mostrar la cuenta, antes
 // de solicitar tokens. Los clics posteriores heredan esa intención, no la recapturan.
-func (v *Vista) ConAutorizacionClientesExternos(identidad func() auth.IdentitySnapshot,
+func (v *Vista) ConAutorizacionClientesExternos(identidad func() autorizacion.IdentitySnapshot,
 	preparar func(context.Context) context.Context,
 ) *Vista {
 	v.controlClientes.identidad, v.controlClientes.preparar = identidad, preparar
@@ -88,7 +88,7 @@ func (c *controlClientesExternos) autorizacionVigente() bool {
 	if c.contexto == nil || c.contexto.Err() != nil {
 		return false
 	}
-	intent := auth.RequestAuthorizationIntent(c.contexto)
+	intent := autorizacion.RequestAuthorizationIntent(c.contexto)
 	return intent == nil || intent.Current()
 }
 
@@ -252,7 +252,7 @@ func abrirClienteVigente(ctx context.Context, p Plataforma, abrir func(Plataform
 	if ctx.Err() != nil {
 		return false
 	}
-	if i := auth.RequestAuthorizationIntent(ctx); i != nil && !i.Current() {
+	if i := autorizacion.RequestAuthorizationIntent(ctx); i != nil && !i.Current() {
 		return false
 	}
 	if abrir == nil || abrir(p) != nil {
@@ -390,7 +390,7 @@ func configurarCliente(ctx context.Context, p Plataforma, crear func(context.Con
 	if err := ctx.Err(); err != nil {
 		return Cliente{Plataforma: p, Fallo: true}
 	}
-	if i := auth.RequestAuthorizationIntent(ctx); i != nil && !i.Current() {
+	if i := autorizacion.RequestAuthorizationIntent(ctx); i != nil && !i.Current() {
 		return Cliente{Plataforma: p, Fallo: true}
 	}
 	clave, err := crear(ctx, p)
@@ -400,7 +400,7 @@ func configurarCliente(ctx context.Context, p Plataforma, crear func(context.Con
 	if ctx.Err() != nil {
 		return Cliente{Plataforma: p, Fallo: true}
 	}
-	if i := auth.RequestAuthorizationIntent(ctx); i != nil && !i.Current() {
+	if i := autorizacion.RequestAuthorizationIntent(ctx); i != nil && !i.Current() {
 		return Cliente{Plataforma: p, Fallo: true}
 	}
 	copiar(clave)

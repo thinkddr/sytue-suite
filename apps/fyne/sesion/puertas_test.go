@@ -26,8 +26,8 @@ import (
 func TestSoloSeAbreConElSistemaPorSuPuerta(t *testing.T) {
 	puertas := map[string]*regexp.Regexp{
 		// `.OpenURL` con paréntesis o sin él: `a.OpenURL` como valor también la cruza.
-		"nucleo/api/abrir.go":          regexp.MustCompile(`\.OpenURL\b`),
-		"fyne/sesion/avisorespaldo.go": regexp.MustCompile(`\.(SendNotification|ScheduleNotification)\b`),
+		"nucleo/api/abrir.go":      regexp.MustCompile(`\.OpenURL\b`),
+		"fyne/anfitrion/avisos.go": regexp.MustCompile(`\.(SendNotification|ScheduleNotification)\b`),
 	}
 	for _, raiz := range []string{"..", filepath.Join("..", "..", "nucleo")} {
 		err := filepath.WalkDir(raiz, func(ruta string, d fs.DirEntry, err error) error {

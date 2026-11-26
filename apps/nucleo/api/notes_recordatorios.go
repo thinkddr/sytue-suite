@@ -52,6 +52,12 @@ func (n *Notes) ListReminders(ctx context.Context) ([]NoteReminder, error) {
 
 // SetReminder pone (o rearma) mi recordatorio en una nota.
 func (n *Notes) SetReminder(ctx context.Context, nota string, in NoteReminderInput) (NoteReminder, error) {
+	if g, privada, ok := notesGrupo[NotesRemindersData](n); privada {
+		if !ok {
+			return NoteReminder{}, ErrPrivateNotesOperation
+		}
+		return g.SetReminder(ctx, nota, in)
+	}
 	cuerpo, err := json.Marshal(in)
 	if err != nil {
 		return NoteReminder{}, err
@@ -64,5 +70,11 @@ func (n *Notes) SetReminder(ctx context.Context, nota string, in NoteReminderInp
 
 // DeleteReminder quita mi recordatorio de una nota.
 func (n *Notes) DeleteReminder(ctx context.Context, nota string) error {
+	if g, privada, ok := notesGrupo[NotesRemindersData](n); privada {
+		if !ok {
+			return ErrPrivateNotesOperation
+		}
+		return g.DeleteReminder(ctx, nota)
+	}
 	return n.sinCuerpo(ctx, http.MethodDelete, "/notes/"+url.PathEscape(nota)+"/reminder", nil)
 }

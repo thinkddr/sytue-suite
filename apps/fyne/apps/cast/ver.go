@@ -42,6 +42,10 @@ type Ver struct {
 
 	AlCompartir, AlDescargar, AlAlternarDescripcion func()
 	AlGestionar, AlCanal, AlTerminar                func()
+	// Mandos son botones de más que van tras los de siempre (la edición local).
+	Mandos []fyne.CanvasObject
+	// SinComentarios no pinta el panel de comentarios.
+	SinComentarios bool
 	// AlDenunciar y AlDenunciarAutor abren la denuncia del vídeo y de quien lo publica;
 	// AlBloquearAutor le bloquea. nil: no se ofrece (lo propio, o bloquear sin sesión).
 	AlDenunciar, AlDenunciarAutor, AlBloquearAutor func()
@@ -71,6 +75,8 @@ func PantallaVer(v Vista, d Ver) *fyne.Container {
 	principal = append(principal, fichaVideo(v, d)...)
 	var pagina *fyne.Container
 	switch {
+	case d.Chat == nil && d.SinComentarios:
+		pagina = Pagina(v, principal...)
 	case d.Chat == nil:
 		principal = append(principal, ui.Bloque{Obj: PanelComentarios(v, d.Video, d.Comentarios)})
 		pagina = Pagina(v, principal...)
@@ -138,6 +144,7 @@ func fichaVideo(v Vista, d Ver) []ui.Bloque {
 			mandos = append(mandos, ui.NuevoBoton(v.Traduce("studio.browser.stop"), d.AlTerminar).Con(ui.Peligro, ui.TallaSM))
 		}
 	}
+	mandos = append(mandos, d.Mandos...)
 	if d.AlDenunciar != nil {
 		mandos = append(mandos, botonDenunciar(v, d))
 	}
@@ -231,7 +238,9 @@ func Metadatos(v Vista, vid api.CastVideo) string {
 	if vid.EnDirecto() && vid.Live != nil && vid.Live.StartedAt != nil {
 		partes = append(partes, v.Traduce("watch.liveSince", i18n.Vars{"time": i18n.FormatTime(loc, *vid.Live.StartedAt)}))
 	} else {
-		partes = append(partes, v.Traduce("watch.views", i18n.Vars{"count": vid.Views}))
+		if s := v.Traduce("watch.views", i18n.Vars{"count": vid.Views}); s != "" {
+			partes = append(partes, s)
+		}
 		fecha := vid.Fecha()
 		if vid.Kind == "live" {
 			if vid.Live != nil && vid.Live.StartedAt != nil {

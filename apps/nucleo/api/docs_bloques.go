@@ -28,12 +28,18 @@ type DocBlocks struct {
 
 // Blocks pide los bloques de ese tipo, con los nombres en el idioma `locale`.
 func (d *Docs) Blocks(ctx context.Context, kind DocKind, locale string) (DocBlocks, error) {
+	if p, ok := d.datos().(DocsBlocksData); ok {
+		return p.DocumentBlocks(ctx, kind, locale)
+	}
 	return JSON[DocBlocks](ctx, d.c, Request{Path: "/blocks", Query: url.Values{"kind": {string(kind)}, "locale": {locale}}})
 }
 
 // Block pide el contenido de un bloque, listo para insertar: HTML en un documento, el JSON
 // de una diapositiva en una presentación y el de unas celdas en una hoja.
 func (d *Docs) Block(ctx context.Context, clave, locale string) (string, error) {
+	if p, ok := d.datos().(DocsBlocksData); ok {
+		return p.DocumentBlock(ctx, clave, locale)
+	}
 	out, err := JSON[struct {
 		Content string `json:"content"`
 	}](ctx, d.c, Request{Path: "/blocks/" + url.PathEscape(clave), Query: url.Values{"locale": {locale}}})

@@ -23,10 +23,17 @@ func diaposPlan(ctx context.Context, resources *cifrado.Resources[*mx.Client], s
 		return empty, err
 	}
 	return cifrado.NewRecordApplicationPlan(ctx, resources, cifrado.RecordApplicationConfig[*office.Repository]{
-		Gateway:    api.NewDrive(suite.URL("drive"), resources.HTTP(), nil),
-		Source:     source,
-		Service:    api.NewRooms(suite.URL("rooms"), resources.HTTP(), nil),
-		New:        office.New,
+		Gateway: api.NewDrive(suite.URL("drive"), resources.HTTP(), nil),
+		Source:  source,
+		Service: api.NewRooms(suite.URL("rooms"), resources.HTTP(), nil),
+		// El PDF accesible exportado declara la lengua de la app (PDF/UA, O-11).
+		New: func(c office.Config) (*office.Repository, error) {
+			r, err := office.New(c)
+			if err == nil {
+				r.Idioma = string(suite.Idioma())
+			}
+			return r, err
+		},
 		Historical: office.NewHistoricalSource,
 		OnWrite:    suite.AvisarEscritura,
 	})

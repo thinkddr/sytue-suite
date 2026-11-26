@@ -205,6 +205,10 @@ func (p *Pantalla) abrirPlano(el Elemento) {
 		p.abrirCarpetaLejana(el)
 		return
 	}
+	if p.enEquipo() {
+		p.abrirEnEquipo(el)
+		return
+	}
 	if p.abrirEnSuApp(el) {
 		return
 	}
@@ -266,6 +270,9 @@ func (p *Pantalla) menuPlano(el Elemento, disparador fyne.CanvasObject) {
 // unidad» (`AccionesDe`): no necesita red, y un fichero sin id no tiene enlace estable.
 // «Mostrar en su carpeta» sin red solo si esa carpeta está en la caché (`ubicable`).
 func (p *Pantalla) accionesPlano(el Elemento, sinRed bool) []accionMenu {
+	if p.enEquipo() {
+		return p.accionesPlanoEnEquipo(el)
+	}
 	var acciones []accionMenu
 	if !el.Carpeta {
 		acciones = append(acciones, accionMenu{

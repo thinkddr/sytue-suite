@@ -330,6 +330,9 @@ func (d *Drive) Restore(ctx context.Context, k DriveKind, id string) error {
 
 // Purge lo borra de verdad: contenido e historial de versiones. No tiene vuelta atrás.
 func (d *Drive) Purge(ctx context.Context, k DriveKind, id string) error {
+	if x, ok := d.data.(DrivePurger); ok {
+		return x.Purge(ctx, k, id)
+	}
 	return d.mandar(ctx, http.MethodDelete, elemento(k, id, "/purge"), nil)
 }
 
@@ -345,6 +348,9 @@ func (d *Drive) CopyFile(ctx context.Context, id string) (File, error) {
 // CopyFolder copia una carpeta con todo su subárbol junto a la original. Tampoco mueve
 // bytes: cada fichero de la copia apunta al contenido del suyo.
 func (d *Drive) CopyFolder(ctx context.Context, id string) (Folder, error) {
+	if x, ok := d.data.(DriveFolderCopier); ok {
+		return x.CopyFolder(ctx, id)
+	}
 	return JSON[Folder](ctx, d.c, Request{Method: http.MethodPost, Path: elemento(DriveFolder, id, "/copy")})
 }
 
@@ -487,6 +493,9 @@ type DriveQuota struct {
 
 // Quota dice cuánto espacio hay y cuánto se ha gastado.
 func (d *Drive) Quota(ctx context.Context) (DriveQuota, error) {
+	if x, ok := d.data.(DriveQuotaReader); ok {
+		return x.Quota(ctx)
+	}
 	return JSON[DriveQuota](ctx, d.c, Request{Path: "/quota"})
 }
 
@@ -715,6 +724,9 @@ func (l DriveLote) Total() int { return l.Ficheros + l.Carpetas }
 // BatchMove mueve ficheros y carpetas bajo otra carpeta en UNA petición. `destino`
 // vacío es la raíz («Mi unidad»), que es lo que hace el servicio.
 func (d *Drive) BatchMove(ctx context.Context, ficheros, carpetas []string, destino string) (DriveLote, error) {
+	if x, ok := d.data.(DriveBatcher); ok {
+		return x.BatchMove(ctx, ficheros, carpetas, destino)
+	}
 	r, err := PostJSON[struct {
 		Ficheros int `json:"moved_files"`
 		Carpetas int `json:"moved_folders"`
@@ -726,6 +738,9 @@ func (d *Drive) BatchMove(ctx context.Context, ficheros, carpetas []string, dest
 
 // BatchTrash manda ficheros y carpetas a la papelera en UNA petición.
 func (d *Drive) BatchTrash(ctx context.Context, ficheros, carpetas []string) (DriveLote, error) {
+	if x, ok := d.data.(DriveBatcher); ok {
+		return x.BatchTrash(ctx, ficheros, carpetas)
+	}
 	r, err := PostJSON[struct {
 		Ficheros int `json:"trashed_files"`
 		Carpetas int `json:"trashed_folders"`

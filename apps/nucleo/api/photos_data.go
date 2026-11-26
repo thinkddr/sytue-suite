@@ -68,6 +68,31 @@ type PhotosAlbumMembershipData interface {
 	RemoveFromAlbum(context.Context, string, string) error
 }
 
+// PhotosCalendarData calcula en el dispositivo lo que el servicio saca de su índice por
+// fechas: saltar a un periodo, los años de la línea de tiempo y los recuerdos.
+type PhotosCalendarData interface {
+	TimelineDesde(context.Context, string, int, bool) ([]Photo, string, error)
+	TimelineYears(context.Context, bool) ([]TimelineYear, error)
+	Memories(context.Context) ([]Memory, error)
+}
+
+// PhotosDiscoveryData agrupa las repetidas y busca «Por aquí» sobre la galería del
+// dispositivo.
+type PhotosDiscoveryData interface {
+	Duplicates(context.Context, int) ([][]Photo, error)
+	Nearby(context.Context, string, int) ([]Photo, error)
+}
+
+// PhotosPurgeData borra para siempre de la papelera del dispositivo.
+type PhotosPurgeData interface {
+	Purgar(context.Context, string) (int, error)
+}
+
+// PhotosAlbumCoverData elige la portada de un álbum personal.
+type PhotosAlbumCoverData interface {
+	PonerPortada(context.Context, string, string, string) error
+}
+
 var ErrPrivatePhotosOperation = errors.New("photos: operation unavailable through private data")
 
 // WithPrivateData binds a separate facade to one verified device repository.

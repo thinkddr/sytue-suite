@@ -34,7 +34,7 @@ func facturaDeEjemplo(t *testing.T) facturaImprimible {
 		Base:     "7,21 €", IVA: "0,29 €", Total: "7,50 €",
 		RotuloBase: "Base", RotuloIVA: "IVA", RotTotal: "Total",
 		Leyenda: "Operación exenta de IVA (artículo 20 de la Ley 37/1992)",
-		QRTexto: "https://www2.agenciatributaria.gob.es/…", qrPNG: png,
+		QRTexto: "https://www2.agenciatributaria.gob.es/…", QRPNG: png,
 	}
 }
 

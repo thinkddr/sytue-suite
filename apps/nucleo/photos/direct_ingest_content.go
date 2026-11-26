@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"strings"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/offline"
 	"git.sytue.eu/sytue/one/apps/nucleo/photos/model"
@@ -240,6 +241,16 @@ func (r *Repository) validateIngestedAssets(ctx context.Context, catalog records
 			return nil, err
 		}
 		if media == nil {
+			// Un original externo (FO-09) o el de una foto que soltó el suyo al purgarla
+			// (LiberarAlPurgar): no hay fichero retenido del original, y su huella es la
+			// apuntada en la fila.
+			extra, err := r.originalSinRetener(ctx, retained, ok, row.JSON)
+			if err != nil {
+				return nil, err
+			}
+			if extra != nil {
+				linked = append(linked, *extra)
+			}
 			continue
 		}
 		if !ok {
@@ -269,12 +280,52 @@ func (r *Repository) initialRendition(ctx context.Context, asset, variant, finge
 	if err != nil {
 		return records.RetainedFile{}, err
 	}
-	if media == nil {
-		return records.RetainedFile{}, ErrNotFound
+	var renditions recipeRenditions
+	if media != nil {
+		renditions = media.Renditions
+	} else {
+		// Las derivadas de un original externo (FO-09) también viven en el almacén.
+		_, externa, err := r.externalAsset(raw)
+		if err != nil {
+			return records.RetainedFile{}, err
+		}
+		if externa == nil {
+			return records.RetainedFile{}, ErrNotFound
+		}
+		renditions = externa.Renditions
 	}
-	file, ok := media.Renditions.Files[model.Variante(variant)]
+	file, ok := renditions.Files[model.Variante(variant)]
 	if !ok {
 		return records.RetainedFile{}, model.ErrInvalidInput
 	}
 	return file, nil
+}
+
+// originalSinRetener es la fila media «original» de una foto cuyo original no es un
+// fichero retenido: uno externo (con sus derivadas, que sí lo son y se comprueban) o el
+// de una foto purgada que lo soltó. nil si la fila no es ninguna de las dos (una foto
+// histórica indexada desde Drive, que trae su propia fila media).
+func (r *Repository) originalSinRetener(ctx context.Context, retained records.RetainedFileCatalog, hayRetenidos bool, raw []byte) (*model.MediaRow, error) {
+	asset, externa, err := r.externalAsset(raw)
+	if err != nil {
+		return nil, err
+	}
+	var sha string
+	switch {
+	case externa != nil:
+		if !hayRetenidos {
+			return nil, ErrSource
+		}
+		for _, file := range renditionFiles(externa.Renditions) {
+			if err := retained.ValidateRetainedFile(ctx, file); err != nil {
+				return nil, err
+			}
+		}
+		sha = externa.Request.SHA256
+	case asset.PurgedAt != nil && asset.OriginalSHA256 != "":
+		sha = asset.OriginalSHA256
+	default:
+		return nil, nil //nolint:nilnil // fila histórica: su original llega por su fila media
+	}
+	return &model.MediaRow{ID: asset.ID, Tenant: r.scope.Tenant, Owner: r.scope.Subject, AssetID: asset.ID, Role: "original", Size: asset.Bytes, SHA256: strings.ToLower(sha), ContentType: asset.MediaType}, nil
 }

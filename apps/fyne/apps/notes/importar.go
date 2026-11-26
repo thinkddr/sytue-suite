@@ -62,6 +62,10 @@ func (p *Pantalla) importar() {
 			if errors.Is(err, model.ErrEncryptedBackupReview) {
 				key = "crypto.migrationFailed"
 			}
+			if p.VolcadoCifrado != "" && errors.Is(err, model.ErrEncryptedMigrationRequired) {
+				p.avisar(ui.AvisoPeligro, p.VolcadoCifrado, "")
+				return
+			}
 			p.avisar(ui.AvisoPeligro, p.tr.T(key, nil), "")
 			return
 		}

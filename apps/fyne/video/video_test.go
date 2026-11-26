@@ -448,3 +448,39 @@ func esperar(t *testing.T, f func() bool, que string) {
 		time.Sleep(5 * time.Millisecond)
 	}
 }
+
+// TestUnWebMEnVP8SeReproduce (Sytue Office, CA-07): un WebM VP8/Opus —el de muchos
+// ficheros viejos y el que graba un navegador— se reproduce con el mismo reproductor.
+// testdata/vp8.webm: 1 s, 160×120, 10 fps, hecho con
+//
+//	ffmpeg -f lavfi -i testsrc=duration=1:size=160x120:rate=10 -f lavfi -i sine=duration=1 \
+//	  -c:v libvpx -b:v 200k -c:a libopus -shortest vp8.webm
+func TestUnWebMEnVP8SeReproduce(t *testing.T) {
+	f, err := os.Open("testdata/vp8.webm")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = f.Close() })
+	r, err := Nuevo(f, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var mu sync.Mutex
+	var tam image.Rectangle
+	n := 0
+	r.AlFotograma = func(img image.Image, _ time.Duration) {
+		mu.Lock()
+		tam = img.Bounds()
+		n++
+		mu.Unlock()
+	}
+	r.Arrancar()
+	defer r.Cerrar()
+	r.Reproducir()
+	esperar(t, r.Terminado, "el final")
+	mu.Lock()
+	defer mu.Unlock()
+	if n < 7 || tam.Dx() != 160 || tam.Dy() != 120 {
+		t.Fatalf("VP8: %d fotogramas de %v", n, tam)
+	}
+}

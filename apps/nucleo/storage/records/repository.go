@@ -81,6 +81,10 @@ type Repository struct {
 	entries       map[storage.Reference]storage.RecordEntry
 	byObject      map[string][]storage.ObjectVersion
 	heads         map[string][]storage.ObjectVersion
+	revision      catalogRevision
+	loaded        loadedStamp
+	// verified es lo ya comprobado (verified_cache.go); nil si el Crypto no lo pide.
+	verified *verifiedCache
 }
 
 type entity struct {
@@ -118,7 +122,7 @@ func newRepository(cfg Config, identity storage.IdentityVersion) (*Repository, e
 		// These two products own separate existing import/staging lifecycles.
 		return nil, ErrSource
 	}
-	return &Repository{cfg: cfg, gate: offline.NewWorkGateWithLease(cfg.Context, cfg.WorkLease)}, nil
+	return &Repository{cfg: cfg, gate: offline.NewWorkGateWithLease(cfg.Context, cfg.WorkLease), verified: newVerifiedCache(cfg.Crypto)}, nil
 }
 
 func (r *Repository) PrivateStorageScope() storage.Scope { return r.cfg.Scope }
@@ -168,6 +172,9 @@ func (r *Repository) Close() {
 			clear(version.Commit.Metadata)
 		}
 	}
+	r.noteHeadsLocked(nil, loadedStamp{})
+	r.verified.close()
+	r.loaded = loadedStamp{}
 	r.heads = nil
 	r.catalog = storage.AtomicCatalogSnapshot{}
 	r.entries = nil
@@ -176,7 +183,24 @@ func (r *Repository) Close() {
 }
 
 func (r *Repository) refresh(ctx context.Context) error {
-	snapshot, err := storage.LoadAtomicCatalog(ctx, r.cfg.Crypto, r.cfg.Scope)
+	// Lo que se va a cargar es lo de este sello o algo posterior (revision.go).
+	stamp, stamped := r.cryptoStamp()
+	if stamped && r.unchangedSince(stamp) {
+		r.mu.Lock()
+		closed := r.closed
+		r.mu.Unlock()
+		if closed {
+			return ErrClosed
+		}
+		return ctx.Err()
+	}
+	// Lo que ya validó y descodificó la carga anterior no se vuelve a hacer
+	// (storage.LoadAtomicCatalogFrom): el resultado es el mismo. Close espera a que acabe
+	// este trabajo antes de borrar nada de r.catalog.
+	r.mu.Lock()
+	previous := r.catalog
+	r.mu.Unlock()
+	snapshot, err := storage.LoadAtomicCatalogFrom(ctx, r.cfg.Crypto, r.cfg.Scope, previous)
 	if errors.Is(err, storage.ErrCatalogSource) {
 		return ErrSource
 	}
@@ -196,6 +220,9 @@ func (r *Repository) refresh(ctx context.Context) error {
 		return err
 	}
 	r.binding = snapshot.Binding
+	loaded := loadedStamp{value: stamp, valid: stamped}
+	r.noteHeadsLocked(heads, loaded)
+	r.loaded = loaded
 	r.heads = heads
 	r.catalog = snapshot
 	r.entries = snapshot.Entries
@@ -275,6 +302,16 @@ func (r *Repository) readFileJSON(ctx context.Context, version storage.ObjectVer
 }
 
 func (r *Repository) readJSON(ctx context.Context, version storage.ObjectVersion) ([]byte, error) {
+	generation := r.verified.current()
+	if r.verified.has(version) {
+		if data, ok := r.readVerifiedJSON(ctx, version); ok {
+			if err := ctx.Err(); err != nil {
+				clear(data)
+				return nil, err
+			}
+			return data, nil
+		}
+	}
 	description, err := r.description(version)
 	if err != nil {
 		return nil, err
@@ -310,6 +347,7 @@ func (r *Repository) readJSON(ctx context.Context, version storage.ObjectVersion
 		clear(data)
 		return nil, err
 	}
+	r.verified.mark(version, generation)
 	return data, nil
 }
 

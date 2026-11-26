@@ -25,9 +25,10 @@ import (
 //     trae SUS recordatorios editables (Recordatorios), aunque sean cero: entonces solo se
 //     conservan los que la API no sabe expresar —un aviso por correo, un disparo a una hora
 //     fija…—, que no se enseñan ni se pueden quitar desde ella;
-//   - los VEVENT de excepción (RECURRENCE-ID), pero SOLO si la serie sigue siendo la misma
-//     (mismo RRULE y mismo DTSTART): con otra regla o a otra hora, esas excepciones
-//     apuntarían a ocurrencias que ya no existen;
+//   - los VEVENT de excepción (RECURRENCE-ID), pero SOLO si la serie se repite igual (el
+//     mismo RRULE): desde el mismo DTSTART, tal cual; desde otro (la serie movida a otra
+//     hora o a otro día), desplazados como el inicio (excepcionesQueSiguen). Con otra
+//     regla, esas excepciones apuntarían a ocurrencias que ya no existen;
 //   - las propiedades del maestro que el formulario REST no conoce (CATEGORIES, ATTACH,
 //     URL, X-*…; ver propiedadesDeLaAPI), si el nuevo no trae ya la suya.
 func CarryOver(nuevo, anterior string, propios bool) (string, error) {
@@ -64,12 +65,10 @@ func CarryOver(nuevo, anterior string, propios bool) (string, error) {
 	if conservarPropiedades(maestroNuevo, maestroAnterior) {
 		tocado = true
 	}
-	if mismaSerie(maestroNuevo, maestroAnterior) && !tieneExcepciones(calNuevo) {
-		for _, hijo := range calAnterior.Children {
-			if hijo.Name == ical.CompEvent && hijo.Props.Get(ical.PropRecurrenceID) != nil {
-				calNuevo.Children = append(calNuevo.Children, hijo)
-				tocado = true
-			}
+	if !tieneExcepciones(calNuevo) {
+		if excepciones := excepcionesQueSiguen(maestroNuevo, maestroAnterior, calAnterior); len(excepciones) > 0 {
+			calNuevo.Children = append(calNuevo.Children, excepciones...)
+			tocado = true
 		}
 	}
 	if !tocado {
@@ -127,17 +126,4 @@ func tieneExcepciones(cal *ical.Calendar) bool {
 		}
 	}
 	return false
-}
-
-// mismaSerie: los dos maestros repiten con la misma regla y desde el mismo inicio.
-func mismaSerie(a, b *ical.Component) bool {
-	valor := func(c *ical.Component, nombre string) string {
-		if p := c.Props.Get(nombre); p != nil {
-			return p.Value
-		}
-		return ""
-	}
-	regla := valor(a, ical.PropRecurrenceRule)
-	return regla != "" && regla == valor(b, ical.PropRecurrenceRule) &&
-		valor(a, ical.PropDateTimeStart) == valor(b, ical.PropDateTimeStart)
 }

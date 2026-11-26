@@ -19,7 +19,6 @@ import (
 	"strings"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/ajustes"
-	"git.sytue.eu/sytue/one/apps/nucleo/auth"
 )
 
 const (
@@ -40,10 +39,18 @@ type CacheSecrets interface {
 	Write(string, []byte) error
 }
 
-type systemSecrets struct{}
+// systemSecrets es ese llavero: el de la sesión de la suite (system_secrets.go) o, en
+// Sytue Office, ninguno (system_secrets_local.go).
 
-func (systemSecrets) Read(k string) ([]byte, error)  { return auth.LeerSecreto(k) }
-func (systemSecrets) Write(k string, v []byte) error { return auth.GuardarSecreto(k, v) }
+// boundCacheSecrets es el llavero del sistema ligado a la caché recién abierta: con él,
+// una clave heredada de Apple solo se migra tras autenticar los registros de esa misma
+// caché (apple_key_migration.go; con `edicionlocal` no hay llavero ni nada que migrar).
+type boundCacheSecrets struct {
+	CacheSecrets
+	root    *os.Root
+	cacheID string
+	ctx     context.Context
+}
 
 type cacheKey struct {
 	Version   int    `json:"v"`

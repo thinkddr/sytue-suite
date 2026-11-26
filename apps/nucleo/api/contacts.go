@@ -366,6 +366,12 @@ const TandaVCard = 200
 // BatchVCard trae, en UNA petición, las vCard guardadas de esos contactos (por id, hasta
 // MaxLoteContactos), ya juntas en un `.vcf`. Los ajenos o borrados no vienen.
 func (c *Contacts) BatchVCard(ctx context.Context, ids []string) ([]byte, error) {
+	if c.data != nil {
+		if lote, ok := c.data.(ContactsBatchData); ok {
+			return lote.BatchVCard(ctx, ids)
+		}
+		return nil, ErrPrivateContactsOperation
+	}
 	datos, err := json.Marshal(map[string]any{"ids": ids})
 	if err != nil {
 		return nil, err
@@ -493,6 +499,12 @@ func (c *Contacts) BatchTrash(ctx context.Context, uids []string) (int, error) {
 // petición, lo último que se tiró de cada UID, y dice cuántos volvieron (comparable
 // con lo que devolvió BatchTrash).
 func (c *Contacts) BatchRestore(ctx context.Context, uids []string) (int, error) {
+	if c.data != nil {
+		if lote, ok := c.data.(ContactsBatchData); ok {
+			return lote.BatchRestore(ctx, uids)
+		}
+		return 0, ErrPrivateContactsOperation
+	}
 	r, err := PostJSON[struct {
 		Restored int `json:"restored"`
 	}](ctx, c.c, "/contacts/batch/restore", map[string]any{"uids": uids})

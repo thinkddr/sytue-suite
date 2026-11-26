@@ -13,7 +13,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"git.sytue.eu/sytue/one/services/syerp/internal/domain"
+	domain "git.sytue.eu/sytue/one/apps/nucleo/erp/dominio"
 )
 
 // ErrModulosDesactivados indica que ventas o facturación están apagados en la org.

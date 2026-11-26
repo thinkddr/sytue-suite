@@ -106,6 +106,8 @@ type Lateral struct {
 	NotaActiva string
 	// Vista es cuál de los tres destinos de arriba está marcado.
 	Vista Vista
+	// SinCompartidas quita «Compartido conmigo» (Pantalla.SinCompartir).
+	SinCompartidas bool
 	// Bloqueado dice que el cuaderno activo está cifrado y todavía cerrado.
 	Bloqueado bool
 	// Cerrados son las ramas plegadas, por ID.
@@ -167,9 +169,12 @@ func (l *Lateral) Objeto(v tema.Variante) fyne.CanvasObject {
 		destino(VistaFijadas, FijarD, "focus.pinned"),
 		destinoIcono(l, v, iconos.Buscar, VistaBusqueda, "sidebar.search"),
 	)
-	abajo := ui.NuevaSeccionLateral("",
+	var filasAbajo []fyne.CanvasObject
+	if !l.SinCompartidas {
 		// «Compartido conmigo», del catálogo COMÚN (el mismo rótulo que en Photos).
-		destinoIcono(l, v, iconos.Usuarios, VistaCompartidas, "sharedWithMe.title"),
+		filasAbajo = append(filasAbajo, destinoIcono(l, v, iconos.Usuarios, VistaCompartidas, "sharedWithMe.title"))
+	}
+	filasAbajo = append(filasAbajo,
 		// «Etiquetas» abre un DIÁLOGO y no cambia de vista: no se marca nunca como
 		// activa, que es lo que hace la web (no le pasa `active`).
 		ui.NuevaFilaLateral(l.tr.T("sidebar.tags", nil),
@@ -178,6 +183,7 @@ func (l *Lateral) Objeto(v tema.Variante) fyne.CanvasObject {
 		destino(VistaArchivo, ArchivoD, "archive.title"),
 		destino(VistaPapelera, PapeleraD, "sidebar.trash"),
 	)
+	abajo := ui.NuevaSeccionLateral("", filasAbajo...)
 
 	cuadernos := ui.NuevaSeccionLateral(l.tr.T("sidebar.notebooks", nil), l.ramas(v)...)
 	cuadernos.Acciones = []fyne.CanvasObject{

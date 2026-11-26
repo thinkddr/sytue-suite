@@ -585,6 +585,11 @@ type RoomsMember struct {
 	External bool `json:"external,omitempty"`
 	// Pending: de fuera y aún sin aceptar la invitación; no es miembro todavía.
 	Pending bool `json:"pending,omitempty"`
+	// PlainName es el nombre de la persona cuando Name lleva algo más detrás: la edición
+	// local, con varias cuentas que conocen gente, le pone la cuenta («Luis · @ana:servidor»)
+	// para distinguirlas, y de ahí no salen unas iniciales. Vacío, Name ya es el de la
+	// persona (lo de siempre). No viaja: lo pone quien junta las cuentas (`local/chat`).
+	PlainName string `json:"-"`
 }
 
 // RoomsPerson es alguien de CUALQUIER organización encontrado por su @usuario o su
@@ -593,6 +598,9 @@ type RoomsPerson struct {
 	UserID   string `json:"user_id"`
 	Name     string `json:"name"`
 	Username string `json:"username,omitempty"`
+	// PlainName es lo mismo que en RoomsMember: el nombre sin la cuenta detrás; vacío,
+	// Name. No viaja.
+	PlainName string `json:"-"`
 }
 
 // TeamMembers es la gente del equipo.

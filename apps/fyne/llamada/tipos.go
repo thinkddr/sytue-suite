@@ -25,7 +25,7 @@ import (
 )
 
 // Lo que comparten la llamada de verdad (llamada.go) y el hueco de js/wasm
-// (llamada_js.go): los tipos que la interfaz lee sin saber en qué destino está.
+// (llamada_sin.go): los tipos que la interfaz lee sin saber en qué destino está.
 
 // Muestreo y tramo de la voz: 48 kHz mono en tramos de 20 ms, lo que WebRTC usa con Opus.
 const (

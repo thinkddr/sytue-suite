@@ -195,6 +195,9 @@ func (d *Docs) CreateDesde(ctx context.Context, kind DocKind, titulo, fuente str
 // original; `titulo` es el ya traducido («Copia de …»). Lo que el original tenga sin
 // guardar no viaja: quien llama guarda antes.
 func (d *Docs) CreateCopy(ctx context.Context, original Document, titulo string) (Document, error) {
+	if p, ok := d.datos().(DocsCopyData); ok {
+		return p.CopyDocument(ctx, original, titulo)
+	}
 	out, err := PostJSON[docResp](ctx, d.c, "/documents", struct {
 		Kind   DocKind `json:"kind"`
 		Title  string  `json:"title"`

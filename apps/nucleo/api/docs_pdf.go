@@ -37,6 +37,10 @@ type PDF struct {
 	// signatures son las firmas con el certificado del sistema preparadas en el
 	// dispositivo (solo con el Drive privado): ver docs_pdf_local_system_sign.go.
 	signatures *localSignatures
+	// local es la configuración del motor del dispositivo que pone la app de la edición
+	// local (ConLocal: autoridad de sellado, anclas y reconocedor). Nil fuera de
+	// WithPrivateDrive.
+	local *pdfLocal
 }
 
 // NewPDF crea el cliente sobre las raíces de Docs y de Drive.
@@ -104,6 +108,9 @@ func (p *PDF) carpetaPDF(ctx context.Context) (raiz, id string, err error) {
 // Lista devuelve los PDF de la carpeta «PDF», el más reciente primero. Sin carpeta todavía
 // no hay PDF: es el estado de quien no ha abierto ninguno, no un fallo.
 func (p *PDF) Lista(ctx context.Context) ([]File, error) {
+	if l, ok := p.pdfLister(); ok {
+		return l.ListPDFs(ctx)
+	}
 	_, carpeta, err := p.carpetaPDF(ctx)
 	if err != nil || carpeta == "" {
 		return nil, err

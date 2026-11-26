@@ -86,7 +86,7 @@ func (p *Pantalla) elegirVista(id string) {
 	b := p.abierta
 	b.VistaID, b.vent = id, sinVentanas()
 	b.enlaces, b.enlaceNuevo, b.falloEnlaces = nil, "", ""
-	if v := b.vista(); v != nil && v.Kind == api.BasesForm && puedeEsquema(b.Datos.Role) {
+	if v := b.vista(); v != nil && v.Kind == api.BasesForm && puedeEsquema(b.Datos.Role) && !p.SinFormularios {
 		p.cargarEnlaces()
 	}
 	b.rejilla.Poner(b.Campos, nil)
@@ -702,7 +702,7 @@ func (p *Pantalla) vistaFormulario(v tema.Variante, vista api.BasesView) fyne.Ca
 		hijos = append(hijos, ui.NuevoRotulo("•  "+c.Name+" ("+p.t("field.kind."+c.Kind)+")", tema.TextoSM, ui.Normal, "text"))
 	}
 	previa := container.New(ui.Columna{Hueco: tema.Espacio(1)}, hijos...)
-	if !puedeEsquema(b.Datos.Role) {
+	if !puedeEsquema(b.Datos.Role) || p.SinFormularios {
 		return previa
 	}
 	return container.New(ui.Columna{Hueco: tema.Espacio(3)}, previa, p.panelFormulario(v))

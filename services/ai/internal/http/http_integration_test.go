@@ -19,10 +19,10 @@ import (
 	"github.com/lestrrat-go/jwx/v2/jws"
 	"github.com/lestrrat-go/jwx/v2/jwt"
 
+	provider "git.sytue.eu/sytue/one/apps/nucleo/ia/proveedor"
 	"git.sytue.eu/sytue/one/platform/pkg/authn"
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/services/ai/internal/config"
-	"git.sytue.eu/sytue/one/services/ai/internal/provider"
 )
 
 // TestAssist_EndToEnd ejerce la cadena COMPLETA y real: JWKS + JWT firmado ->

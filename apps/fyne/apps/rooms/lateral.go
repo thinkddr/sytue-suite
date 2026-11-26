@@ -84,6 +84,20 @@ type Lateral struct {
 	PuedeGestionarApps  bool
 	TieneCifrado        bool
 	TieneConversaciones bool
+	// SinReuniones quita la entrada «Reuniones» (Sytue Office no tiene llamadas).
+	// RotuloCuentas y AlCuentas ponen una entrada que abre las cuentas de mensajería
+	// de la edición local; nil, no se pinta. Con los valores cero el carril es el de
+	// siempre.
+	SinReuniones  bool
+	RotuloCuentas string
+	AlCuentas     func()
+	// SinPresenciaPropia quita la cabecera con tu presencia: en Sytue Office no hay un
+	// Hub que la reparta, y «En línea» no significa nada (ni en qué cuenta).
+	SinPresenciaPropia bool
+	// CanalesPorCuenta es que los canales van en una categoría por cuenta: «Canales»
+	// vacío no dice «Sin canales todavía» (los hay, en sus cuentas); quedan su «＋» y
+	// «Explorar canales».
+	CanalesPorCuenta bool
 	// Presencia y Estado son lo que enseña la cabecera del carril: tu presencia. Con
 	// el socket caído la web la pinta «Sin conexión» aunque hayas elegido otra cosa,
 	// porque el Hub ya no la recibe y «En línea» al lado de «Sin conexión» se
@@ -211,7 +225,9 @@ func (l *Lateral) Construir() *ui.Lateral {
 	refresco := l.Refresco
 	refresco.Arriba = func() bool { return c.Offset.Y <= 0.5 }
 	lat := ui.NuevoLateral(l.T.T("ui.mainNav", nil), ui.RefrescarAlTirar(c, &refresco))
-	lat.Cabecera = l.cabecera()
+	if !l.SinPresenciaPropia {
+		lat.Cabecera = l.cabecera()
+	}
 	return lat
 }
 
@@ -280,9 +296,15 @@ func (l *Lateral) seccionPaneles(v tema.Variante) *ui.SeccionLateral {
 	t := l.T
 	s := ui.NuevaSeccionLateral("")
 	s.Filas = append(s.Filas,
-		l.filaPanel(PanelHilos, t.T("sidebar.threads", nil), glifoHilos, Contador(l.HilosSinLeer), l.HilosSinLeer > 0, v),
-		l.filaPanel(PanelReuniones, t.T("meetings.open", nil), glifoVideo, "", false, v),
-	)
+		l.filaPanel(PanelHilos, t.T("sidebar.threads", nil), glifoHilos, Contador(l.HilosSinLeer), l.HilosSinLeer > 0, v))
+	if !l.SinReuniones {
+		s.Filas = append(s.Filas, l.filaPanel(PanelReuniones, t.T("meetings.open", nil), glifoVideo, "", false, v))
+	}
+	if l.AlCuentas != nil {
+		f := ui.NuevaFilaLateral(l.RotuloCuentas, iconos.Trazo(iconos.Rejilla, GlifoFila, l.tokenPanel("cuentas-locales"), v).Objeto(), l.AlCuentas)
+		f.CajaIcono = CajaIconoFila
+		s.Filas = append(s.Filas, f)
+	}
 	if l.Borradores > 0 {
 		s.Filas = append(s.Filas, l.filaPanel(
 			PanelBorradores, t.T("drafts.title", nil), glifoLapiz, Contador(l.Borradores), true, v))
@@ -373,7 +395,7 @@ func (l *Lateral) seccionesDeCanales(v tema.Variante) []fyne.CanvasObject {
 // (la misma, o la que la envuelve para que una categoría propia se arrastre por su
 // cabecera y se suelte sobre otra).
 //
-//nolint:gocognit // Cada clase de sección lleva sus acciones, su pie y su arrastre.
+//nolint:gocognit,gocyclo // Cada clase de sección lleva sus acciones, su pie y su arrastre.
 func (l *Lateral) seccion(s Seccion, v tema.Variante) (*ui.SeccionLateral, fyne.CanvasObject) {
 	t := l.T
 	titulo := s.Titulo
@@ -431,7 +453,7 @@ func (l *Lateral) seccion(s Seccion, v tema.Variante) (*ui.SeccionLateral, fyne.
 		sec.Filas = append(sec.Filas, l.fila(c, v))
 	}
 	switch {
-	case len(s.Canales) == 0 && s.Clave == ClaveCanales:
+	case len(s.Canales) == 0 && s.Clave == ClaveCanales && !l.CanalesPorCuenta:
 		sec.Filas = append(sec.Filas,
 			ui.NuevoRotulo(t.T("sidebar.noChannelsYet", nil), tema.TextoXS, ui.Normal, "sidebar-fg-muted"))
 	case len(s.Canales) == 0 && s.Categoria != nil:

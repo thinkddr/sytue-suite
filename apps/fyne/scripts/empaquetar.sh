@@ -13,7 +13,8 @@
 #
 # En ESCRITORIO lo que sale son BUNDLES, un instalador con varias apps (ver «LOS
 # BUNDLES DE ESCRITORIO» más abajo): `dist/sytue-<bundle>-linux-amd64.tar.xz` (con su
-# `instalar.sh`), `…-windows-amd64-installer.exe` (NSIS) y `…-macos-universal.dmg`. En
+# `instalar.sh`; `-arm64` con SYTUE_LINUX_ARCH=arm64), `…-windows-amd64-installer.exe`
+# (NSIS) y `…-macos-universal.dmg`. En
 # el MÓVIL, un paquete por app: `sytue-<app>-android-sin-firmar.aab` (Google Play; lo
 # firma `release-mobile.yml` con la clave de subida, ver «Android: Play App Signing» en
 # docs/operations.md) y el de iOS.
@@ -66,6 +67,25 @@ set -euo pipefail
 
 AQUI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FYNE="$(cd "$AQUI/.." && pwd)"
+# El árbol de apps que se empaqueta y el prefijo de sus ejecutables. Por defecto,
+# `cmd` y `sytue-`: la edición conectada, como siempre. Con `SYTUE_ARBOL=cmd-local`
+# se empaqueta Sytue Office, la edición local (PLAN-EDICION-LOCAL §7.2): sus
+# ejecutables llevan `sytue-office-` para no pisar a los de la conectada.
+ARBOL="${SYTUE_ARBOL:-cmd}"
+if [ "$ARBOL" = cmd-local ]; then PREFIJO="${SYTUE_PREFIJO:-sytue-office-}"; else PREFIJO="${SYTUE_PREFIJO:-sytue-}"; fi
+# Las etiquetas de Go de toda compilación. La edición local añade `edicionlocal`
+# (PLAN §5.3), que deja fuera las llamadas (LiveKit y pion) de sus binarios.
+ETIQUETAS_BASE=goolm
+if [ "$ARBOL" = cmd-local ]; then ETIQUETAS_BASE=goolm,edicionlocal; fi
+# La arquitectura del destino `linux`: amd64, lo que publica sytue-one, salvo que
+# SYTUE_LINUX_ARCH diga arm64 (la release de Sytue Office en sytue-suite saca las dos). Va en el nombre del bundle (`sufijo linux`) y en el GOARCH. Los demás
+# destinos llevan la suya.
+LINUX_ARCH="${SYTUE_LINUX_ARCH:-amd64}"
+case "$LINUX_ARCH" in amd64 | arm64) ;; *)
+  echo "::error::SYTUE_LINUX_ARCH es amd64 o arm64, no «$LINUX_ARCH»" >&2
+  exit 2
+  ;;
+esac
 RAIZ="$(cd "$FYNE/../.." && pwd)"
 SALIDA="$FYNE/dist"
 
@@ -96,6 +116,9 @@ tipos) shift ;;
 # .app declara sus tipos de documento, y `registro-windows <app>`, las líneas de NSIS de
 # «Abrir con» y «Aplicaciones predeterminadas»: el test mira las de aquí sin un Mac ni NSIS.
 documentos-mac | registro-windows | mesa-windows) shift ;;
+# `empaquetar.sh esquemas <linux|android|apple|windows> <app>` imprime lo que esa app
+# registra de esquemas de más en ese sistema (`esquemas_extra_de`): el test lo mira.
+esquemas) shift ;;
 # `empaquetar.sh paquetes` imprime los bundles de escritorio, uno por línea, con su
 # clave y sus apps; `empaquetar.sh publicables <plataforma>`, los instaladores que se
 # publican de ella. Los usan el test, los workflows y `traer-instaladores.sh`, para
@@ -104,6 +127,9 @@ paquetes | publicables) shift ;;
 # `empaquetar.sh derechos-tienda <app> <equipo>` imprime los derechos (entitlements) con
 # los que esa app se firma para la Mac App Store: el test los mira sin un Mac.
 derechos-tienda | derechos-sesion) shift ;;
+# `empaquetar.sh derechos-office <app> <equipo>` imprime los que Sytue Office
+# (SYTUE_ARBOL=cmd-local) añade en iOS en vez de los de la sesión: su App Group.
+derechos-office) shift ;;
 # `empaquetar.sh refresco-ios <app>` imprime las órdenes de PlistBuddy del refresco del
 # widget en segundo plano de iOS (`plist_refresco`), o nada: el test las mira sin un Mac.
 refresco-ios) shift ;;
@@ -120,6 +146,9 @@ version-code) shift ;;
 # `empaquetar.sh instalar-sh "<bundle>"` imprime el `instalar.sh` del bundle de Linux:
 # el test lo ejecuta de verdad contra un bundle de mentira.
 instalar-sh) shift ;;
+# `empaquetar.sh mime-office` imprime el shared-mime-info de los formatos nativos de
+# Sytue Office (.docus, .calcus, .diapos), que el bundle de Linux de la edición lleva.
+mime-office) shift ;;
 # `empaquetar.sh xcode` es la fase de compilación de cada target de
 # apps/fyne/xcode/Sytue.xcodeproj (Xcode Cloud): lee lo que Xcode exporta y no lleva
 # argumentos. Ver «LA FASE DE XCODE» más abajo.
@@ -129,6 +158,7 @@ xcode) shift ;;
   echo "     $0 xcode   (solo desde una fase de Sytue.xcodeproj)" >&2
   echo "     $0 derechos-tienda <app|directorio> <equipo de Apple>" >&2
   echo "     $0 derechos-sesion <app|directorio> <equipo de Apple> <ios|developerid>" >&2
+  echo "     $0 derechos-office <app|directorio> <equipo de Apple>   (SYTUE_ARBOL=cmd-local)" >&2
   echo "     $0 derechos-archivos <app|directorio> <equipo de Apple> <ios|macos|app-ios>" >&2
   echo "     $0 widgets-apple   (si|no: SYTUE_WIDGETS_APPLE de apps/fyne/xcode/Sytue.xcconfig)" >&2
   echo "     $0 refresco-ios <app|directorio>" >&2
@@ -140,6 +170,7 @@ xcode) shift ;;
   echo "     $0 documentos-mac <app|directorio>" >&2
   echo "     $0 registro-windows <app|directorio>" >&2
   echo "     $0 mesa-windows <carpeta>" >&2
+  echo "     $0 esquemas <linux|android|apple|windows> <app|directorio>" >&2
   echo "     $0 paquetes" >&2
   echo "     $0 publicables {linux|windows|macos|macappstore|android|android-sin-firmar|ios} [directorio]" >&2
   echo "     $0 version-code <vX.Y.Z>" >&2
@@ -215,7 +246,7 @@ nombre_bundle() { # <clave>
 # «<clave> <app> <app>…», un bundle por línea, en orden de clave y de app.
 paquetes() {
   local t d
-  for t in "$FYNE"/cmd/*/FyneApp.toml; do
+  for t in "$FYNE"/"$ARBOL"/*/FyneApp.toml; do
     [ -f "$t" ] || continue
     d="$(dirname "$t")"
     printf '%s %s\n' "$(bundle_de "$d")" "$(basename "$d")"
@@ -224,7 +255,7 @@ paquetes() {
 
 sufijo() { # <plataforma> -> lo que va detrás de `sytue-<bundle>-`
   case "$1" in
-  linux) printf 'linux-amd64.tar.xz' ;;
+  linux) printf 'linux-%s.tar.xz' "${LINUX_ARCH:-amd64}" ;;
   windows) printf 'windows-amd64-installer.exe' ;;
   macos) printf 'macos-universal.dmg' ;;
   # En Android no hay bundles: `<bundle>` es la app. Lo que sale de aquí va SIN firmar
@@ -374,7 +405,7 @@ derechos_tienda() { # <dir de la app> <equipo de Apple (Team ID)>
 }
 if [ "$plataforma" = derechos-tienda ]; then
   d="${1:?uso: $0 derechos-tienda <app|directorio> <equipo de Apple>}"
-  [ -d "$d" ] || d="$FYNE/cmd/$1"
+  [ -d "$d" ] || d="$FYNE/$ARBOL/$1"
   derechos_tienda "$d" "${2:-}"
   exit $?
 fi
@@ -411,10 +442,63 @@ derechos_sesion() { # <dir> <equipo> <ios|developerid>
 }
 if [ "$plataforma" = derechos-sesion ]; then
   d="${1:?uso: $0 derechos-sesion <app|directorio> <equipo de Apple> <ios|developerid>}"
-  [ -d "$d" ] || d="$FYNE/cmd/$1"
+  [ -d "$d" ] || d="$FYNE/$ARBOL/$1"
   derechos_sesion "$d" "${2:-}" "${3:-}"
   exit $?
 fi
+
+# --- SYTUE OFFICE EN iOS (SYTUE_ARBOL=cmd-local, PLAN-EDICION-LOCAL F11) ---------------
+# Sytue Office no tiene sesión de la suite: ni su Keychain compartido ni su App Group le
+# sirven, y derechos_sesion no acepta sus App ID (`eu.sytue.office.<app>`). Lo que sí
+# comparten sus apps en iOS es un App Group propio de la edición, `group.<ServicioLlavero>`
+# de apps/nucleo/local/espacio/espacio.go (la única fuente de la identidad de la edición),
+# para lo que es de toda la edición y no de cada app (D-17: perfil, IA, cuentas). El
+# contenedor lo da `ficheros.CarpetaDeGrupo`. Hay que registrar el grupo en Apple Developer
+# y asociarlo a los quince App ID antes de regenerar sus perfiles (PLAN §11, punto 5).
+grupo_office_apple() {
+  local g
+  g="$(sed -n 's/^[[:space:]]*ServicioLlavero[[:space:]]*= "\(eu\.sytue\.[a-z.]*\)"$/group.\1/p' "$RAIZ/apps/nucleo/local/espacio/espacio.go")"
+  [[ "$g" =~ ^group\.eu\.sytue\.[a-z.]+$ ]] || {
+    echo '::error::no se lee el ServicioLlavero de apps/nucleo/local/espacio/espacio.go' >&2
+    return 1
+  }
+  printf '%s\n' "$g"
+}
+
+derechos_office() { # <dir> <equipo>
+  local appid equipo="${2:-}" grupo
+  appid="$(metadato "$1" ID)"
+  [[ "$appid" =~ ^eu\.sytue\.office\.[a-z]+$ ]] && [[ "$equipo" =~ ^[A-Z0-9]{10}$ ]] || {
+    echo "::error::derechos de Sytue Office: $1 no es una app de cmd-local o «$equipo» no es un Team ID" >&2
+    return 1
+  }
+  grupos_sesion_apple "$equipo" || return 1
+  grupo="$(grupo_office_apple)" || return 1
+  printf '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0"><dict>\n'
+  printf '\t<key>com.apple.security.application-groups</key><array><string>%s</string></array>\n' "$grupo"
+  printf '</dict></plist>\n'
+}
+if [ "$plataforma" = derechos-office ]; then
+  d="${1:?uso: $0 derechos-office <app|directorio> <equipo de Apple>}"
+  [ -d "$d" ] || d="$FYNE/$ARBOL/$1"
+  derechos_office "$d" "${2:-}"
+  exit $?
+fi
+
+# SytueIA.framework, el puente con Foundation Models (apps/fyne/xcode/ia-sistema), dentro
+# de <App>.app/Frameworks y firmado con la identidad de la app. Solo Sytue Office: es su
+# IA del sistema (apps/nucleo/local/asistente/sistema_ios.go lo abre con dlopen y, si no
+# está, Ajustes lo dice). Se construye una vez por ejecución.
+incorporar_ia_apple() { # <.app> <identidad>
+  local fw="$ESCENARIO/ia-sistema/SytueIA.framework"
+  if [ ! -d "$fw" ]; then
+    bash "$FYNE/xcode/ia-sistema/construir.sh" iphoneos "$ESCENARIO/ia-sistema" >/dev/null || return 1
+  fi
+  mkdir -p "$1/Frameworks"
+  rm -rf "$1/Frameworks/SytueIA.framework"
+  cp -R "$fw" "$1/Frameworks/"
+  codesign -f -s "$2" "$1/Frameworks/SytueIA.framework"
+}
 
 # --- LOS DERECHOS DE LA EXTENSIÓN FILE PROVIDER (apps/fyne/xcode/proveedor-archivos) ---
 # Sytue Drive en el Finder y en Archivos. La extensión solo necesita la red y el grupo de
@@ -460,7 +544,7 @@ derechos_archivos() { # <dir de la app> <equipo> <ios|macos|app-ios>
 }
 if [ "$plataforma" = derechos-archivos ]; then
   d="${1:?uso: $0 derechos-archivos <app|directorio> <equipo de Apple> <ios|macos|app-ios>}"
-  [ -d "$d" ] || d="$FYNE/cmd/$1"
+  [ -d "$d" ] || d="$FYNE/$ARBOL/$1"
   derechos_archivos "$d" "${2:-}" "${3:-}"
   exit $?
 fi
@@ -469,8 +553,11 @@ fi
 # la demo. La lista la da el árbol, como en el resto de este guion.
 apps_moviles() {
   local t
-  for t in "$FYNE"/cmd/*/FyneApp.toml; do
+  for t in "$FYNE"/"$ARBOL"/*/FyneApp.toml; do
     [ -f "$t" ] || continue
+    # `movil = "no"` en [Development]: solo de escritorio (el Hub de Sytue Office: en el
+    # móvil cada app va por separado y no hay lanzador).
+    [ "$(metadato "$(dirname "$t")" movil)" = no ] && continue
     t="$(basename "$(dirname "$t")")"
     [ "$t" = demo ] || printf '%s\n' "$t"
   done
@@ -527,6 +614,36 @@ codesign_sellado() { # <argumentos de codesign…>
 # escritorios: copia cada programa, escribe su entrada del menú con rutas completas
 # —`~/.local/bin` no está en el PATH de todos— y avisa al escritorio para que se
 # entere de los esquemas y los tipos sin cerrar sesión.
+# LOS FORMATOS NATIVOS DE SYTUE OFFICE EN LINUX: el .desktop declara sus tipos, pero el
+# escritorio solo sabe que `informe.docus` ES `application/vnd.sytue.docus+zip` si un
+# shared-mime-info se lo dice (si no, lo ve como un ZIP y «Abrir con» no ofrece Docus).
+# Va en share/mime/packages/ y `instalar.sh` llama a update-mime-database.
+mime_office() {
+  cat <<'XML'
+<?xml version="1.0" encoding="UTF-8"?>
+<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
+  <mime-type type="application/vnd.sytue.docus+zip">
+    <comment>Sytue Docus document</comment>
+    <comment xml:lang="es">Documento de Sytue Docus</comment>
+    <sub-class-of type="application/zip"/>
+    <glob pattern="*.docus"/>
+  </mime-type>
+  <mime-type type="application/vnd.sytue.calcus+zip">
+    <comment>Sytue Calcus spreadsheet</comment>
+    <comment xml:lang="es">Hoja de cálculo de Sytue Calcus</comment>
+    <sub-class-of type="application/zip"/>
+    <glob pattern="*.calcus"/>
+  </mime-type>
+  <mime-type type="application/vnd.sytue.diapos+zip">
+    <comment>Sytue Diapos presentation</comment>
+    <comment xml:lang="es">Presentación de Sytue Diapos</comment>
+    <sub-class-of type="application/zip"/>
+    <glob pattern="*.diapos"/>
+  </mime-type>
+</mime-info>
+XML
+}
+
 instalar_sh() { # <nombre del bundle>
   printf '#!/bin/sh\n# %s para Linux: instala sus programas, cada uno con su entrada en el menú\n' "$1"
   cat <<'SH'
@@ -628,6 +745,17 @@ for d in "$aqui"/share/applications/*.desktop; do
     sed -e "s|^Exec=|Exec=$p/bin/|" -e "s|^Icon=.*|Icon=$p/share/pixmaps/$n.png|" "$d" >"$p/share/applications/$n.desktop"
   fi
 done
+# Los tipos propios (los formatos nativos de Sytue Office), para que el escritorio los
+# reconozca por la extensión.
+mime=
+for x in "$aqui"/share/mime/packages/*.xml; do
+  [ -e "$x" ] || continue
+  mime=si
+  if [ -n "$quitar" ]; then rm -f "$p/share/mime/packages/$(basename "$x")"; else install -D -m 0644 "$x" "$p/share/mime/packages/$(basename "$x")"; fi
+done
+if [ -n "$mime" ] && command -v update-mime-database >/dev/null 2>&1; then
+  update-mime-database "$p/share/mime" >/dev/null 2>&1 || true
+fi
 if command -v update-desktop-database >/dev/null 2>&1; then
   update-desktop-database "$p/share/applications" || true
 fi
@@ -659,7 +787,7 @@ plist_simulador() { # <dir de la app>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
 <key>CFBundleIdentifier</key><string>$appid</string>
-<key>CFBundleExecutable</key><string>sytue-$(basename "$1")</string>
+<key>CFBundleExecutable</key><string>${PREFIJO}$(basename "$1")</string>
 <key>CFBundleName</key><string>$nombre</string>
 <key>CFBundleDisplayName</key><string>$(nombre_movil "$1")</string>
 <key>CFBundlePackageType</key><string>APPL</string>
@@ -677,15 +805,19 @@ plist_simulador() { # <dir de la app>
 P
 }
 if [ "$plataforma" = nombre-movil ]; then
-  nombre_movil "$FYNE/cmd/${1:?uso: $0 nombre-movil <app>}"
+  nombre_movil "$FYNE/$ARBOL/${1:?uso: $0 nombre-movil <app>}"
   exit $?
 fi
 if [ "$plataforma" = plist-simulador ]; then
-  plist_simulador "$FYNE/cmd/${1:?uso: $0 plist-simulador <app>}"
+  plist_simulador "$FYNE/$ARBOL/${1:?uso: $0 plist-simulador <app>}"
   exit $?
 fi
 if [ "$plataforma" = instalar-sh ]; then
   instalar_sh "${1:?uso: $0 instalar-sh <nombre del bundle>}"
+  exit 0
+fi
+if [ "$plataforma" = mime-office ]; then
+  mime_office
   exit 0
 fi
 if [ "$plataforma" = paquetes ]; then
@@ -714,7 +846,9 @@ if [ "$plataforma" = publicables ]; then
   case "$1" in android* | ios | macappstore) lista=apps_moviles ;; esac
   while read -r b _; do
     [ "$b" = demo ] && continue
-    f="sytue-$b-$(sufijo "$1")"
+    # El bundle de escritorio ya lleva su nombre («sytue-office»); una app móvil va con
+    # el prefijo de su árbol (`sytue-office-` en Sytue Office), como su ejecutable.
+    if [ "$lista" = apps_moviles ]; then f="${PREFIJO:-sytue-}$b-$(sufijo "$1")"; else f="sytue-$b-$(sufijo "$1")"; fi
     if [ -n "${2:-}" ]; then
       [ -f "$2/$f" ] || {
         echo "::error::falta $2/$f: $b no se ha empaquetado" >&2
@@ -754,6 +888,35 @@ tipo_mime() { # <extensión> -> tipo MIME
   numbers) printf 'application/vnd.apple.numbers' ;;
   key) printf 'application/vnd.apple.keynote' ;;
   pdf) printf 'application/pdf' ;;
+  # Las de Sytue Office (SYTUE_ARBOL=cmd-local), que abre más formatos que la conectada.
+  txt) printf 'text/plain' ;;
+  md | markdown) printf 'text/markdown' ;;
+  html | htm) printf 'text/html' ;;
+  csv) printf 'text/csv' ;;
+  tsv) printf 'text/tab-separated-values' ;;
+  eml) printf 'message/rfc822' ;;
+  ics) printf 'text/calendar' ;;
+  vcf) printf 'text/vcard' ;;
+  jpg | jpeg) printf 'image/jpeg' ;;
+  png) printf 'image/png' ;;
+  gif) printf 'image/gif' ;;
+  webp) printf 'image/webp' ;;
+  avif) printf 'image/avif' ;;
+  heic) printf 'image/heic' ;;
+  webm) printf 'video/webm' ;;
+  mkv) printf 'video/x-matroska' ;;
+  mp4) printf 'video/mp4' ;;
+  m4v) printf 'video/x-m4v' ;;
+  mov) printf 'video/quicktime' ;;
+  avi) printf 'video/x-msvideo' ;;
+  enex) printf 'application/enex+xml' ;;
+  onex) printf 'application/onenote' ;;
+  # Una exportación de Markdown en ZIP (Notepads de Sytue Office la importa).
+  zip) printf 'application/zip' ;;
+  # Los formatos nativos de Sytue Office (un ZIP sin pérdida del modelo de la suite).
+  docus) printf 'application/vnd.sytue.docus+zip' ;;
+  calcus) printf 'application/vnd.sytue.calcus+zip' ;;
+  diapos) printf 'application/vnd.sytue.diapos+zip' ;;
   *)
     echo "::error::no sé el tipo MIME de .$1: añádelo a tipo_mime en empaquetar.sh" >&2
     return 1
@@ -782,6 +945,32 @@ uti_de() { # <extensión> -> UTI
   numbers) printf 'com.apple.iwork.numbers.sffnumbers' ;;
   key) printf 'com.apple.iwork.keynote.sffkey' ;;
   pdf) printf 'com.adobe.pdf' ;;
+  txt) printf 'public.plain-text' ;;
+  md | markdown) printf 'net.daringfireball.markdown' ;;
+  html | htm) printf 'public.html' ;;
+  csv) printf 'public.comma-separated-values-text' ;;
+  tsv) printf 'public.tab-separated-values-text' ;;
+  eml) printf 'com.apple.mail.email' ;;
+  ics) printf 'com.apple.ical.ics' ;;
+  vcf) printf 'public.vcard' ;;
+  jpg | jpeg) printf 'public.jpeg' ;;
+  png) printf 'public.png' ;;
+  gif) printf 'com.compuserve.gif' ;;
+  webp) printf 'org.webmproject.webp' ;;
+  avif) printf 'public.avif' ;;
+  heic) printf 'public.heic' ;;
+  webm) printf 'org.webmproject.webm' ;;
+  mkv) printf 'org.matroska.mkv' ;;
+  mp4) printf 'public.mpeg-4' ;;
+  m4v) printf 'com.apple.m4v-video' ;;
+  mov) printf 'com.apple.quicktime-movie' ;;
+  avi) printf 'public.avi' ;;
+  enex) printf 'com.evernote.enex' ;;
+  onex) printf 'com.microsoft.onenote.onex' ;;
+  zip) printf 'public.zip-archive' ;;
+  docus) printf 'eu.sytue.office.docus' ;;
+  calcus) printf 'eu.sytue.office.calcus' ;;
+  diapos) printf 'eu.sytue.office.diapos' ;;
   *)
     echo "::error::no sé el UTI de .$1: añádelo a uti_de en empaquetar.sh" >&2
     return 1
@@ -791,6 +980,76 @@ uti_de() { # <extensión> -> UTI
 
 extensiones_de() { # <dir de la app> -> extensiones separadas por espacios
   sed -n 's/^[[:space:]]*extensiones[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' "$1/FyneApp.toml" | head -1 | tr ',' ' '
+}
+
+# UN SEGUNDO ESQUEMA (o más) por app: `[Development] esquemas_extra = "mailto"`. Mail de
+# Sytue Office se ofrece así como programa de correo. Cada sistema lo apunta como
+# CANDIDATO, nunca se lo quita a quien lo tenga: Linux en el `MimeType` del .desktop,
+# Android en el intent-filter, macOS e iOS en CFBundleURLSchemes y Windows en
+# `Capabilities\URLAssociations` (la persona lo elige en «Aplicaciones predeterminadas»;
+# no se escribe `Classes\mailto`, que se lo quitaría a su programa de correo). La app lo
+# lee en `Custom["esquemas_extra"]` (`--metadata`) y la cáscara lo entrega a
+# `l.AlAbrirEnlace`. Un nombre que no sea un esquema (RFC 3986), el propio o uno de la
+# suite FALLA el empaquetado.
+esquemas_extra_de() { # <dir de la app> -> esquemas separados por espacios
+  local e propio crudo lista=()
+  propio="$(metadato "$1" esquema)"
+  crudo="$(sed -n 's/^[[:space:]]*esquemas_extra[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' "$1/FyneApp.toml" | head -1)"
+  [ -z "$crudo" ] || IFS=, read -ra lista <<<"$crudo"
+  for e in "${lista[@]}"; do
+    if ! [[ "$e" =~ ^[a-z][a-z0-9+.-]*$ ]] || [ "$e" = "$propio" ] || [[ "$e" == sytue* ]] ||
+      [ "$e" = http ] || [ "$e" = https ] || [ "$e" = file ]; then
+      echo "::error::$1: «$e» no vale como esquema extra (minúsculas, ni el propio, ni de la suite, ni web)" >&2
+      return 1
+    fi
+    printf '%s ' "$e"
+  done
+}
+
+plist_esquemas() { # <dir de la app> -> órdenes de PlistBuddy de CFBundleURLTypes
+  local appid esquema extra e i=1
+  appid="$(metadato "$1" ID)"
+  esquema="$(metadato "$1" esquema)"
+  extra="$(esquemas_extra_de "$1")" || return 1
+  printf '%s\n' "Add :CFBundleURLTypes array" "Add :CFBundleURLTypes:0 dict" \
+    "Add :CFBundleURLTypes:0:CFBundleURLName string $appid" \
+    "Add :CFBundleURLTypes:0:CFBundleURLSchemes array" \
+    "Add :CFBundleURLTypes:0:CFBundleURLSchemes:0 string $esquema"
+  for e in $extra; do
+    printf 'Add :CFBundleURLTypes:0:CFBundleURLSchemes:%d string %s\n' "$i" "$e"
+    i=$((i + 1))
+  done
+}
+
+android_esquemas_extra() { # <esquemas> -> líneas <data> del intent-filter VIEW
+  local e
+  for e in $1; do
+    printf '\n\t\t\t<data android:scheme="%s" />' "$e"
+  done
+}
+
+nsis_esquemas_extra() { # <esquemas> <appid> <nombre> <ejecutable>
+  [ -n "$1" ] || return 0
+  local progid="$2.enlace" e cap="Software\\Sytue\\$2\\Capabilities"
+  printf '  ; ESQUEMAS DE MÁS (%s): candidata en «Aplicaciones predeterminadas», sin quitárselos a nadie.\n' "${1% }"
+  printf '  WriteRegStr HKCU "Software\\Classes\\%s" "" "URL:%s"\n' "$progid" "$3"
+  printf '  WriteRegStr HKCU "Software\\Classes\\%s" "URL Protocol" ""\n' "$progid"
+  printf '  WriteRegStr HKCU "Software\\Classes\\%s\\DefaultIcon" "" "$INSTDIR\\%s.exe,0"\n' "$progid" "$4"
+  printf '  WriteRegStr HKCU "Software\\Classes\\%s\\shell\\open\\command" "" %s\n' "$progid" "'\"\$INSTDIR\\$4.exe\" \"%1\"'"
+  printf '  WriteRegStr HKCU "%s" "ApplicationName" "%s"\n' "$cap" "$3"
+  printf '  WriteRegStr HKCU "%s" "ApplicationDescription" "%s"\n' "$cap" "$3"
+  for e in $1; do
+    printf '  WriteRegStr HKCU "%s\\URLAssociations" "%s" "%s"\n' "$cap" "$e" "$progid"
+  done
+  printf '  WriteRegStr HKCU "Software\\RegisteredApplications" "%s" "%s"\n' "$3" "$cap"
+}
+
+nsis_quitar_esquemas_extra() { # <esquemas> <appid> <nombre>
+  [ -n "$1" ] || return 0
+  printf '  DeleteRegKey HKCU "Software\\Classes\\%s.enlace"\n' "$2"
+  printf '  DeleteRegValue HKCU "Software\\RegisteredApplications" "%s"\n' "$3"
+  printf '  DeleteRegKey HKCU "Software\\Sytue\\%s"\n' "$2"
+  printf '  DeleteRegKey /ifempty HKCU "Software\\Sytue"\n'
 }
 
 tipos_de() { # <dir de la app> -> un tipo MIME por línea
@@ -1036,7 +1295,22 @@ PY
   # La sesión compartida (el Keychain de la suite) desde que existe grupo_apple.go; un tag
   # anterior se firma con lo que trae. El App Group y su comprobación contra el perfil,
   # solo con el interruptor de los widgets encendido (widgets_apple_activos).
-  if [ -f "$RAIZ/apps/nucleo/ajustes/grupo_apple.go" ]; then
+  if [ "${ARBOL:-cmd}" = cmd-local ]; then
+    # Sytue Office: su App Group en vez de la sesión de la suite (derechos_office).
+    grupos_sesion_apple || return 1
+    equipo="${GRUPO_LLAVERO_SUITE%%.*}"
+    sesion="$dir/sesion.plist"
+    derechos_office "$6" "$equipo" >"$sesion" || return 1
+    bash "$AQUI/apple-firma.sh" verificar-perfil-grupo "$app/embedded.mobileprovision" "$4" ios "$(grupo_office_apple)" "" "" "$sesion" || return 1
+    python3 - "$ent" "$sesion" <<'PY' || return 1
+import pathlib, plistlib, sys
+destino, adicionales = map(pathlib.Path, sys.argv[1:])
+derechos = plistlib.loads(destino.read_bytes())
+derechos.update(plistlib.loads(adicionales.read_bytes()))
+destino.write_bytes(plistlib.dumps(derechos))
+PY
+    rm -f "$sesion"
+  elif [ -f "$RAIZ/apps/nucleo/ajustes/grupo_apple.go" ]; then
     grupos_sesion_apple || return 1
     equipo="${GRUPO_LLAVERO_SUITE%%.*}"
     sesion="$dir/sesion.plist"
@@ -1080,6 +1354,7 @@ PY
   # y Apple exige lectura pública (90255).
   chmod -R u+rwX,go+rX "$app"
   incorporar_widgets_apple "$app" "$6" ios "${SYTUE_IOS_IDENTIDAD:?}" || return 1
+  [ "${ARBOL:-cmd}" != cmd-local ] || incorporar_ia_apple "$app" "${SYTUE_IOS_IDENTIDAD:?}" || return 1
   ! command -v xattr >/dev/null 2>&1 || xattr -cr "$app"
   codesign -f -s "${SYTUE_IOS_IDENTIDAD:?para volver a firmar el IPA hace falta SYTUE_IOS_IDENTIDAD}" \
     --entitlements "$ent" "$app"
@@ -1274,13 +1549,31 @@ if [ "$plataforma" = tipos ]; then
     exit 2
   }
   d="$1"
-  [ -d "$d" ] || d="$FYNE/cmd/$1"
+  [ -d "$d" ] || d="$FYNE/$ARBOL/$1"
   [ -f "$d/FyneApp.toml" ] || {
     echo "::error::$1 no tiene FyneApp.toml" >&2
     exit 2
   }
   tipos_de "$d"
   exit $?
+fi
+if [ "$plataforma" = esquemas ]; then
+  so="${1:?uso: $0 esquemas <linux|android|apple|windows> <app|directorio>}"
+  d="${2:?uso: $0 esquemas <linux|android|apple|windows> <app|directorio>}"
+  [ -d "$d" ] || d="$FYNE/$ARBOL/$2"
+  extra="$(esquemas_extra_de "$d")" || exit 1
+  case "$so" in
+  linux) for e in $extra; do printf 'x-scheme-handler/%s\n' "$e"; done ;;
+  android) android_esquemas_extra "$extra" && printf '\n' ;;
+  apple) plist_esquemas "$d" ;;
+  windows)
+    a="$(metadato "$d" ID)"
+    nsis_esquemas_extra "$extra" "$a" "$(metadato "$d" Name)" "${PREFIJO}$(basename "$d")"
+    nsis_quitar_esquemas_extra "$extra" "$a" "$(metadato "$d" Name)"
+    ;;
+  *) exit 2 ;;
+  esac
+  exit 0
 fi
 if [ "$plataforma" = mesa-windows ]; then
   nsis_mesa "${1:?uso: $0 mesa-windows <carpeta>}"
@@ -1289,20 +1582,20 @@ if [ "$plataforma" = mesa-windows ]; then
 fi
 if [ "$plataforma" = refresco-ios ]; then
   d="${1:?uso: $0 refresco-ios <app|directorio>}"
-  [ -d "$d" ] || d="$FYNE/cmd/$1"
+  [ -d "$d" ] || d="$FYNE/$ARBOL/$1"
   plist_refresco "$d"
   exit $?
 fi
 if [ "$plataforma" = documentos-mac ] || [ "$plataforma" = registro-windows ]; then
   d="${1:?uso: $0 $plataforma <app|directorio>}"
-  [ -d "$d" ] || d="$FYNE/cmd/$1"
+  [ -d "$d" ] || d="$FYNE/$ARBOL/$1"
   if [ "$plataforma" = documentos-mac ]; then
     plist_documentos "$d"
     exit $?
   fi
   e="$(extensiones_de "$d")"
   a="$(metadato "$d" ID)"
-  nsis_abrir_con "$e" "$a" "$(metadato "$d" Name)" "sytue-$(basename "$d")"
+  nsis_abrir_con "$e" "$a" "$(metadato "$d" Name)" "${PREFIJO}$(basename "$d")"
   nsis_quitar_abrir_con "$e" "$a" "$(metadato "$d" Name)"
   exit 0
 fi
@@ -1321,7 +1614,25 @@ bash "$AQUI/preparar-livekit.sh"
 # públicos, que es la fuga que `compliance/supply-chain/README.md` §A da por
 # cerrada—, así que sin `GOPRIVATE` el `go build` de más abajo se va al proxy
 # público y muere con un 404 que no dice por qué.
-if grep -q '^replace .*=> github\.com/thinkddr/' "$FYNE/go.mod" 2>/dev/null; then
+#
+# DESDE vendor/ no se descarga nada y GOPRIVATE no hace falta: es como compila un árbol
+# autónomo de Sytue Office (con GOFLAGS=-mod=vendor y GOPROXY=off).
+# Allí apps/fyne y apps/nucleo son un espacio de trabajo (go.work en la raíz) y vendor/
+# está en la raíz; en un módulo suelto, en apps/fyne/vendor. Go lo usa con `-mod=vendor`
+# y, sin `-mod`, en cuanto existe su modules.txt.
+vendor_go=""
+if [ -f "$FYNE/vendor/modules.txt" ]; then
+  vendor_go="$FYNE/vendor"
+elif [ -f "$RAIZ/go.work" ] && [ -f "$RAIZ/vendor/modules.txt" ]; then
+  vendor_go="$RAIZ/vendor"
+fi
+desde_vendor=""
+case " ${GOFLAGS:-} " in
+*" -mod=vendor "*) desde_vendor=si ;;
+*" -mod="*) ;;
+*) [ -z "$vendor_go" ] || desde_vendor=si ;;
+esac
+if [ -z "$desde_vendor" ] && grep -q '^replace .*=> github\.com/thinkddr/' "$FYNE/go.mod" 2>/dev/null; then
   case "${GOPRIVATE:-}" in
   *github.com/thinkddr*) ;;
   *)
@@ -1447,10 +1758,36 @@ apk_a_aab() { # <apk> <aab> <lib> <servicios> <imagen-en-imagen> <manifiesto-fue
   t="$(mktemp -d)"
   mkdir -p "$t/apk" "$t/base/manifest" "$t/base/dex" "$t/base/root"
   unzip -q "$apk" -d "$t/apk" -x 'META-INF/*'
+  # Sytue Office (SYTUE_ARBOL=cmd-local): sin widgets ni broker de sesión, y con ML Kit si
+  # va (`MLKIT`, preparado arriba): su manifiesto y sus recursos se enlazan con los iconos.
+  local edicion=()
+  if [ "$ARBOL" = cmd-local ]; then
+    edicion=(--edicion local)
+    [ -z "${MLKIT:-}" ] || edicion+=(--mlkit "$MLKIT" --r-java "$t/r")
+  fi
   python3 "$AQUI/android-widgets.py" --appdir "$appdir" --manifest "$manifiesto" \
     --apk-root "$t/apk" --aapt2 "$AAPT2" --android-jar "$ANDROID_JAR" \
-    --min-sdk "$ANDROID_MIN_SDK" --target-sdk "$ANDROID_TARGET_SDK"
+    --min-sdk "$ANDROID_MIN_SDK" --target-sdk "$ANDROID_TARGET_SDK" ${edicion[@]+"${edicion[@]}"}
   cp "$DEX_PROPIO" "$t/apk/classes.dex"
+  # ML Kit va DETRÁS del dex propio (classes2.dex…), que sigue siendo classes.dex: lo que
+  # verificar_aab mira. Luego las R de sus bibliotecas con los identificadores de ESTA app,
+  # y los META-INF/services de sus JAR (ServiceLoader de kotlinx-coroutines).
+  if [ -n "${MLKIT:-}" ] && [ "$ARBOL" = cmd-local ]; then
+    local i=1 n=2 rs=()
+    while [ -f "$MLKIT/dex/classes$([ "$i" = 1 ] || echo "$i").dex" ]; do
+      cp "$MLKIT/dex/classes$([ "$i" = 1 ] || echo "$i").dex" "$t/apk/classes$n.dex"
+      i=$((i + 1)) n=$((n + 1))
+    done
+    while IFS= read -r s; do rs+=("$s"); done < <(find "$t/r" -name 'R.java')
+    "$(command -v javac || echo "$JAVA_HOME/bin/javac")" --release 17 -encoding UTF-8 -nowarn -d "$t/r-cls" ${rs[@]+"${rs[@]}"}
+    rs=()
+    while IFS= read -r s; do rs+=("$s"); done < <(find "$t/r-cls" -name '*.class')
+    mkdir -p "$t/r-dex"
+    "$D8" --release --min-api "$ANDROID_MIN_SDK" --lib "$ANDROID_JAR" --output "$t/r-dex" ${rs[@]+"${rs[@]}"}
+    cp "$t/r-dex/classes.dex" "$t/apk/classes$n.dex"
+    rm -rf "$t/r" "$t/r-cls" "$t/r-dex"
+    [ ! -d "$MLKIT/servicios/META-INF" ] || cp -R "$MLKIT/servicios/META-INF" "$t/apk/"
+  fi
   python3 "$AQUI/android-binario.py" alineacion "$t/apk/lib/arm64-v8a/lib$lib.so" 16384
   python3 "$AQUI/android-binario.py" min-sdk "$t/apk/AndroidManifest.xml" "$ANDROID_MIN_SDK"
   python3 "$AQUI/android-binario.py" target-sdk "$t/apk/AndroidManifest.xml" "$ANDROID_TARGET_SDK"
@@ -1494,8 +1831,10 @@ apk_a_aab() { # <apk> <aab> <lib> <servicios> <imagen-en-imagen> <manifiesto-fue
 # el paquete (que ya no se puede cambiar una vez subido), el versionCode del tag, el
 # mínimo, target y el esquema con que las demás apps la abren.
 verificar_aab() { # <aab> <paquete> <esquema> [«clase:tipo …» de los servicios] [si: proveedor de documentos] [si: imagen dentro de imagen]
-  local m dex
+  local m dex piezas=si
   m="$(bundletool dump manifest --bundle "$1")"
+  # Las piezas de la conectada (widgets y broker de sesión): ni la demo ni Sytue Office.
+  if [ "$2" = eu.sytue.fyne.demo ] || [ "$ARBOL" = cmd-local ]; then piezas=no; fi
   grep -q "package=\"$2\"" <<<"$m" || {
     echo "::error::$1 no es el paquete $2." >&2
     return 1
@@ -1518,7 +1857,8 @@ verificar_aab() { # <aab> <paquete> <esquema> [«clase:tipo …» de los servici
   }
   # La demo (eu.sytue.fyne.demo) no es un producto y va sin widgets ni broker de sesión:
   # android-widgets.py y android-sesion.py no se los ponen, y aquí tampoco se le piden.
-  if [ "$2" != eu.sytue.fyne.demo ] && { ! grep -q 'android:name="eu.sytue.nativo.Widgets"' <<<"$m" ||
+  # Sytue Office tampoco los lleva (PLAN-EDICION-LOCAL §7.2): `verificar_office`.
+  if [ "$piezas" = si ] && { ! grep -q 'android:name="eu.sytue.nativo.Widgets"' <<<"$m" ||
     ! grep -q 'android:name="android.appwidget.provider"' <<<"$m" ||
     ! grep -q 'android:name="eu.sytue.nativo.SesionProveedor"' <<<"$m" ||
     ! grep -q 'android:name="eu.sytue.nativo.SesionDesbloqueo"' <<<"$m"; }; then
@@ -1528,7 +1868,7 @@ verificar_aab() { # <aab> <paquete> <esquema> [«clase:tipo …» de los servici
   # El trabajo del widget con la app cerrada (RefrescoWidgets): sin BIND_JOB_SERVICE,
   # JobScheduler no lo encola. Con el relevo de One (android-widgets.py, FONDO_GO), el
   # trabajo pide red, y Android 14+ lo rechaza sin ACCESS_NETWORK_STATE.
-  if [ "$2" != eu.sytue.fyne.demo ] && ! grep -q 'android:name="eu.sytue.nativo.RefrescoWidgets"' <<<"$m"; then
+  if [ "$piezas" = si ] && ! grep -q 'android:name="eu.sytue.nativo.RefrescoWidgets"' <<<"$m"; then
     echo "::error::$1 no declara RefrescoWidgets: el widget no se repintaría ni refrescaría con la app cerrada." >&2
     return 1
   fi
@@ -1573,27 +1913,88 @@ verificar_aab() { # <aab> <paquete> <esquema> [«clase:tipo …» de los servici
     echo "::error::$1 lleva el dex de la CLI de Fyne, no el del fork: «Abrir un fichero» cerraría la app." >&2
     return 1
   fi
-  if [ "$2" != eu.sytue.fyne.demo ] && { ! grep -qa 'Leu/sytue/nativo/Widgets;' "$dex" || ! unzip -Z1 "$1" base/assets/sytue-widget.json >/dev/null 2>&1; }; then
+  if [ "$piezas" = si ] && { ! grep -qa 'Leu/sytue/nativo/Widgets;' "$dex" || ! unzip -Z1 "$1" base/assets/sytue-widget.json >/dev/null 2>&1; }; then
     rm -f "$dex"
     echo "::error::$1 no contiene la implementación del widget o sus metadatos." >&2
     return 1
   fi
   rm -f "$dex"
+  if [ "$ARBOL" = cmd-local ]; then verificar_office "$1" "$2" "$m" || return 1; fi
   echo "  AAB: $2, versionCode $build, mínimo $ANDROID_MIN_SDK, target $ANDROID_TARGET_SDK, $3:// comprobados"
+}
+
+# Lo propio de un AAB de Sytue Office (SYTUE_ARBOL=cmd-local), leído del AAB: sin las piezas
+# de la conectada, los permisos justos (los de la app, `permisos_extra` del bucle, y el de
+# AICore si lleva ML Kit) y, con ML Kit, sus clases, su arranque y SIN el canal de métricas.
+verificar_office() { # <aab> <paquete> <manifiesto volcado>
+  local m="$3" pedidos justificados d f dex=0 ia=no
+  for d in eu.sytue.nativo.Widgets eu.sytue.nativo.RefrescoWidgets eu.sytue.nativo.RelevoWidgets \
+    eu.sytue.nativo.SesionProveedor eu.sytue.nativo.SesionDesbloqueo eu.sytue.nativo.Avisos eu.sytue.nativo.Documentos; do
+    if grep -q "android:name=\"$d\"" <<<"$m"; then
+      echo "::error::$1 declara $d, que es de la edición conectada (PLAN-EDICION-LOCAL §7.2)." >&2
+      return 1
+    fi
+  done
+  # El vídeo del sistema (MediaCodec y la miniatura de Cast y Photos) va en el dex propio.
+  f="$(mktemp)"
+  if ! unzip -p "$1" base/dex/classes.dex >"$f" || ! grep -qa 'Leu/sytue/nativo/VideoSistema;' "$f"; then
+    rm -f "$f"
+    echo "::error::$1 no lleva eu.sytue.nativo.VideoSistema: Cast y Photos no verían en la app lo que no es WebM." >&2
+    return 1
+  fi
+  rm -f "$f"
+  justificados="android.permission.INTERNET android.permission.POST_NOTIFICATIONS ${permisos_extra[*]+${permisos_extra[*]}}"
+  [ -z "${MLKIT:-}" ] || justificados="$justificados com.google.android.apps.aicore.service.BIND_SERVICE"
+  justificados="$(printf '%s\n' $justificados | sort -u | tr '\n' ' ')"
+  pedidos="$(grep -o '<uses-permission [^>]*android:name="[^"]*"' <<<"$m" | sed 's/.*android:name="//; s/"$//' | sort -u | tr '\n' ' ')"
+  [ "$pedidos" = "$justificados" ] || {
+    echo "::error::$1 pide «$pedidos» y lo único justificado es «$justificados»." >&2
+    return 1
+  }
+  if [ -n "${MLKIT:-}" ]; then
+    for d in com.google.mlkit.common.internal.MlKitInitProvider com.google.mlkit.common.internal.MlKitComponentDiscoveryService \
+      com.google.android.aicore com.google.android.gms.version; do
+      grep -q "android:name=\"$d\"" <<<"$m" || {
+        echo "::error::$1 lleva ML Kit sin declarar $d: la Prompt API no arrancaría o no vería AICore." >&2
+        return 1
+      }
+    done
+    grep -q "android:authorities=\"$2.mlkitinitprovider\"" <<<"$m" || {
+      echo "::error::$1: el proveedor de ML Kit no lleva la autoridad de su paquete." >&2
+      return 1
+    }
+    # El canal de las métricas de uso de ML Kit hacia Google NO se declara (android-mlkit.py).
+    if grep -q 'TransportBackendDiscovery\|JobInfoSchedulerService\|AlarmManagerSchedulerBroadcastReceiver' <<<"$m"; then
+      echo "::error::$1 declara el transporte de métricas de Google: Sytue Office no manda nada que la persona no haya pedido." >&2
+      return 1
+    fi
+    d="$(mktemp -d)"
+    unzip -q "$1" 'base/dex/*.dex' -d "$d"
+    for f in "$d"/base/dex/*.dex; do
+      dex=$((dex + 1))
+      if grep -qa 'Lcom/google/mlkit/genai/prompt/Generation;' "$f"; then ia=si; fi
+    done
+    rm -rf "$d"
+    [ "$ia" = si ] && [ "$dex" -gt 1 ] || {
+      echo "::error::$1 no lleva las clases de la Prompt API de ML Kit en su dex." >&2
+      return 1
+    }
+    echo "  ML Kit: Prompt API en $dex dex, arranque y AICore declarados, sin el canal de métricas"
+  fi
 }
 
 # --- Qué apps -----------------------------------------------------------------
 apps=()
 if [ "$#" -gt 0 ]; then
   for a in "$@"; do
-    [ -f "$FYNE/cmd/$a/FyneApp.toml" ] || {
+    [ -f "$FYNE/$ARBOL/$a/FyneApp.toml" ] || {
       echo "::error::apps/fyne/cmd/$a no existe o no tiene FyneApp.toml" >&2
       exit 1
     }
     apps+=("$a")
   done
 else
-  for t in "$FYNE"/cmd/*/FyneApp.toml; do
+  for t in "$FYNE"/"$ARBOL"/*/FyneApp.toml; do
     [ -f "$t" ] || continue
     apps+=("$(basename "$(dirname "$t")")")
   done
@@ -1615,6 +2016,45 @@ CLI="$(command -v fyne || true)"
   exit 1
 }
 
+# --- Los identificadores de cliente OAuth de Sytue Office ---------------------
+# `nube.ClienteGoogle`, `nube.ClienteGoogleSecreto` y `nube.ClienteMicrosoft`
+# (apps/nucleo/local/nube): los clientes «App de escritorio» de Google y de Microsoft
+# Entra con los que la edición entra en Drive, OneDrive, Calendar, Outlook, Teams y
+# Google Chat sin que la persona registre el suyo (Calendar y Rooms los toman de
+# `nube.ClientesCompilados`). Llegan del ENTORNO —en los workflows, de los secretos del
+# mismo nombre— y entran con `-ldflags -X`: no se escriben en ningún fichero ni salen
+# en el log. Sin ellos se compila como siempre y Ajustes pide a la persona el suyo.
+# Solo Sytue Office: la conectada no enlaza `nube` y no se le pasa nada.
+#
+# DOS FORMAS, según quién lea GOFLAGS (medido con go1.27 y fyne.io/tools 1.7.4).
+# `fyne build` (escritorio, y la recompilación de `fyne package` en Windows) parte
+# GOFLAGS por espacios y junta en uno cada `-ldflags=`: va una entrada por variable
+# (`goflags_oauth`). Un `go build` directo, y el de `fyne package` en Android, se quedan
+# con el ÚLTIMO `-ldflags=` de GOFLAGS: ahí todo va en una entrada entre comillas, que
+# Go entiende, o en la línea de `-ldflags` de la orden (`ldflags_oauth`).
+oauth_x=()
+if [ "$ARBOL" = cmd-local ]; then
+  for par in SYTUE_OFFICE_GOOGLE_CLIENT_ID:ClienteGoogle SYTUE_OFFICE_GOOGLE_CLIENT_SECRET:ClienteGoogleSecreto \
+    SYTUE_OFFICE_MICROSOFT_CLIENT_ID:ClienteMicrosoft; do
+    variable="${par%%:*}"
+    valor="${!variable:-}"
+    if [ -z "$valor" ]; then
+      echo "::notice::OAuth: sin $variable, se compila sin él (Ajustes pide el de la persona)"
+      continue
+    fi
+    # Sin espacios ni comillas, que GOFLAGS y el enlazador partirían. El valor no se
+    # enseña ni al rechazarlo.
+    [[ "$valor" =~ ^[A-Za-z0-9._~-]+$ ]] || {
+      echo "::error::$variable no tiene la forma de un identificador de cliente OAuth (letras, cifras y . _ ~ -); no se muestra" >&2
+      exit 1
+    }
+    oauth_x+=("-X=git.sytue.eu/sytue/one/apps/nucleo/local/nube.${par#*:}=$valor")
+    echo "   OAuth: $variable va en los binarios"
+  done
+fi
+goflags_oauth() { local x; for x in ${oauth_x[@]+"${oauth_x[@]}"}; do printf ' -ldflags=%s' "$x"; done; }
+ldflags_oauth() { local x; for x in ${oauth_x[@]+"${oauth_x[@]}"}; do printf ' %s' "$x"; done; }
+
 # COMPILA LA CLI, NO `go build`: con `--executable`, `fyne package` no compila
 # (package.go:196 de fyne.io/tools) y por tanto no inyecta fyne_metadata_init.go
 # (build.go:127 solo corre dentro de su propio build). Sin él, Metadata().ID/Name/
@@ -1625,7 +2065,7 @@ CLI="$(command -v fyne || true)"
 # CLI avisa y SIGUE («omitting metadata»): aquí eso es rojo.
 compilar_fyne() { # <salida> [--tags …]; GOOS lo pone --target, el resto viene del entorno
   local salida
-  salida="$("$CLI" build --tags goolm --target "$objetivo" -o "$@" 2>&1)" || { printf '%s\n' "$salida" >&2; return 1; }
+  salida="$("$CLI" build --tags "${ETIQUETAS_BASE:-goolm}" --target "$objetivo" -o "$@" 2>&1)" || { printf '%s\n' "$salida" >&2; return 1; }
   case "$salida" in *"omitting metadata"*)
     printf '%s\n' "$salida" >&2
     echo "::error::fyne build no inyectó los metadatos de FyneApp.toml en $1" >&2
@@ -1726,6 +2166,9 @@ compilar_ios() { # <iphoneos|iphonesimulator> <salida>
     ld="-ldflags=-extldflags=-Wl,-platform_version,ios-simulator,$minimo,$(xcrun --sdk "$sdk" --show-sdk-version)"
   fi
   fl="-isysroot $raiz_sdk $fl -arch arm64"
+  # Los identificadores OAuth de Sytue Office, en el MISMO `-ldflags` (es un `go build`:
+  # dos entradas en GOFLAGS y solo valdría la última). `$ld` no lleva espacios.
+  [ -z "${oauth_x[*]+x}" ] || ld="'$ld$(ldflags_oauth)'"
   [ -z "${SYTUE_WIDGET_PRODUCTOS:-}" ] || widgets_fl="$(enlace_widgets_apple '@executable_path/Frameworks')" || return 1
   # Los metadatos con el Go del anfitrión: con GOOS=ios, `go run` compilaría la
   # herramienta para el iPhone y no podría ejecutarla.
@@ -1741,7 +2184,7 @@ compilar_ios() { # <iphoneos|iphonesimulator> <salida>
       CGO_LDFLAGS_ALLOW="$(permiso_enlace_widgets_apple)"
       export CGO_LDFLAGS_ALLOW
     fi
-    go build -tags "goolm${etiquetas:+,$etiquetas}" -o "$salida" .
+    go build -tags "${ETIQUETAS_BASE:-goolm}${etiquetas:+,$etiquetas}" -o "$salida" .
   ) || r=$?
   rm -f "$meta"
   return "$r"
@@ -1816,14 +2259,15 @@ verificar_ios_paquete() { # <.app>
 # clang graba como minos la versión de la máquina (26.5 en Codemagic) y ningún Mac anterior
 # abre la app. 13.0 es lo que exige Go 1.27 (Ventura).
 compilar_mac() { # <salida> [--tags …]
-  local salida="$1" cc widgets_fl=""
+  local salida="$1" cc widgets_fl="" goflags
   shift
   cc="$(xcrun -f clang)"
   cc="$cc -arch x86_64 -isysroot $(xcrun -sdk macosx -show-sdk-path)"
   [ -z "${SYTUE_WIDGET_PRODUCTOS:-}" ] || widgets_fl="$(enlace_widgets_apple '@executable_path/../Frameworks')" || return 1
+  goflags="-trimpath$(goflags_oauth)"
   (
     # shellcheck disable=SC2030,SC2031 # a propósito: el subshell acota el export a esta compilación
-    export MACOSX_DEPLOYMENT_TARGET=13.0 GOFLAGS=-trimpath CGO_ENABLED=1
+    export MACOSX_DEPLOYMENT_TARGET=13.0 GOFLAGS="$goflags" CGO_ENABLED=1
     if [ -n "$widgets_fl" ]; then
       export CGO_LDFLAGS="${CGO_LDFLAGS:+$CGO_LDFLAGS }$widgets_fl"
       CGO_LDFLAGS_ALLOW="$(permiso_enlace_widgets_apple)"
@@ -1852,21 +2296,16 @@ compilar_mac() { # <salida> [--tags …]
 #     `llamadas`). El texto sale del catálogo común, en inglés en el plist y en cada idioma
 #     en su `InfoPlist.strings` (en macOS dentro de Contents/Resources).
 plist_apple() { # <macos|ios|iossimulator> <dir de la app> <Info.plist> <carpeta de recursos>
-  local p="$1" dir="$2" plist="$3" recursos="$4" appid esquema documentos o refresco
+  local p="$1" dir="$2" plist="$3" recursos="$4" appid esquema esquemas documentos o refresco
   local claves=()
   appid="$(metadato "$dir" ID)"
   esquema="$(metadato "$dir" esquema)"
   documentos="$(plist_documentos "$dir")" || return 1
+  esquemas="$(plist_esquemas "$dir")" || return 1
   /usr/libexec/PlistBuddy -c "Delete :CFBundleURLTypes" "$plist" >/dev/null 2>&1 || true
   # PlistBuddy y no `plutil -insert`: el segundo no sabe crear un array de diccionarios
-  # anidado en una sola orden.
-  /usr/libexec/PlistBuddy \
-    -c "Add :CFBundleURLTypes array" \
-    -c "Add :CFBundleURLTypes:0 dict" \
-    -c "Add :CFBundleURLTypes:0:CFBundleURLName string $appid" \
-    -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes array" \
-    -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes:0 string $esquema" \
-    "$plist"
+  # anidado en una sola orden. El esquema propio y los de más (`plist_esquemas`).
+  while IFS= read -r o; do /usr/libexec/PlistBuddy -c "$o" "$plist"; done <<<"$esquemas"
   # Una orden por llamada: con más de ~16 `-c` PlistBuddy aborta (SIGABRT).
   if [ -n "$documentos" ]; then
     /usr/libexec/PlistBuddy -c "Delete :CFBundleDocumentTypes" "$plist" >/dev/null 2>&1 || true
@@ -1932,7 +2371,7 @@ PY
 # Store (etiqueta `tienda`, con sus derechos de sandbox en el target): el .dmg sigue
 # saliendo de `empaquetar.sh macos`. Ver «Xcode Cloud» en docs/operations.md.
 if [ "$plataforma" = xcode ]; then
-  dir="$FYNE/cmd/${SYTUE_APP:?lo define cada target de Sytue.xcodeproj}"
+  dir="$FYNE/$ARBOL/${SYTUE_APP:?lo define cada target de Sytue.xcodeproj}"
   salida="${TARGET_BUILD_DIR:?esto solo lo lanza una fase de Xcode}/${EXECUTABLE_PATH:?}"
   mkdir -p "$(dirname "$salida")"
   # Las dependencias WidgetKit ya están compiladas por Xcode; el ejecutable Go
@@ -1949,7 +2388,7 @@ if [ "$plataforma" = xcode ]; then
     destino_plist=ios
     ;;
   macosx)
-    (cd "$dir" && compilar_mac "$salida" --tags tienda,goolm)
+    (cd "$dir" && compilar_mac "$salida" --tags "tienda,${ETIQUETAS_BASE:-goolm}")
     destino_plist=macos
     ;;
   *)
@@ -1987,13 +2426,15 @@ fi
 # multiplica el tamaño del APK y el tiempo de compilación.
 case "$plataforma" in
 linux)
-  arch=amd64
-  case "$(uname -m)" in
-  x86_64 | amd64)
+  # amd64 salvo SYTUE_LINUX_ARCH=arm64. Nativo cuando el destino es la máquina; amd64
+  # desde ARM64 se cruza (los runners del frontal); lo demás no se sabe hacer.
+  arch="$LINUX_ARCH"
+  case "$arch:$(uname -m)" in
+  amd64:x86_64 | amd64:amd64 | arm64:aarch64 | arm64:arm64)
     # shellcheck disable=SC2031 # el CC de quien llama, no el que compilar_ios/compilar_mac acotan a su subshell
     CC_DESTINO="${CC:-gcc}"
     ;;
-  aarch64 | arm64)
+  amd64:aarch64 | amd64:arm64)
     command -v x86_64-linux-gnu-gcc >/dev/null 2>&1 || {
       echo "::error::desde ARM64 hace falta x86_64-linux-gnu-gcc para publicar Linux/amd64." >&2
       echo "  Lo instala el perfil 'escritorio-amd64' de .github/actions/toolchain/accion.sh." >&2
@@ -2004,7 +2445,7 @@ linux)
     export PKG_CONFIG_LIBDIR=/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/share/pkgconfig
     ;;
   *)
-    echo "::error::no sé publicar Linux/amd64 desde $(uname -m)." >&2
+    echo "::error::no sé publicar Linux/$arch desde $(uname -m): arm64 se compila en una máquina ARM64." >&2
     exit 1
     ;;
   esac
@@ -2148,10 +2589,17 @@ android)
   # `go list -m` da el directorio de un módulo solo si ya está en la caché: en una máquina
   # recién hecha (Codemagic) salía VACÍO y javac buscaba `/internal/driver/mobile/app`
   # (build 6ab946479c453db833436cc8). Se descarga antes, y un vacío para aquí.
-  (cd "$FYNE" && go mod download fyne.io/fyne/v2)
-  fork_fyne="$(cd "$FYNE" && go list -m -f '{{with .Replace}}{{.Dir}}{{else}}{{.Dir}}{{end}}' fyne.io/fyne/v2)"
+  # Desde vendor/ (un árbol autónomo de Sytue Office, con GOPROXY=off) no hay ni caché ni
+  # descarga: el fork está en vendor/ con el nombre de módulo de Fyne, que es lo que se
+  # compila, y `go mod download` fallaría.
+  if [ -n "$desde_vendor" ] && [ -d "$vendor_go/fyne.io/fyne/v2/internal/driver/mobile/app" ]; then
+    fork_fyne="$vendor_go/fyne.io/fyne/v2"
+  else
+    (cd "$FYNE" && go mod download fyne.io/fyne/v2)
+    fork_fyne="$(cd "$FYNE" && go list -m -f '{{with .Replace}}{{.Dir}}{{else}}{{.Dir}}{{end}}' fyne.io/fyne/v2)"
+  fi
   [ -n "$fork_fyne" ] && [ -d "$fork_fyne/internal/driver/mobile/app" ] || {
-    echo "::error::no se encuentra el fork de Fyne en la caché de módulos («$fork_fyne»): sin él no hay dex." >&2
+    echo "::error::no se encuentra el fork de Fyne en la caché de módulos ni en vendor/ («$fork_fyne»): sin él no hay dex." >&2
     exit 1
   }
   dex_tmp="$(mktemp -d)"
@@ -2161,7 +2609,15 @@ android)
   while IFS= read -r fuente; do java_propias+=("$fuente"); done < <(find "$FYNE/android/java" -name '*.java')
   # Pins finales por paquete, no la firma de subida del AAB. La activación queda en
   # el catálogo revisado; nunca la cambia un env del runner ni una preferencia.
-  python3 "$AQUI/android-sesion.py" java "$dex_tmp/generated/eu/sytue/nativo/SesionFirmas.java"
+  # Sytue Office no tiene sesión que compartir (PLAN-EDICION-LOCAL §7.2): su SesionFirmas
+  # sale apagado y sin ningún paquete de confianza, sin el catálogo de la conectada ni sus
+  # cmd/*/FyneApp.toml, que un árbol autónomo de la edición no lleva. Lo mismo en sytue-one
+  # que en sytue-suite: el mismo dex de la misma fuente.
+  if [ "$ARBOL" = cmd-local ]; then
+    python3 "$AQUI/android-sesion.py" java "$dex_tmp/generated/eu/sytue/nativo/SesionFirmas.java" --edicion local
+  else
+    python3 "$AQUI/android-sesion.py" java "$dex_tmp/generated/eu/sytue/nativo/SesionFirmas.java"
+  fi
   java_propias+=("$dex_tmp/generated/eu/sytue/nativo/SesionFirmas.java")
   # `-encoding UTF-8`: los comentarios van en castellano, y un JDK con el locale en ASCII
   # (el contenedor del frontal) no compila ni una clase sin él.
@@ -2175,10 +2631,16 @@ android)
   "$(command -v javac || echo "$JAVA_HOME/bin/javac")" --release 17 -encoding UTF-8 -nowarn -d "$dex_tmp/prueba" \
     "$FYNE/android/java/eu/sytue/nativo/DocumentosIdentidad.java" "$FYNE/android/prueba/eu/sytue/nativo/DocumentosIdentidadPrueba.java"
   "$(command -v java || echo "$JAVA_HOME/bin/java")" -cp "$dex_tmp/prueba" eu.sytue.nativo.DocumentosIdentidadPrueba
+  # La preferencia de Drive y la confianza del broker con el SesionFirmas que va en el dex:
+  # el de la conectada con sus firmas de Play (DrivePreferenciaPrueba) y el de Sytue Office,
+  # que no confía en nadie (SesionLocalPrueba).
+  prueba_sesion=DrivePreferenciaPrueba
+  if [ "$ARBOL" = cmd-local ]; then prueba_sesion=SesionLocalPrueba; fi
   "$(command -v javac || echo "$JAVA_HOME/bin/javac")" --release 17 -encoding UTF-8 -nowarn -d "$dex_tmp/prueba" \
     "$FYNE/android/java/eu/sytue/nativo/DrivePreferencia.java" "$FYNE/android/java/eu/sytue/nativo/SesionConfianza.java" \
-    "$dex_tmp/generated/eu/sytue/nativo/SesionFirmas.java" "$FYNE/android/prueba/eu/sytue/nativo/DrivePreferenciaPrueba.java"
-  "$(command -v java || echo "$JAVA_HOME/bin/java")" -cp "$dex_tmp/prueba" eu.sytue.nativo.DrivePreferenciaPrueba
+    "$FYNE/android/java/eu/sytue/nativo/RefrescoReglas.java" \
+    "$dex_tmp/generated/eu/sytue/nativo/SesionFirmas.java" "$FYNE/android/prueba/eu/sytue/nativo/$prueba_sesion.java"
+  "$(command -v java || echo "$JAVA_HOME/bin/java")" -cp "$dex_tmp/prueba" "eu.sytue.nativo.$prueba_sesion"
   "$(command -v javac || echo "$JAVA_HOME/bin/javac")" --release 17 -encoding UTF-8 -nowarn -d "$dex_tmp/prueba" \
     "$FYNE/android/java/eu/sytue/nativo/WidgetSnapshot.java" "$FYNE/android/prueba/eu/sytue/nativo/WidgetSnapshotPrueba.java" \
     "$FYNE/android/prueba/eu/sytue/nativo/WidgetsBloqueoPrueba.java"
@@ -2201,11 +2663,77 @@ android)
   "$(command -v javac || echo "$JAVA_HOME/bin/javac")" --release 17 -encoding UTF-8 -nowarn -d "$dex_tmp/prueba" \
     "$FYNE/android/java/eu/sytue/nativo/SesionTrabajo.java" "$FYNE/android/prueba/eu/sytue/nativo/SesionTrabajoPrueba.java"
   "$(command -v java || echo "$JAVA_HOME/bin/java")" -cp "$dex_tmp/prueba" eu.sytue.nativo.SesionTrabajoPrueba
+  # El puente con Gemini Nano contra un ML Kit de mentira (lo busca por reflexión; contra el
+  # de verdad lo mira IASistemaContrato, más abajo, cuando la APK lo lleva). Con android.jar
+  # porque IASistema nombra Context; las clases falsas de ML Kit están en android/prueba y
+  # no van en ninguna APK.
+  "$(command -v javac || echo "$JAVA_HOME/bin/javac")" --release 17 -encoding UTF-8 -nowarn -cp "$ANDROID_JAR" -d "$dex_tmp/prueba-ia" \
+    "$FYNE/android/java/eu/sytue/nativo/IASistema.java" "$FYNE/android/prueba/eu/sytue/nativo/IASistemaPrueba.java" \
+    "$FYNE/android/prueba/com/google/mlkit/genai/prompt/Generation.java" \
+    "$FYNE/android/prueba/com/google/mlkit/genai/prompt/java/GenerativeModelFutures.java" \
+    "$FYNE/android/prueba/com/google/mlkit/genai/common/DownloadCallback.java"
+  "$(command -v java || echo "$JAVA_HOME/bin/java")" -cp "$dex_tmp/prueba-ia" eu.sytue.nativo.IASistemaPrueba
+  # El vídeo del sistema de Sytue Office (VideoSistema: MediaExtractor + MediaCodec para el
+  # reproductor de Cast y Photos, y la miniatura de MediaMetadataRetriever) contra un
+  # android.media de mentira (android/prueba/android), SIN android.jar: esas clases ocupan su
+  # sitio en la JVM y ninguna va en una APK.
+  "$(command -v javac || echo "$JAVA_HOME/bin/javac")" --release 17 -encoding UTF-8 -nowarn -d "$dex_tmp/prueba-video" \
+    "$FYNE/android/java/eu/sytue/nativo/VideoSistema.java" "$FYNE/android/prueba/eu/sytue/nativo/VideoSistemaPrueba.java" \
+    "$FYNE"/android/prueba/android/*/*.java
+  "$(command -v java || echo "$JAVA_HOME/bin/java")" -cp "$dex_tmp/prueba-video" eu.sytue.nativo.VideoSistemaPrueba
+  # La galería del teléfono (Carrete: fotos y vídeos de MediaStore, con la duración y los
+  # lados de los vídeos que lee `carrete.deLineas`) contra un MediaStore de mentira, igual:
+  # sin android.jar, con las clases de android/prueba/android a cualquier profundidad.
+  "$(command -v javac || echo "$JAVA_HOME/bin/javac")" --release 17 -encoding UTF-8 -nowarn -d "$dex_tmp/prueba-carrete" \
+    "$FYNE/android/java/eu/sytue/nativo/Carrete.java" "$FYNE/android/prueba/eu/sytue/nativo/CarretePrueba.java" \
+    "$FYNE"/android/prueba/android/*.java "$FYNE"/android/prueba/android/*/*.java "$FYNE"/android/prueba/android/*/*/*.java
+  "$(command -v java || echo "$JAVA_HOME/bin/java")" -cp "$dex_tmp/prueba-carrete" eu.sytue.nativo.CarretePrueba
+  # La carpeta de Drive elegida con el selector (DR-12: ArbolDocumentos, ACTION_OPEN_DOCUMENT_TREE y
+  # DocumentsContract) contra un Android de mentira con un proveedor como el del teléfono sobre
+  # una carpeta temporal (android/prueba/arbol), también SIN android.jar.
+  "$(command -v javac || echo "$JAVA_HOME/bin/javac")" --release 17 -encoding UTF-8 -nowarn -d "$dex_tmp/prueba-arbol" \
+    "$FYNE/android/java/eu/sytue/nativo/ArbolDocumentos.java" "$FYNE/android/prueba/eu/sytue/nativo/ArbolDocumentosPrueba.java" \
+    "$FYNE"/android/prueba/arbol/android/*/*.java
+  "$(command -v java || echo "$JAVA_HOME/bin/java")" -cp "$dex_tmp/prueba-arbol" eu.sytue.nativo.ArbolDocumentosPrueba
   SYTUE_AAPT2="$AAPT2" SYTUE_ANDROID_JAR="$ANDROID_JAR" python3 "$AQUI/android-widgets-test.py"
   clases=()
   while IFS= read -r fuente; do clases+=("$fuente"); done < <(find "$dex_tmp/cls" -name '*.class')
   "$D8" --min-api "$ANDROID_MIN_SDK" --lib "$ANDROID_JAR" --output "$dex_tmp" ${clases[@]+"${clases[@]}"}
   DEX_PROPIO="$dex_tmp/classes.dex"
+  # ML KIT GENAI EN SYTUE OFFICE: la IA del sistema en Android (Gemini Nano por AICore, que
+  # IASistema llama por reflexión). Solo la edición local y solo con SYTUE_MLKIT=si: sus
+  # bibliotecas son propietarias de Google (ML Kit Terms of Service, Android SDK License) y
+  # la Prompt API está en beta, así que meterlas es decisión del dueño. Por defecto la APK
+  # sale sin ellas y Ajustes dice que la compilación no trae el puente. Sus bibliotecas salen de
+  # android/mlkit/dependencias.tsv, con su sha256, de la caché o de su repositorio
+  # (`android-mlkit.py`); se dexan UNA vez aquí y cada app las lleva detrás de su dex, con
+  # sus recursos y las R que les toca (`apk_a_aab`). Ver «ML Kit GenAI» en docs/operations.md.
+  MLKIT=""
+  if [ "$ARBOL" = cmd-local ] && [ "${SYTUE_MLKIT:-no}" = si ]; then
+    MLKIT="$dex_tmp/mlkit"
+    cache_maven="${SYTUE_MAVEN_CACHE:-$HOME/.cache/sytue/maven}"
+    python3 "$AQUI/android-mlkit-test.py"
+    python3 "$AQUI/android-mlkit.py" bajar --cache "$cache_maven"
+    python3 "$AQUI/android-mlkit.py" preparar --cache "$cache_maven" --salida "$MLKIT"
+    # El puente contra la API DE VERDAD, en la JVM: que cada método que IASistema busca por
+    # reflexión existe en estas clases con la forma que espera. La prueba de arriba lo
+    # ejercita contra una de mentira; esta ata la de mentira a la versión fijada.
+    "$(command -v javac || echo "$JAVA_HOME/bin/javac")" --release 17 -encoding UTF-8 -nowarn \
+      -cp "$ANDROID_JAR:$MLKIT/jars/*" -d "$dex_tmp/contrato-ia" \
+      "$FYNE/android/java/eu/sytue/nativo/IASistema.java" "$FYNE/android/prueba/eu/sytue/nativo/IASistemaContrato.java"
+    "$(command -v java || echo "$JAVA_HOME/bin/java")" -cp "$dex_tmp/contrato-ia:$MLKIT/jars/*:$ANDROID_JAR" \
+      eu.sytue.nativo.IASistemaContrato
+    # `--release`: sin información de depuración, que en estas bibliotecas son megas. Avisa
+    # de que sus metadatos de Kotlin son más nuevos que él: d8 no los reescribe sin R8.
+    mkdir -p "$MLKIT/dex"
+    "$D8" --release --min-api "$ANDROID_MIN_SDK" --lib "$ANDROID_JAR" --output "$MLKIT/dex" \
+      "$MLKIT"/jars/*.jar >"$MLKIT/d8.log" 2>&1 || {
+      cat "$MLKIT/d8.log" >&2
+      echo "::error::d8 no pudo dexar ML Kit." >&2
+      exit 1
+    }
+    echo "ML Kit: $(find "$MLKIT/dex" -name 'classes*.dex' | wc -l | tr -d ' ') dex, $(du -sk "$MLKIT/dex" | cut -f1) KiB"
+  fi
   ;;
 ios)
   arch=arm64
@@ -2268,7 +2796,7 @@ mkdir -p "$ESCENARIO/toml"
 restaurar_toml() {
   local c
   for c in "$ESCENARIO"/toml/*; do
-    [ -e "$c" ] && cp "$c" "$FYNE/cmd/$(basename "$c")/FyneApp.toml"
+    [ -e "$c" ] && cp "$c" "$FYNE/$ARBOL/$(basename "$c")/FyneApp.toml"
   done
   return 0
 }
@@ -2313,7 +2841,7 @@ SH
 fi
 
 for app in "${apps[@]}"; do
-  dir="$FYNE/cmd/$app"
+  dir="$FYNE/$ARBOL/$app"
   [ -f "$dir/FyneApp.toml" ] && cp "$dir/FyneApp.toml" "$ESCENARIO/toml/$app"
   appid="$(metadato "$dir" ID)"
   nombre="$(metadato "$dir" Name)"
@@ -2340,8 +2868,11 @@ for app in "${apps[@]}"; do
   # (clase Avisos, `escritorio.MantenerAvisos`) de tipo specialUse, que es lo que es:
   # mantener abierto el flujo del Hub sin Firebase. Solo el Hub; las demás no lo llevan.
   # Y DRIVE ENTRA EN «ARCHIVOS» DE ANDROID: el proveedor de documentos, solo en su app.
+  # SYTUE OFFICE (SYTUE_ARBOL=cmd-local) NO LLEVA NINGUNA DE LAS DOS (PLAN-EDICION-LOCAL
+  # §7.2): el proveedor de documentos de Drive y el servicio de avisos del Hub hablan con
+  # el servidor de la conectada, y la edición local no tiene servidor.
   documentos=""
-  [ "$app" != drive ] || documentos=si
+  [ "$app" != drive ] || [ "$ARBOL" = cmd-local ] || documentos=si
   servicio_avisos=""
   # LA GALERÍA DEL TELÉFONO (`fototeca`, Photos): leerla para la copia de seguridad
   # (READ_MEDIA_IMAGES y READ_MEDIA_VIDEO desde la API 33, READ_EXTERNAL_STORAGE antes, y
@@ -2355,7 +2886,7 @@ for app in "${apps[@]}"; do
     tarea_fondo=si
     permisos_extra+=(android.permission.READ_MEDIA_IMAGES android.permission.READ_MEDIA_VIDEO android.permission.READ_MEDIA_VISUAL_USER_SELECTED android.permission.READ_EXTERNAL_STORAGE android.permission.ACCESS_MEDIA_LOCATION android.permission.ACCESS_NETWORK_STATE android.permission.RECEIVE_BOOT_COMPLETED)
   fi
-  if [ "$app" = hub ]; then
+  if [ "$app" = hub ] && [ "$ARBOL" != cmd-local ]; then
     servicio_avisos=si
     permisos_extra+=(android.permission.FOREGROUND_SERVICE android.permission.FOREGROUND_SERVICE_SPECIAL_USE)
   fi
@@ -2376,6 +2907,9 @@ for app in "${apps[@]}"; do
   # abren un fichero suelto.
   extensiones="$(extensiones_de "$dir")"
   tipos="$(tipos_de "$dir")" || exit 1
+  # Los esquemas de más (`esquemas_extra_de`): `mailto` en Mail de Sytue Office.
+  esquemas_extra="$(esquemas_extra_de "$dir")" || exit 1
+  [ -z "$esquemas_extra" ] || echo "   también: ${esquemas_extra% }"
   # Los tipos de documento de macOS, comprobados antes de compilar (`plist_apple`).
   plist_documentos "$dir" >/dev/null || exit 1
   [ -z "$extensiones" ] || echo "   abre con: $extensiones"
@@ -2383,7 +2917,7 @@ for app in "${apps[@]}"; do
   # El EJECUTABLE se llama `sytue-<app>`, no como el directorio temporal: ese
   # nombre acaba en /usr/local/bin y en el Exec del .desktop, así que tiene que
   # estar espaciado de nombres — dieciséis apps comparten ese directorio.
-  ejecutable="sytue-$app"
+  ejecutable="${PREFIJO}$app"
 
   # La salida de `fyne package` cae al lado del fuente con el nombre de la app; se
   # limpia antes para no recoger la de una ejecución anterior.
@@ -2406,6 +2940,7 @@ for app in "${apps[@]}"; do
   # mergeMetadata): con `--release` (iOS) la CLI lee [Release] y no [Development]
   # (data.go:51-55) y el esquema se perdería → sesion.go fallaría al entrar.
   comunes=(--target "$objetivo" --app-version "$version" --app-build "$build" --metadata "esquema=$esquema")
+  [ -z "$esquemas_extra" ] || comunes+=(--metadata "esquemas_extra=$(printf '%s' "${esquemas_extra% }" | tr ' ' ',')")
 
   unset SYTUE_WIDGET_PRODUCTOS SYTUE_EXTENSION_PRODUCTOS
   if [ "$plataforma" = ios ] || { [ "$plataforma" = macos ] && { [ -n "$tienda" ] || [ -n "${SYTUE_MACOS_IDENTIDAD:-}" ]; }; }; then
@@ -2450,7 +2985,9 @@ for app in "${apps[@]}"; do
     libname="$(printf '%s' "$nombre" | sed 's/[^a-zA-Z0-9]/_/g')"
     sesion_queries=""
     sesion_components=""
-    if [ "$app" != demo ]; then
+    # Sytue Office no tiene sesión que compartir (PLAN-EDICION-LOCAL §7.2): sin broker. Lo
+    # suyo (ML Kit, si va) lo añade `android-widgets.py --edicion local` al enlazar.
+    if [ "$app" != demo ] && [ "$ARBOL" != cmd-local ]; then
       sesion_queries="$(python3 "$AQUI/android-sesion.py" queries - --package "$appid")"
       sesion_components="$(python3 "$AQUI/android-sesion.py" components - --package "$appid")"
     fi
@@ -2487,7 +3024,7 @@ $1}
 			<action android:name="android.intent.action.VIEW" />
 			<category android:name="android.intent.category.DEFAULT" />
 			<category android:name="android.intent.category.BROWSABLE" />
-			<data android:scheme="$esquema" />
+			<data android:scheme="$esquema" />$(android_esquemas_extra "$esquemas_extra")
 		</intent-filter>$(filtro_enlaces "$host_enlaces")$(filtro_documentos "$tipos")
 	</activity>
 
@@ -2524,7 +3061,7 @@ XML
         # `-trimpath` por GOFLAGS: `fyne build` solo lo añade con --release.
         # `-buildmode=pie` también (FYP-06): sin él, el ejecutable sale `Type: EXEC`, sin
         # ASLR. Lo comprueba verificar_pie al publicarlo.
-        CC="$CC_DESTINO" GOFLAGS="-trimpath -buildmode=pie" CGO_ENABLED=1 GOOS=linux GOARCH=amd64 \
+        CC="$CC_DESTINO" GOFLAGS="-trimpath -buildmode=pie$(goflags_oauth)" CGO_ENABLED=1 GOOS=linux GOARCH="$arch" \
           compilar_fyne "$exe"
         ;;
       windows)
@@ -2541,21 +3078,23 @@ XML
         # nombre de fichero y no `-lssp`, porque `ld` preferiría `libssp.dll.a` y
         # el .exe pediría en Windows una libssp-0.dll que nadie instala.
         # GOFLAGS también: la recompilación de `fyne package` solo pone -trimpath con
-        # --release, y es su binario el que se publica.
+        # --release, y es su binario el que se publica. Por eso los identificadores OAuth
+        # de Sytue Office van en GOFLAGS (los lee esa recompilación) y en la orden.
+        goflags_windows="-trimpath$(goflags_oauth)"
         # shellcheck disable=SC2030,SC2031 # a propósito: el subshell acota el export a esta app
-        export CC="$CC_DESTINO" CGO_ENABLED=1 GOOS=windows GOARCH=amd64 GOFLAGS=-trimpath \
+        export CC="$CC_DESTINO" CGO_ENABLED=1 GOOS=windows GOARCH=amd64 GOFLAGS="$goflags_windows" \
           CGO_LDFLAGS="-L$ESCENARIO/gl-diferido ${CGO_LDFLAGS:-} -l:libssp.a -ldelayimp"
-        go build -tags goolm -trimpath -ldflags "-H windowsgui" -o "$exe" .
+        go build -tags "${ETIQUETAS_BASE:-goolm}" -trimpath -ldflags "-H windowsgui$(ldflags_oauth)" -o "$exe" .
         ;;
       macos)
         # La variante de la Mac App Store, con su etiqueta: sin actualizador propio y con
         # el llavero, la carpeta compartida y el panel de abrir que valen dentro del sandbox.
         etiquetas=()
-        [ -z "$tienda" ] || etiquetas=(--tags "tienda,goolm")
+        [ -z "$tienda" ] || etiquetas=(--tags "tienda,${ETIQUETAS_BASE:-goolm}")
         compilar_mac "$exe" ${etiquetas[@]+"${etiquetas[@]}"}
         ;;
       esac
-      "$CLI" package --tags goolm "${comunes[@]}" --executable "$(basename "$exe")"
+      "$CLI" package --tags "${ETIQUETAS_BASE:-goolm}" "${comunes[@]}" --executable "$(basename "$exe")"
     )
     rm -f "$exe"
     ;;
@@ -2588,7 +3127,7 @@ XML
       # Lo que la app lee en ejecución: con --release la CLI lee [Release], y lo que no
       # esté ahí se toma de [Development]. Lo hacía la recompilación con `fyne build`;
       # ahora va en el único compilado, el de `fyne package` (el último --metadata manda).
-      for clave in esquema client_id extensiones; do
+      for clave in esquema esquemas_extra client_id extensiones; do
         if valor="$(metadato "$dir" "$clave" Release)" || valor="$(metadato "$dir" "$clave" Development)"; then
           extra+=(--metadata "$clave=$valor")
         fi
@@ -2617,13 +3156,23 @@ XML
     entorno_movil=(GOFLAGS=)
     [ "$plataforma" = android ] &&
       entorno_movil=(GOFLAGS=-ldflags=-checklinkname=0 "CGO_LDFLAGS=-Wl,-z,max-page-size=16384")
+    # Los identificadores OAuth de Sytue Office, en el MISMO `-ldflags` que el
+    # `-checklinkname=0` y entre comillas: la CLI deja GOFLAGS tal cual a su `go build`, y
+    # con dos entradas solo valdría la última.
+    if [ "$plataforma" = android ] && [ -n "${oauth_x[*]+x}" ]; then
+      entorno_movil[0]="GOFLAGS='-ldflags=-checklinkname=0$(ldflags_oauth)'"
+    fi
     if [ "$plataforma" = ios ]; then
       # -trimpath como el resto de binarios: sin él, las rutas del Mac que compila
       # quedan dentro del ejecutable que va a la tienda.
       entorno_movil=(GOFLAGS=-trimpath "XCODE_XCCONFIG_FILE=$ESCENARIO/ios.xcconfig")
       [ -z "$xcrun_ios_previo" ] || entorno_movil+=("SYTUE_XCRUN_REAL=$xcrun_ios_previo" "PATH=$ESCENARIO/ios-xcrun:$PATH")
+      # Con `--release`, la CLI pone su propio `-ldflags -w` en la orden y pisa cualquiera
+      # de GOFLAGS: los identificadores OAuth no tienen por dónde entrar en el .ipa.
+      [ -z "${oauth_x[*]+x}" ] ||
+        echo "::warning::iOS: fyne package fija su -ldflags y los identificadores de cliente OAuth no entran en $app; la app pedirá los de la persona en Ajustes" >&2
     fi
-    (cd "$dir" && env "${entorno_movil[@]}" "$CLI" package --tags goolm "${comunes[@]}" ${extra[@]+"${extra[@]}"})
+    (cd "$dir" && env "${entorno_movil[@]}" "$CLI" package --tags "${ETIQUETAS_BASE:-goolm}" "${comunes[@]}" ${extra[@]+"${extra[@]}"})
     ;;
   esac
 
@@ -2636,15 +3185,15 @@ XML
   caja="$ESCENARIO/bundles/$b"
   case "$plataforma" in linux | windows | macos) mkdir -p "$caja" ;; esac
   case "$plataforma" in
-  linux) producido="$(find "$dir" -maxdepth 1 -name '*.tar.xz' | head -1)"; destino="$ESCENARIO/sytue-$app-linux-amd64.tar.xz" ;;
-  windows) producido="$(find "$dir" -maxdepth 1 -name '*.exe' | head -1)"; destino="$ESCENARIO/sytue-$app-windows-amd64.exe" ;;
-  macos) producido="$(find "$dir" -maxdepth 1 -name '*.app' | head -1)"; destino="$ESCENARIO/sytue-$app-macos-universal.app" ;;
+  linux) producido="$(find "$dir" -maxdepth 1 -name '*.tar.xz' | head -1)"; destino="$ESCENARIO/${PREFIJO}$app-linux-$arch.tar.xz" ;;
+  windows) producido="$(find "$dir" -maxdepth 1 -name '*.exe' | head -1)"; destino="$ESCENARIO/${PREFIJO}$app-windows-amd64.exe" ;;
+  macos) producido="$(find "$dir" -maxdepth 1 -name '*.app' | head -1)"; destino="$ESCENARIO/${PREFIJO}$app-macos-universal.app" ;;
   # El APK es un paso intermedio: lo que se publica es el AAB, que sale de él más abajo.
-  android) producido="$(find "$dir" -maxdepth 1 -name '*.apk' | head -1)"; destino="$ESCENARIO/sytue-$app-android.apk" ;;
+  android) producido="$(find "$dir" -maxdepth 1 -name '*.apk' | head -1)"; destino="$ESCENARIO/${PREFIJO}$app-android.apk" ;;
   # `fyne package` deja un .app (el .ipa es de `fyne release`): se recoge lo que haya y
   # más abajo sale SIEMPRE un .ipa, que es lo único que acepta App Store Connect.
-  ios) producido="$(find "$dir" -maxdepth 1 \( -name '*.ipa' -o -name '*.app' \) | head -1)"; destino="$ESCENARIO/sytue-$app-ios.${producido##*.}" ;;
-  iossimulator) producido="$app_sim"; destino="$SALIDA/sytue-$app-iossimulator.app" ;;
+  ios) producido="$(find "$dir" -maxdepth 1 \( -name '*.ipa' -o -name '*.app' \) | head -1)"; destino="$ESCENARIO/${PREFIJO}$app-ios.${producido##*.}" ;;
+  iossimulator) producido="$app_sim"; destino="$SALIDA/${PREFIJO}$app-iossimulator.app" ;;
   esac
   [ -n "$producido" ] && [ -e "$producido" ] || {
     echo "::error::fyne package terminó bien y no dejó ningún artefacto en $dir" >&2
@@ -2675,7 +3224,8 @@ XML
     # de ficheros le pasa la ruta o `file://…`, y los dos los entiende `sesion`.
     # `%U` y no `%u`: con varios ficheros seleccionados, el gestor los pasa todos.
     sed -i.bak "s|^Exec=.*|Exec=$ejecutable %U|" "$entrada" && rm -f "$entrada.bak"
-    printf 'MimeType=x-scheme-handler/%s;%s\n' "$esquema" "$(printf '%s' "$tipos" | tr '\n' ';' | sed 's/;*$/;/;s/^;$//')" >>"$entrada"
+    printf 'MimeType=x-scheme-handler/%s;%s%s\n' "$esquema" "$(for e in $esquemas_extra; do printf 'x-scheme-handler/%s;' "$e"; done)" \
+      "$(printf '%s' "$tipos" | tr '\n' ';' | sed 's/;*$/;/;s/^;$//')" >>"$entrada"
     # El Makefile de la CLI no viaja: el bundle trae su `instalar.sh`, que no pide
     # `make` (no viene en muchos escritorios) y registra las catorce apps de una vez.
     icono="$(find "$reempaque" -path '*/share/pixmaps/*' -type f | head -1)"
@@ -2693,7 +3243,9 @@ XML
     # recognized») y, con pipefail, el grep vacío mataba el guion sin decir nada
     # (release-desktop v3.5.12, Linux): se usa el del compilador cruzado si está,
     # y si no se puede leer se avisa en vez de morir.
-    lector="$(command -v x86_64-linux-gnu-objdump || command -v objdump || true)"
+    cruzado=x86_64-linux-gnu-objdump
+    [ "$arch" != arm64 ] || cruzado=aarch64-linux-gnu-objdump
+    lector="$(command -v "$cruzado" || command -v objdump || true)"
     glibc=""
     [ -z "$lector" ] || glibc="$("$lector" -T "$binario" 2>/dev/null |
       grep -oE 'GLIBC_[0-9]+\.[0-9]+' | sort -uV | tail -1 || true)"
@@ -2710,6 +3262,10 @@ XML
     cp "$binario" "$caja/sytue-$b/bin/$ejecutable"
     cp "$entrada" "$caja/sytue-$b/share/applications/"
     cp "$icono" "$caja/sytue-$b/share/pixmaps/"
+    if grep -q '^application/vnd\.sytue\.' <<<"$tipos"; then
+      mkdir -p "$caja/sytue-$b/share/mime/packages"
+      mime_office >"$caja/sytue-$b/share/mime/packages/sytue-office.xml"
+    fi
     rm -rf "$reempaque"
     ;;
   macos | ios | iossimulator)
@@ -2730,7 +3286,7 @@ XML
         mv "$destino" "$ipa_abierto/Payload/$nombre.app"
       fi
       bundle_ios="$(find "$ipa_abierto/Payload" -maxdepth 1 -name '*.app' | head -1)"
-      destino="$SALIDA/sytue-$app-ios.ipa"
+      destino="$SALIDA/${PREFIJO}$app-ios.ipa"
     fi
     plist="$destino/Contents/Info.plist"
     [ "$plataforma" = macos ] || plist="$bundle_ios/Info.plist"
@@ -2893,7 +3449,7 @@ XML
       echo "::error::sin aapt2 no se puede comprobar el esquema ni los permisos de $destino." >&2
       exit 1
     fi
-    aab="$SALIDA/sytue-$app-$(sufijo android-sin-firmar)"
+    aab="$SALIDA/${PREFIJO}$app-$(sufijo android-sin-firmar)"
     # Los servicios en primer plano y su tipo (FOREGROUND_SERVICE_TYPE_*): specialUse el
     # de avisos del Hub, mediaProjection el de compartir la pantalla de Rooms.
     servicios_fg=""
@@ -2945,6 +3501,7 @@ XML
   WriteRegStr HKCU "Software\\Classes\\$esquema\\DefaultIcon" "" "\$INSTDIR\\$ejecutable.exe,0"
   WriteRegStr HKCU "Software\\Classes\\$esquema\\shell\\open\\command" "" '"\$INSTDIR\\$ejecutable.exe" "%1"'
 $(nsis_abrir_con "$extensiones" "$appid" "$nombre" "$ejecutable")
+$(nsis_esquemas_extra "$esquemas_extra" "$appid" "$nombre" "$ejecutable")
   ; LA AUMID: una app sin paquete no puede enseñar toasts con un identificador que
   ; Windows no conoce, y los avisos (los de Fyne y los que llevan clic en
   ; apps/nucleo/sistema/escritorio) usan el de la app. Es lo que registra también
@@ -2958,6 +3515,7 @@ NSI
   DeleteRegKey HKCU "Software\\Classes\\$esquema"
   DeleteRegKey HKCU "Software\\Classes\\AppUserModelId\\$appid"
 $(nsis_quitar_abrir_con "$extensiones" "$appid" "$nombre")
+$(nsis_quitar_esquemas_extra "$esquemas_extra" "$appid" "$nombre")
 NSI
   fi
 
@@ -2968,7 +3526,7 @@ NSI
     # el de la app). Dentro va el .app con el nombre que verá el Finder, a /Applications.
     mkdir -p "$ESCENARIO/tienda/$app"
     mv "$destino" "$ESCENARIO/tienda/$app/$nombre.app"
-    destino="$SALIDA/sytue-$app-$(sufijo macappstore)"
+    destino="$SALIDA/${PREFIJO}$app-$(sufijo macappstore)"
     rm -f "$destino"
     productbuild --component "$ESCENARIO/tienda/$app/$nombre.app" /Applications \
       --sign "$SYTUE_MAS_INSTALADOR" "$destino" >/dev/null

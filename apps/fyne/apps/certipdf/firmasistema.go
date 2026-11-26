@@ -50,6 +50,8 @@ type firmaSistema struct {
 	selloCaido bool
 	trabajando bool
 	error      string
+	// urlSello es la dirección de otra autoridad que escribe la persona (edición local).
+	urlSello *ui.Entrada
 }
 
 // Firma con el certificado del sistema: el paso de la Pantalla que da Almacenes.
@@ -115,9 +117,12 @@ func (d *dialogoFirmar) loQueSeFirma(ancho float32) fyne.CanvasObject {
 	} else {
 		lineas = append(lineas, a.t("pdf.dialog.firmar.sistema.avanzada"))
 	}
-	if p.Sello != "" {
+	switch {
+	case p.Sello != "":
 		lineas = append(lineas, a.p.tv("pdf.dialog.firmar.sistema.sello", i18n.Vars{"tsa": p.Sello}))
-	} else {
+	case a.p.SelloDeTiempo != nil:
+		lineas = append(lineas, a.p.propio("sinSello"))
+	default:
 		lineas = append(lineas, a.t("pdf.dialog.firmar.sistema.sinSello"))
 	}
 	if d.sistema.selloCaido {

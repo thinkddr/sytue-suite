@@ -10,7 +10,7 @@ import (
 
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
-	"git.sytue.eu/sytue/one/apps/nucleo/auth"
+	"git.sytue.eu/sytue/one/apps/nucleo/autorizacion"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 )
 
@@ -41,7 +41,7 @@ func (p *Pantalla) capturarAutorizacionSuite() context.Context {
 		return nil
 	}
 	ctx = p.prepararSuite(ctx)
-	if ctx == nil || p.verificarSuite(ctx) != nil || !auth.RequestAuthorizationIntent(ctx).Current() {
+	if ctx == nil || p.verificarSuite(ctx) != nil || !autorizacion.RequestAuthorizationIntent(ctx).Current() {
 		return nil
 	}
 	return ctx
@@ -54,7 +54,7 @@ func (p *Pantalla) suiteVidaVigente(ctx context.Context) bool {
 }
 
 func (p *Pantalla) suiteSigueVigente(ctx context.Context) bool {
-	return p.suiteVidaVigente(ctx) && auth.RequestAuthorizationIntent(ctx).Current()
+	return p.suiteVidaVigente(ctx) && autorizacion.RequestAuthorizationIntent(ctx).Current()
 }
 
 // ofreceCompartir dice si «Compartir en Rooms» tiene con qué hacerse.
@@ -110,7 +110,7 @@ func (p *Pantalla) compartirEnSala(n Nota) {
 			if !p.permiteEnviarContenidoExterno(cuaderno, n) || trabajo.Err() != nil || p.claveAlmacen() != owner || p.Suite != suite {
 				return
 			}
-			organizacion := auth.RequestAuthorizationIntent(trabajo).Identity().Organization
+			organizacion := autorizacion.RequestAuthorizationIntent(trabajo).Identity().Organization
 			p.iniciar(func() { p.publicarEnSalaConContexto(trabajo, suite, organizacion, cuaderno, n, e) })
 		},
 	}
@@ -127,7 +127,7 @@ func (p *Pantalla) publicarEnSala(cuaderno string, n Nota, sala api.Elegible) {
 	if ctx == nil {
 		return
 	}
-	p.publicarEnSalaConContexto(ctx, p.Suite, auth.RequestAuthorizationIntent(ctx).Identity().Organization, cuaderno, n, sala)
+	p.publicarEnSalaConContexto(ctx, p.Suite, autorizacion.RequestAuthorizationIntent(ctx).Identity().Organization, cuaderno, n, sala)
 }
 
 func (p *Pantalla) publicarEnSalaConContexto(trabajo context.Context, suite *api.Elegir, organizacion, cuaderno string, n Nota, sala api.Elegible) {

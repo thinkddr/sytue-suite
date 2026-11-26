@@ -48,6 +48,9 @@ type Explorador struct {
 	// Ruta son las carpetas desde la raíz hasta la actual, sin incluir «Mi unidad»,
 	// que la pinta la primera miga.
 	Ruta []Elemento
+	// RaizNombre, si no está vacío, es la primera miga en vez de «Mi unidad»: una unidad
+	// de la nube en Sytue Office (DR-13).
+	RaizNombre string
 	// Elementos es lo que se enseña: carpetas primero y ficheros después.
 	Elementos []Elemento
 	// Seleccion son los ID marcados.
@@ -365,7 +368,11 @@ func (e *Explorador) cabecera(v tema.Variante) fyne.CanvasObject {
 	// cabecera sin ningún segmento cuando se está en el primer nivel —o sea, casi
 	// siempre—, y se vio mirando el PNG.
 	nombres := make([]string, 0, len(e.Ruta)+1)
-	nombres = append(nombres, e.t("nav.myDrive"))
+	if e.RaizNombre != "" {
+		nombres = append(nombres, e.RaizNombre)
+	} else {
+		nombres = append(nombres, e.t("nav.myDrive"))
+	}
 	for _, c := range e.Ruta {
 		nombres = append(nombres, c.Nombre)
 	}

@@ -4,6 +4,7 @@
 package calendario
 
 import (
+	"context"
 	"slices"
 	"time"
 
@@ -120,6 +121,11 @@ func (p *Pantalla) lateral() *ui.Lateral {
 	mini.AlDesplazar = p.AlDesplazarMes
 
 	bloques := []fyne.CanvasObject{mini, p.seccionMisCalendarios()}
+	for _, g := range p.Cuentas {
+		if s := p.seccionCuenta(g); s != nil {
+			bloques = append(bloques, s)
+		}
+	}
 	if p.compacta() {
 		bloques = append([]fyne.CanvasObject{p.seccionVistaMovil()}, bloques...)
 	}
@@ -266,8 +272,86 @@ func (p *Pantalla) seccionMisCalendarios() *ui.SeccionLateral {
 		}
 		return s
 	}
+	deCuenta := p.deCuenta()
 	for _, c := range p.Calendarios {
+		if deCuenta[c.ID] {
+			continue
+		}
 		s.Filas = append(s.Filas, p.filaDe(c, false))
+	}
+	return s
+}
+
+// GrupoCuenta son los calendarios de una cuenta externa (CalDAV, Google, Microsoft):
+// los de este equipo que la sincronización mantiene al día con ella.
+type GrupoCuenta struct {
+	// Rotulo es el nombre de la cuenta («iCloud», «ana@example.org»).
+	Rotulo string
+	// Calendarios son los ids de sus calendarios.
+	Calendarios []string
+	// Aviso, si no está vacío, va bajo el nombre («Hay que volver a entrar»).
+	Aviso string
+	// RotuloSincronizar y AlSincronizar son «Sincronizar ahora»; nil, no sale.
+	RotuloSincronizar string
+	AlSincronizar     func()
+	// CrearCalendario, si no es nil, crea un calendario en la cuenta (MKCALENDAR en
+	// CalDAV): la sección lleva «Crear calendario», que abre el mismo formulario que el
+	// de «Mis calendarios». nil, no sale.
+	CrearCalendario func(ctx context.Context, nombre, color string) error
+}
+
+// deCuenta son los ids de los calendarios que tienen cuenta: no salen en «Mis
+// calendarios», sino en la sección de su cuenta.
+func (p *Pantalla) deCuenta() map[string]bool {
+	m := map[string]bool{}
+	for _, g := range p.Cuentas {
+		for _, id := range g.Calendarios {
+			m[id] = true
+		}
+	}
+	return m
+}
+
+// seccionCuenta es la sección de una cuenta: sus calendarios, en el orden de la lista,
+// con «Solo lectura» en los que la cuenta no deja escribir. Sin calendarios aún (la
+// primera sincronización no terminó) sale igual, con su acción, para que se vea la
+// cuenta.
+func (p *Pantalla) seccionCuenta(g GrupoCuenta) *ui.SeccionLateral {
+	if p.CargandoCalendarios {
+		return nil
+	}
+	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
+	s := ui.NuevaSeccionLateral(g.Rotulo)
+	if g.AlSincronizar != nil {
+		a := ui.NuevaAccionLateralCon(g.RotuloSincronizar, iconos.Trazo(iconos.Rotar, 16, "sidebar-fg-muted", v), g.AlSincronizar)
+		a.Inerte = p.SinConexion
+		s.Acciones = append(s.Acciones, a)
+	}
+	if g.CrearCalendario != nil && p.alCrearEnCuenta != nil {
+		grupo := g
+		a := ui.NuevaAccionLateralCon(p.t("cal.create", nil), iconos.Trazo(iconos.Mas, 16, "sidebar-fg-muted", v), func() { p.alCrearEnCuenta(grupo) })
+		a.Inerte = p.SinConexion
+		s.Acciones = append(s.Acciones, a)
+	}
+	if g.Aviso != "" {
+		s.Filas = append(s.Filas, ui.Texto(g.Aviso, tema.TextoSM, ui.Normal, tema.Color("sidebar-fg-muted", v)))
+	}
+	ids := map[string]bool{}
+	for _, id := range g.Calendarios {
+		ids[id] = true
+	}
+	for _, c := range p.Calendarios {
+		if !ids[c.ID] {
+			continue
+		}
+		f := p.filaDe(c, false)
+		if c.ReadOnly {
+			// No es una suscripción por URL: es un calendario de la cuenta que solo
+			// deja ver. La insignia lo dice en texto, como en «Compartidos conmigo».
+			f.Suscrito = false
+			f.Permiso = p.t("nav.permReaderTitle", nil)
+		}
+		s.Filas = append(s.Filas, f)
 	}
 	return s
 }

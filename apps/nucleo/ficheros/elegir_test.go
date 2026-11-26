@@ -67,3 +67,38 @@ func TestElegirCarpetaEnWindowsYMac(t *testing.T) {
 		t.Errorf("guion de Mac = %s; quiero %s", got, want)
 	}
 }
+
+// TestLaFototecaOfreceVideosSiSePiden: con selector de la fototeca (iOS), lo que es todo
+// imagen o vídeo va a él, y con vídeos le pide los vídeos (Photos los importa); lo que
+// mezcla otra cosa va al de ficheros. Sin tocar ningún selector de verdad.
+func TestLaFototecaOfreceVideosSiSePiden(t *testing.T) {
+	var aFotos, aFicheros [][]string
+	viejoFotos, viejoPanel := EnFotos, panelPropio
+	t.Cleanup(func() { EnFotos, panelPropio = viejoFotos, viejoPanel })
+	EnFotos = func(ext []string) ([]string, error) { aFotos = append(aFotos, ext); return nil, nil }
+	panelPropio = func(_ string, ext []string) ([]string, error) { aFicheros = append(aFicheros, ext); return nil, nil }
+
+	if _, err := ElegirImagenes("Fotos"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ElegirFotosYVideos("Fotos", append(slices.Clone(ExtensionesImagen), "MP4", ".mov")...); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ElegirFotosYVideos("Fotos", "jpg", "pdf"); err != nil {
+		t.Fatal(err)
+	}
+	if len(aFotos) != 2 || ConVideos(aFotos[0]) || !ConVideos(aFotos[1]) {
+		t.Fatalf("a la fototeca: %q", aFotos)
+	}
+	if len(aFicheros) != 1 || !slices.Equal(aFicheros[0], []string{"jpg", "pdf"}) {
+		t.Fatalf("al de ficheros: %q", aFicheros)
+	}
+	// Sin fototeca, todo va al de ficheros, con sus extensiones.
+	EnFotos = nil
+	if _, err := ElegirFotosYVideos("Fotos", "jpg", "mp4"); err != nil {
+		t.Fatal(err)
+	}
+	if len(aFicheros) != 2 || !slices.Equal(aFicheros[1], []string{"jpg", "mp4"}) {
+		t.Fatalf("sin fototeca: %q", aFicheros)
+	}
+}

@@ -113,7 +113,9 @@ func (t *Tarjeta) resumen() string {
 	case vid.EnDirecto() && vid.Live != nil:
 		partes = append(partes, v.Traduce("live.viewers", i18n.Vars{"count": vid.Live.ViewersNow}))
 	case vid.Status == api.CastStatusReady:
-		partes = append(partes, v.Traduce("watch.views", i18n.Vars{"count": vid.Views}))
+		if s := v.Traduce("watch.views", i18n.Vars{"count": vid.Views}); s != "" {
+			partes = append(partes, s)
+		}
 	}
 	partes = append(partes, Hace(v, vid.Fecha()))
 	return strings.Join(partes, " · ")

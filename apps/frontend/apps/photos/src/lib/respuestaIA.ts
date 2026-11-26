@@ -21,6 +21,13 @@ export interface Descripcion {
 export const MAX_DESCRIPCION = 500;
 export const MAX_ETIQUETAS = 12;
 
+/**
+ * Cuántas fotos se describen por pasada como mucho: cada una es una llamada de
+ * visión, y se cobra. Lo usan describir la selección y organizar en álbumes; es el
+ * `TopeDescribir` de Fyne (`apps/fyne/apps/photos/app_ia.go`).
+ */
+export const TOPE_DESCRIBIR = 50;
+
 export function interpretarRespuesta(texto: string): Descripcion | null {
   const crudo = extraerObjeto(texto);
   if (crudo === null) return null;
@@ -52,9 +59,9 @@ export function interpretarRespuesta(texto: string): Descripcion | null {
  * valla solo resuelve uno de los tres casos. Se cuentan las llaves para no
  * cortar en la primera `}` de un objeto anidado, y se ignoran las que van
  * dentro de una cadena —una descripción con una llave dentro es texto, no
- * estructura—.
+ * estructura—. Lo usa también el lector de «Organizar con IA» (`agruparIA.ts`).
  */
-function extraerObjeto(texto: string): string | null {
+export function extraerObjeto(texto: string): string | null {
   const inicio = texto.indexOf('{');
   if (inicio < 0) return null;
   let nivel = 0;

@@ -273,6 +273,8 @@ type estadoAlbumes struct {
 	montones [][]api.Photo
 	buscando bool
 	creando  bool
+	// org es «Organizar con IA» (organizar.go).
+	org estadoOrganizar
 }
 
 type estadoAlbum struct {

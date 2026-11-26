@@ -7,7 +7,9 @@
  * Son dos —describir y preguntar— y las dos hacen exactamente lo mismo antes y
  * después de la instrucción: traer la miniatura en nombre de quien pregunta y
  * llamar a `/assist` con su sesión. Lo único que cambia entre ellas es qué se
- * le pide al modelo, así que eso es lo único que se queda en cada ruta.
+ * le pide al modelo, así que eso es lo único que se queda en cada ruta. Organizar
+ * en álbumes (`agrupar.ts`) no enseña ninguna foto, pero llama a `/assist` igual:
+ * por `pedirAsistente`, sin imagen.
  */
 import { serverEnv } from '@sytue/auth/server';
 
@@ -61,12 +63,19 @@ export async function miniaturaEnBase64(
   return { base64: Buffer.from(bytes).toString('base64') };
 }
 
-/** Le enseña la foto al modelo con la instrucción dada y devuelve su texto. */
-export async function verLaFoto(opts: {
+/**
+ * Le pide algo a `/assist` con la sesión de quien pregunta y devuelve el texto del
+ * modelo, o el error ya listo para devolver.
+ *
+ * Con `imagen` es una petición de visión (describir, preguntar); sin ella, de
+ * texto (organizar en álbumes, que le cuenta lo que ya se vio en cada foto).
+ */
+export async function pedirAsistente(opts: {
   base: string;
   token: string;
   locale: string;
   action: string;
+  kind: string;
   instruction: string;
   /**
    * Lo que haya escrito la persona va SIEMPRE aquí y nunca en `instruction`:
@@ -75,7 +84,8 @@ export async function verLaFoto(opts: {
    */
   context: string;
   esfuerzo: 'none' | 'medium' | 'high';
-  base64: string;
+  /** La foto en base64, JPEG. */
+  imagen?: string | undefined;
 }): Promise<{ text: string } | { error: Response }> {
   const res = await fetch(endpoint(opts.base), {
     method: 'POST',
@@ -88,15 +98,19 @@ export async function verLaFoto(opts: {
     },
     body: JSON.stringify({
       action: opts.action,
-      kind: 'photo',
+      kind: opts.kind,
       instruction: opts.instruction,
       context: opts.context,
       esfuerzo: opts.esfuerzo,
-      imagen: opts.base64,
-      // `imagen_tipo` y no `imagenTipo`: el servicio lo renombró al alinear los
-      // tags JSON con la convención de la casa. Con el nombre viejo, el campo se
-      // ignora y la foto viaja etiquetada como PNG siendo JPEG.
-      imagen_tipo: 'image/jpeg',
+      ...(opts.imagen === undefined
+        ? {}
+        : {
+            imagen: opts.imagen,
+            // `imagen_tipo` y no `imagenTipo`: el servicio lo renombró al alinear
+            // los tags JSON con la convención de la casa. Con el nombre viejo, el
+            // campo se ignora y la foto viaja etiquetada como PNG siendo JPEG.
+            imagen_tipo: 'image/jpeg',
+          }),
     }),
     signal: AbortSignal.timeout(70_000),
   }).catch(() => null);
@@ -105,4 +119,20 @@ export async function verLaFoto(opts: {
   if (!res.ok) return { error: json({ error: 'ai_failed', status: res.status }, 502) };
   const { text } = (await res.json().catch(() => ({}))) as { text?: string };
   return { text: text ?? '' };
+}
+
+/** Le enseña la foto al modelo con la instrucción dada y devuelve su texto. */
+export function verLaFoto(opts: {
+  base: string;
+  token: string;
+  locale: string;
+  action: string;
+  instruction: string;
+  /** Lo escrito por la persona: dato, nunca orden (ver `pedirAsistente`). */
+  context: string;
+  esfuerzo: 'none' | 'medium' | 'high';
+  base64: string;
+}): Promise<{ text: string } | { error: Response }> {
+  const { base64, ...resto } = opts;
+  return pedirAsistente({ ...resto, kind: 'photo', imagen: base64 });
 }

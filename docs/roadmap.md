@@ -177,10 +177,10 @@ left:
   Entra public app, the Apple App Group `group.eu.sytue.office` for the `eu.sytue.office.*` App IDs,
   test accounts for each provider, and a legal review of VERI\*FACTU in a local program.
 - **Release packages** ([operations](operations.md#sytue-office-publico)): `office.yml` has not yet
-  run against a real release of this repository.
+  run against a real release of this repository. The pull request that brings it builds every
+  package without attaching anything; the upload to a release is only tested by the first one.
 
 **Out of scope**, and not debt: serving anything to the local network, syncing between the person's
 devices, push notifications with the app closed, Teams and Meet calls inside the app, collaboration,
 `.doc`/`.xls`/`.ppt`/`.rtf`, own encryption, faces and places in Photos, a web build, and migrating
 on its own from the connected edition beyond importing the "Your data" ZIP.
-

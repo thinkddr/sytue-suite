@@ -33,6 +33,12 @@ name: office
 on:
   release:
     types: [published]
+  # En un PR que cambia este workflow: compila todo, sin adjuntar nada a ninguna release.
+  # Así se prueba antes de la primera release que lo use (las herramientas, el contenedor
+  # y empaquetar.sh), que es cuando más caro sale descubrir que algo falla.
+  pull_request:
+    paths:
+      - .github/workflows/office.yml
   # A mano, para volver a compilar una release ya publicada (un job que falló a medias).
   workflow_dispatch:
     inputs:
@@ -45,7 +51,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: office-${{ inputs.tag || github.event.release.tag_name }}
+  group: office-${{ inputs.tag || github.event.release.tag_name || github.ref }}
   cancel-in-progress: false
 
 defaults:
@@ -53,6 +59,7 @@ defaults:
     shell: bash
 
 env:
+  # Vacío en un PR: empaquetar.sh numera los paquetes 0.0.0 y no se adjunta nada.
   TAG: ${{ inputs.tag || github.event.release.tag_name }}
   # El árbol de apps de Sytue Office (apps/fyne/cmd-local) en empaquetar.sh.
   SYTUE_ARBOL: cmd-local
@@ -95,15 +102,17 @@ jobs:
       - name: Clonar la etiqueta
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: refs/tags/${{ env.TAG }}
+          ref: ${{ github.event_name != 'pull_request' && format('refs/tags/{0}', env.TAG) || '' }}
           persist-credentials: false
 
       - name: Comprobar la etiqueta
         run: |
           set -euo pipefail
-          case "$TAG" in v[0-9]*.[0-9]*.[0-9]*) ;; *)
-            echo "::error::«$TAG» no es una etiqueta vX.Y.Z" >&2; exit 1 ;; esac
-          [ -d apps/fyne/cmd-local ] || { echo "::error::$TAG no trae Sytue Office (apps/fyne/cmd-local)" >&2; exit 1; }
+          if [ "$GITHUB_EVENT_NAME" != pull_request ]; then
+            case "$TAG" in v[0-9]*.[0-9]*.[0-9]*) ;; *)
+              echo "::error::«$TAG» no es una etiqueta vX.Y.Z" >&2; exit 1 ;; esac
+          fi
+          [ -d apps/fyne/cmd-local ] || { echo "::error::${TAG:-este PR} no trae Sytue Office (apps/fyne/cmd-local)" >&2; exit 1; }
 
       - name: Herramientas (Go, cabeceras, NSIS, MinGW, jq)
         run: .github/actions/toolchain/accion.sh go escritorio jq
@@ -116,7 +125,7 @@ jobs:
           SYTUE_LINUX_ARCH: ${{ matrix.arch }}
         run: bash apps/fyne/scripts/empaquetar.sh "${{ matrix.plataforma }}"
 
-      - name: Adjuntar a la release
+      - name: Adjuntar a la release (en un PR, solo la lista y sus sumas)
         env:
           SYTUE_GIT_TOKEN: ${{ github.token }}
           SYTUE_LINUX_ARCH: ${{ matrix.arch }}
@@ -126,7 +135,8 @@ jobs:
           lista="$(bash apps/fyne/scripts/empaquetar.sh publicables "${{ matrix.plataforma }}" apps/fyne/dist)"
           mapfile -t publicables <<<"$lista"
           (cd apps/fyne/dist && sha256sum -- "${publicables[@]##*/}") | tee -a "$GITHUB_STEP_SUMMARY"
-          bash deploy/sytue-git/bin/publicar-asset.sh "$TAG" "${publicables[@]}"
+          # En un PR basta con que estén todos (la lista es roja si falta alguno).
+          [ "$GITHUB_EVENT_NAME" = pull_request ] || bash deploy/sytue-git/bin/publicar-asset.sh "$TAG" "${publicables[@]}"
 
   macos:
     name: macOS universal
@@ -138,12 +148,12 @@ jobs:
       - name: Clonar la etiqueta
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: refs/tags/${{ env.TAG }}
+          ref: ${{ github.event_name != 'pull_request' && format('refs/tags/{0}', env.TAG) || '' }}
           persist-credentials: false
 
       - name: Comprobar la etiqueta
         run: |
-          [ -d apps/fyne/cmd-local ] || { echo "::error::$TAG no trae Sytue Office (apps/fyne/cmd-local)" >&2; exit 1; }
+          [ -d apps/fyne/cmd-local ] || { echo "::error::${TAG:-este PR} no trae Sytue Office (apps/fyne/cmd-local)" >&2; exit 1; }
 
       - name: Go fijado
         run: .github/actions/toolchain/accion.sh go
@@ -156,7 +166,7 @@ jobs:
       - name: Empaquetar
         run: bash apps/fyne/scripts/empaquetar.sh macos
 
-      - name: Adjuntar a la release
+      - name: Adjuntar a la release (en un PR, solo la lista y sus sumas)
         env:
           SYTUE_GIT_TOKEN: ${{ github.token }}
         run: |
@@ -165,7 +175,8 @@ jobs:
           publicables=()
           while IFS= read -r f; do publicables+=("$f"); done <<<"$lista"
           (cd apps/fyne/dist && shasum -a 256 -- "${publicables[@]##*/}") | tee -a "$GITHUB_STEP_SUMMARY"
-          bash deploy/sytue-git/bin/publicar-asset.sh "$TAG" "${publicables[@]}"
+          # En un PR basta con que estén todos (la lista es roja si falta alguno).
+          [ "$GITHUB_EVENT_NAME" = pull_request ] || bash deploy/sytue-git/bin/publicar-asset.sh "$TAG" "${publicables[@]}"
 
   android:
     name: Android
@@ -179,15 +190,17 @@ jobs:
       - name: Clonar la etiqueta
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: refs/tags/${{ env.TAG }}
+          ref: ${{ github.event_name != 'pull_request' && format('refs/tags/{0}', env.TAG) || '' }}
           persist-credentials: false
 
       - name: Comprobar la etiqueta
         run: |
           set -euo pipefail
-          case "$TAG" in v[0-9]*.[0-9]*.[0-9]*) ;; *)
-            echo "::error::«$TAG» no es una etiqueta vX.Y.Z" >&2; exit 1 ;; esac
-          [ -d apps/fyne/cmd-local ] || { echo "::error::$TAG no trae Sytue Office (apps/fyne/cmd-local)" >&2; exit 1; }
+          if [ "$GITHUB_EVENT_NAME" != pull_request ]; then
+            case "$TAG" in v[0-9]*.[0-9]*.[0-9]*) ;; *)
+              echo "::error::«$TAG» no es una etiqueta vX.Y.Z" >&2; exit 1 ;; esac
+          fi
+          [ -d apps/fyne/cmd-local ] || { echo "::error::${TAG:-este PR} no trae Sytue Office (apps/fyne/cmd-local)" >&2; exit 1; }
 
       - name: Herramientas (Go, JDK, SDK y NDK de Android, bundletool, jq)
         run: .github/actions/toolchain/accion.sh go jdk bundletool android-sdk jq
@@ -215,7 +228,7 @@ jobs:
             unzip -p "$apks" universal.apk >"${aab%-sin-firmar.aab}-universal-sin-firmar.apk"
           done <<<"$lista"
 
-      - name: Adjuntar a la release
+      - name: Adjuntar a la release (en un PR, solo la lista y sus sumas)
         env:
           SYTUE_GIT_TOKEN: ${{ github.token }}
         run: |
@@ -228,14 +241,15 @@ jobs:
             publicables+=("$aab" "$apk")
           done <<<"$lista"
           (cd apps/fyne/dist && sha256sum -- "${publicables[@]##*/}") | tee -a "$GITHUB_STEP_SUMMARY"
-          bash deploy/sytue-git/bin/publicar-asset.sh "$TAG" "${publicables[@]}"
+          # En un PR basta con que estén todos (la lista es roja si falta alguno).
+          [ "$GITHUB_EVENT_NAME" = pull_request ] || bash deploy/sytue-git/bin/publicar-asset.sh "$TAG" "${publicables[@]}"
 
   # SHA256SUMS de TODO lo adjunto, aunque una plataforma haya fallado (se vuelve a
   # calcular al relanzar los jobs fallidos), y el aviso de «sin firmar» en la release.
   sumas:
     name: SHA256SUMS y aviso
     needs: [escritorio, macos, android]
-    if: ${{ !cancelled() }}
+    if: ${{ !cancelled() && github.event_name != 'pull_request' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
@@ -244,7 +258,7 @@ jobs:
       - name: Clonar la etiqueta
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: refs/tags/${{ env.TAG }}
+          ref: ${{ github.event_name != 'pull_request' && format('refs/tags/{0}', env.TAG) || '' }}
           persist-credentials: false
 
       - name: Bajar lo adjunto y escribir SHA256SUMS

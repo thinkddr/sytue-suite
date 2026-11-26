@@ -15,7 +15,8 @@ two hundred CRUDs that differ only in their column names, and a
 migration every time someone wants a new field. Not here.
 
 **The model catalog is DATA.** It lives in
-[`internal/catalogo/modulos/*.json`](internal/catalogo/modulos): each file
+[`apps/nucleo/erp/catalogo/modulos/*.json`](../../apps/nucleo/erp/catalogo/modulos) (shared with
+the ERP of Sytue Office, the local edition): each file
 declares models with their fields, their states and their list columns. The core does not
 have a single line of code specific to Sales, Fleet or Quality.
 
@@ -40,7 +41,7 @@ The consequences, which are the product:
 - **A single interface.** The app (`apps/frontend/apps/erp`) generates the list and the detail view
   from the catalog this service provides.
 - **The five languages, once.** Common labels (date, amount, customer…)
-  live in [`terminos.json`](internal/catalogo/terminos.json) with their five
+  live in [`terminos.json`](../../apps/nucleo/erp/catalogo/terminos.json) with their five
   translations and are shared by the 24 modules; a field without a label **prevents
   startup**, it does not fall back to English. `TestTodoTraducidoEnLosCincoIdiomas` guards this.
 

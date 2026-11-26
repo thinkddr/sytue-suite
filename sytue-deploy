@@ -69,9 +69,15 @@ Modo clúster (Kubernetes/Helm, avanzado)
   ./sytue-deploy --mode helm          Genera values y scripts de Secrets para tu clúster
   ./sytue-deploy --integrations       Solo las apps OAuth de terceros sobre un Helm existente
 
+Sytue Office (las apps en este equipo, sin servidor ni cuenta; Linux y macOS)
+  ./sytue-deploy --mode sytue-office  Compila e instala las quince apps de escritorio
+  ./sytue-deploy --mode sytue-office --office-apps docus,calcus,mail
+                                      Solo esas
+
 Opciones:
-  --mode <compose|servidor|helm>
-                            Modo de despliegue (por defecto: compose)
+  --mode <compose|servidor|helm|sytue-office>
+                            Modo de despliegue (por defecto: compose). sytue-office no
+                            despliega nada: compila e instala las apps en este equipo
   --profile <full|office|core|lista>
                             Servicios de Compose: full (todo), office, core o una lista
                             de perfiles separados por comas (p. ej. mail,drive,docs)
@@ -101,6 +107,7 @@ Opciones:
   --org-slug <slug>         (Servidor/Helm) Organización inicial
   --namespace <ns>          (Helm) Namespace de Kubernetes (por defecto: sytue-prod)
   --integrations            Solo el asistente de integraciones (Helm)
+  --office-apps <lista>     (Sytue Office) Las apps, separadas por comas (por defecto: todas)
   -h, --help                Muestra esta ayuda
 EOF
 }
@@ -137,6 +144,7 @@ CON_ERP=""
 CON_MATRIX=""
 CON_DEVX=""
 SMS_KEY="${SYTUE_SMS_SWEEGO_API_KEY:-}"
+OFFICE_APPS=""
 
 need_arg() { [ $# -ge 2 ] && [ -n "$2" ] || die "La opción $1 necesita un valor."; }
 while [ $# -gt 0 ]; do
@@ -164,11 +172,13 @@ while [ $# -gt 0 ]; do
     --sin-devx)        CON_DEVX=0; shift ;;
     --sms-sweego-key)  need_arg "$@"; SMS_KEY="$2"; shift 2 ;;
     --integrations|integraciones) INTEGRATIONS_ONLY=1; shift ;;
+    --office-apps)     need_arg "$@"; OFFICE_APPS="$2"; shift 2 ;;
     -h|--help)         usage; exit 0 ;;
     *) err "Opción desconocida: $1"; usage; exit 2 ;;
   esac
 done
-case "$MODE" in ""|compose|servidor|helm) ;; *) die "--mode debe ser «compose», «servidor» o «helm»." ;; esac
+case "$MODE" in ""|compose|servidor|helm|sytue-office) ;; *) die "--mode debe ser «compose», «servidor», «helm» o «sytue-office»." ;; esac
+[ -z "$OFFICE_APPS" ] || [ "$MODE" = sytue-office ] || die "--office-apps es de --mode sytue-office."
 
 prompt_default() {
   local prompt_text="$1" default_val="$2" var_name="$3" input=""
@@ -1867,6 +1877,161 @@ instalar_servidor() {
 }
 
 # ---------------------------------------------------------------------------
+# Sytue Office: las apps en este equipo, sin servidor
+# ---------------------------------------------------------------------------
+# Las quince apps de Fyne en su edición local (apps/fyne/cmd-local): sin cuenta, sin
+# cifrado propio y sin servidores. No despliega nada: compila con el mismo
+# apps/fyne/scripts/empaquetar.sh que la release (SYTUE_ARBOL=cmd-local) y lo instala.
+# En Windows, el instalador de la release.
+
+# Las apps que enlazan la cámara (`llamada/camara`): piden las cabeceras de PipeWire con
+# spa/param/buffers.h (Debian 12, Ubuntu 23.04 o más nuevo).
+OFFICE_CON_CAMARA="cast hub photos rooms"
+
+office_cabeceras_linux() {
+  local faltan=() m
+  # Lo que pide compilar (GL y las extensiones de X11 de GLFW); la pista de abajo instala
+  # además lo que usa el CI, que no estorba.
+  for m in gl x11 xcursor xrandr xinerama xi xxf86vm xkbcommon; do
+    pkg-config --exists "$m" 2>/dev/null || faltan+=("$m")
+  done
+  [ "${#faltan[@]}" -eq 0 ] && return 0
+  err "Faltan cabeceras para compilar las apps: ${faltan[*]}"
+  if check_cmd apt-get; then
+    printf "  sudo apt-get install gcc pkg-config xz-utils libgl1-mesa-dev xorg-dev libwayland-dev \\\\\n"
+    printf "    libxkbcommon-dev libx11-xcb-dev libxkbcommon-x11-dev libxcursor-dev libxfixes-dev \\\\\n"
+    printf "    libegl1-mesa-dev libgles2-mesa-dev libvulkan-dev libffi-dev libpipewire-0.3-dev libspa-0.2-dev\n"
+  elif check_cmd dnf; then
+    printf "  sudo dnf install gcc pkgconf xz mesa-libGL-devel mesa-libEGL-devel mesa-libGLES-devel libX11-devel \\\\\n"
+    printf "    libXcursor-devel libXfixes-devel libxkbcommon-x11-devel wayland-devel vulkan-loader-devel \\\\\n"
+    printf "    libffi-devel pipewire-devel\n"
+  fi
+  exit 1
+}
+
+# office_pipewire dice si están las cabeceras de PipeWire que pide la cámara.
+office_pipewire() {
+  local inc
+  pkg-config --exists libpipewire-0.3 libspa-0.2 2>/dev/null || return 1
+  inc="$(pkg-config --variable=includedir libspa-0.2)"
+  [ -f "$inc/spa-0.2/spa/param/buffers.h" ]
+}
+
+instalar_office() {
+  local fyne="${ROOT_DIR}/apps/fyne" plataforma arch="" go_fyne version bin apps=() quitadas=() a marca f n=0
+  [ -d "$fyne/cmd-local" ] || die "Este árbol no trae Sytue Office (apps/fyne/cmd-local)."
+  case "$(uname -s)" in
+    Linux)  plataforma=linux ;;
+    Darwin) plataforma=macos ;;
+    *) die "Sytue Office se compila aquí en Linux y en macOS. En Windows, descarga el instalador de la última release: https://github.com/thinkddr/sytue-suite/releases" ;;
+  esac
+  if [ "$plataforma" = linux ]; then
+    case "$(uname -m)" in
+      x86_64|amd64)  arch=amd64 ;;
+      aarch64|arm64) arch=arm64 ;;
+      *) die "Sytue Office se publica para Linux x86-64 y ARM64; este equipo es $(uname -m)." ;;
+    esac
+  fi
+
+  step "Sytue Office · 1 de 3 · Requisitos"
+  check_cmd go || die "Falta Go (https://go.dev/dl/). Con Go 1.21 o más nuevo basta: baja él la versión que piden las apps."
+  # Dentro del módulo, Go cambia solo a la versión que pide su go.mod (GOTOOLCHAIN=auto).
+  go_fyne="$(cd "$fyne" && go env GOVERSION 2>/dev/null)" ||
+    die "Go no puede usar la versión que piden las apps ($(sed -n 's/^go //p' "$fyne/go.mod")). ¿GOTOOLCHAIN=local?"
+  ok "Go: ${go_fyne}"
+  for a in git tar python3; do check_cmd "$a" || die "Falta '$a'."; done
+  if [ "$plataforma" = linux ]; then
+    check_cmd cc || check_cmd gcc || die "Falta un compilador de C (gcc)."
+    check_cmd pkg-config || die "Falta 'pkg-config'."
+    check_cmd xz || die "Falta 'xz' (xz-utils)."
+    office_cabeceras_linux
+  else
+    xcode-select -p >/dev/null 2>&1 || die "Faltan las herramientas de línea de órdenes de Xcode: xcode-select --install"
+  fi
+  ok "Compilador y cabeceras"
+
+  # Qué apps: todas las de cmd-local, o las pedidas.
+  if [ -n "$OFFICE_APPS" ]; then
+    IFS=',' read -r -a apps <<<"$OFFICE_APPS"
+    for a in "${apps[@]}"; do
+      [ -f "$fyne/cmd-local/$a/FyneApp.toml" ] || die "«$a» no es una app de Sytue Office (apps/fyne/cmd-local)."
+    done
+  else
+    for f in "$fyne"/cmd-local/*/FyneApp.toml; do apps+=("$(basename "$(dirname "$f")")"); done
+  fi
+  if [ "$plataforma" = linux ] && ! office_pipewire; then
+    local quedan=()
+    for a in "${apps[@]}"; do
+      case " $OFFICE_CON_CAMARA " in *" $a "*) quitadas+=("$a") ;; *) quedan+=("$a") ;; esac
+    done
+    if [ "${#quitadas[@]}" -gt 0 ]; then
+      [ -z "$OFFICE_APPS" ] || die "${quitadas[*]} necesitan las cabeceras de PipeWire 0.3.65 o más nuevas (spa/param/buffers.h)."
+      warn "Sin las cabeceras de PipeWire 0.3.65 o más nuevas no se compilan ${quitadas[*]}: se instala el resto."
+      apps=("${quedan[@]}")
+    fi
+  fi
+  [ "${#apps[@]}" -gt 0 ] || die "No queda ninguna app que compilar."
+  info "Apps: ${BOLD}${apps[*]}${RESET}"
+  if [ "$NON_INTERACTIVE" -eq 0 ]; then
+    local seguir=""
+    prompt_default "Compilar e instalar (tarda unos minutos por app) [S/n]" "S" seguir
+    case "$seguir" in n|N|no|NO) die "Cancelado." ;; esac
+  fi
+
+  step "Sytue Office · 2 de 3 · Compilar"
+  version="$(sed -n 's/^FYNE_TOOLS_VERSION=//p' "$ROOT_DIR/deploy/sytue-git/versions.env")"
+  [ -n "$version" ] || die "deploy/sytue-git/versions.env no fija FYNE_TOOLS_VERSION."
+  # La CLI de Fyne compilada contra el mismo fork que las apps: la que pide empaquetar.sh.
+  bin="$(cd "$fyne" && bash "$ROOT_DIR/.github/actions/toolchain/fyne-cli.sh" "$fyne" "$version")" ||
+    die "No se pudo compilar la CLI de Fyne."
+  marca="$(mktemp)"
+  trap 'rm -f "$marca"' EXIT
+  (
+    cd "$ROOT_DIR"
+    # SYTUE_PARA_ESTE_EQUIPO: se instala aquí, así que el suelo de glibc de la release
+    # (Debian 12) no aplica; un Linux más nuevo compila con la suya.
+    export PATH="$bin:$PATH" SYTUE_ARBOL=cmd-local GOPRIVATE='github.com/thinkddr/*' SYTUE_PARA_ESTE_EQUIPO=1
+    [ -z "$arch" ] || export SYTUE_LINUX_ARCH="$arch"
+    bash apps/fyne/scripts/empaquetar.sh "$plataforma" "${apps[@]}"
+  ) || die "No se pudo empaquetar Sytue Office (lo anterior dice qué falló)."
+
+  step "Sytue Office · 3 de 3 · Instalar"
+  if [ "$plataforma" = linux ]; then
+    while IFS= read -r f; do
+      local caja
+      caja="$(mktemp -d)"
+      tar -xJf "$f" -C "$caja"
+      for a in "$caja"/*/instalar.sh "$caja"/instalar.sh; do
+        [ -f "$a" ] || continue
+        bash "$a" || die "Falló la instalación de $(basename "$f")."
+        n=$((n + 1))
+      done
+      rm -rf "$caja"
+    done < <(find "$fyne/dist" -maxdepth 1 -type f -newer "$marca" -name "*-linux-${arch}.tar.xz")
+    [ "$n" -gt 0 ] || die "empaquetar.sh no dejó ningún paquete de Linux en apps/fyne/dist."
+    ok "Instaladas en ${PREFIJO:-$HOME/.local}: búscalas en el menú de aplicaciones como «Sytue … Office»."
+  else
+    mkdir -p "$HOME/Applications"
+    while IFS= read -r f; do
+      local montaje
+      montaje="$(mktemp -d)"
+      hdiutil attach -nobrowse -readonly -mountpoint "$montaje" "$f" >/dev/null || die "No se pudo abrir $f."
+      for a in "$montaje"/*.app; do
+        [ -d "$a" ] || continue
+        rm -rf "$HOME/Applications/$(basename "$a")"
+        cp -R "$a" "$HOME/Applications/" && n=$((n + 1))
+      done
+      hdiutil detach "$montaje" >/dev/null || true
+    done < <(find "$fyne/dist" -maxdepth 1 -type f -newer "$marca" -name "*.dmg")
+    [ "$n" -gt 0 ] || die "empaquetar.sh no dejó ningún .dmg en apps/fyne/dist."
+    ok "Instaladas en ~/Applications (${n} apps)."
+  fi
+  [ "${#quitadas[@]}" -eq 0 ] || warn "Sin instalar: ${quitadas[*]} (faltan las cabeceras de PipeWire de arriba)."
+  printf "\n${BOLD}Sytue Office${RESET} guarda todo en ${BOLD}~/Sytue Office${RESET}, en claro: sin cuenta y sin servidor.\n"
+  exit 0
+}
+
+# ---------------------------------------------------------------------------
 # Inicio
 # ---------------------------------------------------------------------------
 printf "${BOLD}${CYAN}"
@@ -1880,7 +2045,7 @@ cat <<'BANNER'
 BANNER
 printf "${RESET}${BOLD}Instalador paso a paso (Apache-2.0)${RESET}\n"
 
-check_cmd openssl || die "Se necesita 'openssl' para generar las claves criptográficas."
+[ "$MODE" = sytue-office ] || check_cmd openssl || die "Se necesita 'openssl' para generar las claves criptográficas."
 
 if [ "$INTEGRATIONS_ONLY" -eq 1 ]; then
   modo_integraciones
@@ -1894,11 +2059,13 @@ if [ -z "$MODE" ]; then
     echo "    1) En este equipo con Docker  — recomendado: prueba o servidor único, en https://*.${LOCAL_DOMAIN}"
     echo "    2) En un servidor con tu dominio — una máquina con Docker, HTTPS con Let's Encrypt"
     echo "    3) En un clúster Kubernetes   — avanzado: tu dominio, tu registro, tu PostgreSQL y tu S3"
+    echo "    4) Sytue Office               — solo las apps en este equipo, sin servidor ni cuenta"
     eleccion=""
     prompt_default "Opción" "1" eleccion
     case "$eleccion" in
       2|servidor) MODE="servidor" ;;
       3|helm|k8s) MODE="helm" ;;
+      4|office|sytue-office) MODE="sytue-office" ;;
       *)          MODE="compose" ;;
     esac
   fi
@@ -1906,7 +2073,8 @@ fi
 ok "Modo: ${BOLD}${MODE}${RESET}"
 
 case "$MODE" in
-  compose)  instalar_compose ;;
-  servidor) instalar_servidor ;;
-  *)        instalar_helm ;;
+  compose)      instalar_compose ;;
+  servidor)     instalar_servidor ;;
+  sytue-office) instalar_office ;;
+  *)            instalar_helm ;;
 esac

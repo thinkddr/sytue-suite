@@ -159,3 +159,28 @@ The desktop and mobile apps are native Go + Fyne, without a webview. The rule is
 - **Control plane (`cloud-api`)**: Management of projects, environments, environment variables encrypted with AES-256-GCM (`CLOUD_SECRET_ENC_KEY`), deployments, custom domains and optional spending limits.
 - **Execution plane (`KubeRunner`)**: Declarative creation of `Namespace`, `Deployment`, `Service`, `Ingress` and `NetworkPolicy` for per-tenant isolation on Kubernetes.
 - **Managed services**: Provisioning of dedicated PostgreSQL databases, cache and automatic injection of credentials into deployed applications.
+
+<a id="sytue-office-lo-que-falta"></a>
+
+## 7. Sytue Office (local edition) — what is left
+
+Sytue Office is the fifteen Fyne apps whole on the device: no account, no own encryption and no
+Sytue servers ([ADR 0083](decisions.md#0083)). It is built on the desktop from end to end; what is
+left:
+
+- **Devices and stores.** Android builds and packages (one AAB per app); iOS, the macOS `.dmg`
+  signed and notarized, and the App Store and Google Play listings are not done. Nothing has been
+  tried on a real phone yet.
+- **Real services.** Outlook with OAuth, Teams and Google Chat in Rooms, and Calendar and Contacts
+  against a real server have not been tried end to end.
+- **The owner's registrations**: the Google desktop OAuth client and its verification, the Microsoft
+  Entra public app, the Apple App Group `group.eu.sytue.office` for the `eu.sytue.office.*` App IDs,
+  test accounts for each provider, and a legal review of VERI\*FACTU in a local program.
+- **Release packages** ([operations](operations.md#sytue-office-publico)): `office.yml` has not yet
+  run against a real release of this repository.
+
+**Out of scope**, and not debt: serving anything to the local network, syncing between the person's
+devices, push notifications with the app closed, Teams and Meet calls inside the app, collaboration,
+`.doc`/`.xls`/`.ppt`/`.rtf`, own encryption, faces and places in Photos, a web build, and migrating
+on its own from the connected edition beyond importing the "Your data" ZIP.
+

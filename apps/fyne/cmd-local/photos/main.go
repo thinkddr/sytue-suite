@@ -131,7 +131,7 @@ func fallaLaFototeca(l *local.App, w fyne.Window, tr *i18n.Translator, err error
 	if errors.Is(err, fototeca.ErrEnUso) {
 		detalle = texto(l, "migrar.enUso")
 	}
-	w.SetContent(l.Montar(w, iconos.Photos, ui.NuevoVacio(tr.T("matrix.failed", nil), detalle)))
+	w.SetContent(l.Montar(w, iconos.Photos, ui.NuevoVacioError(tr.T("matrix.failed", nil), detalle)))
 }
 
 // pantallaDeMigrar pone en la ventana que se está poniendo al día la fototeca, con una

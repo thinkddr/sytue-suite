@@ -67,7 +67,7 @@ func main() {
 	fachada, err := abrirBases(l)
 	if err != nil {
 		slog.Error("bases: no se pudo abrir el almacén", "error", err)
-		w.SetContent(l.Montar(w, iconos.Bases, ui.NuevoVacio(t.T("matrix.failed", nil), err.Error())))
+		w.SetContent(l.Montar(w, iconos.Bases, ui.NuevoVacioError(t.T("matrix.failed", nil), err.Error())))
 		w.ShowAndRun()
 		return
 	}

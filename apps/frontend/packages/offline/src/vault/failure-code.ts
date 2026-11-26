@@ -12,6 +12,10 @@
  */
 const token = /^[a-z0-9_]{1,64}$/u;
 const className = /^[A-Za-z]{1,40}$/u;
+// Lo que dice cada navegador cuando `fetch` no llega al servidor: Chromium, Firefox
+// y Safari (en sus variantes de sin red, sin servidor y tiempo agotado).
+const fetchFailure =
+  /^(?:failed to fetch|networkerror when attempting to fetch resource|network error|load failed|the network connection was lost|could not connect to the server|the internet connection appears to be offline|a server with the specified hostname could not be found|the request timed out)/iu;
 
 function part(value: unknown): string {
   return typeof value === 'string' && token.test(value) ? value : '';
@@ -81,9 +85,14 @@ export function vaultFailureCode(error: unknown): string {
       const first = Array.isArray(e.errors) ? (e.errors as unknown[])[0] : undefined;
       return first === undefined ? 'aggregate' : vaultFailureCode(first);
     }
-    // `fetch` sin red (o cortado por el navegador) es un TypeError sin más.
+    // `fetch` sin red (o cortado por el navegador) es un TypeError, pero no todo
+    // TypeError es la red: «Illegal invocation» o leer de `undefined` son fallos del
+    // código, y contarlos como `network` escondió durante días el de la bóveda (ver
+    // `PqVault`). El mensaje solo se compara, nunca se copia al código.
     case 'TypeError':
-      return 'network';
+      return typeof e.message === 'string' && fetchFailure.test(e.message)
+        ? 'network'
+        : 'error.TypeError';
     default:
       return 'error.' + (className.test(e.name) ? e.name : 'other');
   }

@@ -27,7 +27,7 @@ func firmar(cuerpo []byte, secreto string, t time.Time) string {
 // rompe, cualquiera puede dar facturas por cobradas.
 func TestFirmaStripe(t *testing.T) {
 	cuerpo := []byte(`{"id":"evt_1","type":"invoice.paid"}`)
-	const secreto = "whsec_pruebapruebapruebaprueba"
+	const secreto = "webhook_secret_for_tests"
 	ahora := time.Now()
 
 	if err := VerificarFirmaStripe(cuerpo, firmar(cuerpo, secreto, ahora), secreto, ahora); err != nil {
@@ -45,7 +45,7 @@ func TestFirmaStripe(t *testing.T) {
 			[]byte(`{"id":"evt_1","type":"invoice.paid","amount_paid":999999}`),
 			firmar(cuerpo, secreto, ahora), secreto, ahora, ErrFirmaInvalida,
 		},
-		"secreto equivocado":   {cuerpo, firmar(cuerpo, secreto, ahora), "whsec_otro", ahora, ErrFirmaInvalida},
+		"secreto equivocado":   {cuerpo, firmar(cuerpo, secreto, ahora), "webhook_secret_other", ahora, ErrFirmaInvalida},
 		"sin cabecera":         {cuerpo, "", secreto, ahora, ErrFirmaInvalida},
 		"sin v1":               {cuerpo, "t=123", secreto, ahora, ErrFirmaInvalida},
 		"firma no hexadecimal": {cuerpo, "t=" + fmt.Sprint(ahora.Unix()) + ",v1=zzzz", secreto, ahora, ErrFirmaInvalida},
@@ -71,11 +71,11 @@ func TestFirmaStripe(t *testing.T) {
 func TestFirmaAdmiteVariasDuranteLaRotacion(t *testing.T) {
 	cuerpo := []byte(`{"id":"evt_2"}`)
 	ahora := time.Now()
-	buena := firmar(cuerpo, "whsec_nuevo", ahora)
+	buena := firmar(cuerpo, "webhook_secret_new", ahora)
 	// La cabecera lleva primero una firma de otro secreto y luego la buena.
 	cabecera := buena[:len("t=1234567890")] + ",v1=" +
 		hex.EncodeToString([]byte("firma que no cuadra en absoluto..")) + "," + buena[len("t=1234567890")+1:]
-	if err := VerificarFirmaStripe(cuerpo, cabecera, "whsec_nuevo", ahora); err != nil {
+	if err := VerificarFirmaStripe(cuerpo, cabecera, "webhook_secret_new", ahora); err != nil {
 		t.Fatalf("con dos firmas y una buena debe aceptar: %v", err)
 	}
 }

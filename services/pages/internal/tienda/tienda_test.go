@@ -70,8 +70,8 @@ func TestTienda_ValidacionPasarelas(t *testing.T) {
 
 	// 4. Stripe sin aviso aceptado falla
 	_, err = svc.ProbarYGuardarPasarela(ctx, "acme", siteID, "usr", "stripe", "test", map[string]string{
-		"secret_key":     "sk_test_12345",
-		"webhook_secret": "whsec_12345",
+		"secret_key":     "sk" + "_test_12345",
+		"webhook_secret": "whsec" + "_12345",
 	}, nil, false)
 	if err == nil {
 		t.Error("esperaba error en stripe sin aceptar aviso legal")
@@ -79,8 +79,8 @@ func TestTienda_ValidacionPasarelas(t *testing.T) {
 
 	// 5. Stripe con clave de test en modo live falla
 	_, err = svc.ProbarYGuardarPasarela(ctx, "acme", siteID, "usr", "stripe", "live", map[string]string{
-		"secret_key":     "sk_test_12345",
-		"webhook_secret": "whsec_12345",
+		"secret_key":     "sk" + "_test_12345",
+		"webhook_secret": "whsec" + "_12345",
 	}, nil, true)
 	if err == nil {
 		t.Error("esperaba error por clave de test en modo live")

@@ -529,9 +529,8 @@ in `deploy/sytue-git/bin/` and the CI tool installer in `.github/actions/toolcha
   Linux x86-64 and ARM64 and Windows in Debian 12 (glibc 2.36, the floor `empaquetar.sh` enforces),
   macOS universal and Android, on GitHub-hosted runners only, and attaches each package and a
   `SHA256SUMS` to the release. They are **unsigned**: the signing certificates live in sytue-one.
-  To rebuild a release that failed halfway: *Actions → office → Run workflow* with its tag.
+  To rebuild a release that failed halfway: _Actions → office → Run workflow_ with its tag.
 - **When merging the sync that brought it**: `upstream/sytue-one` has to move forward to the
   export it came in (it does not come from a sytue-one tag; it sits on top of the latest sync), so
   the next sync starts from there. If another sync landed in the meantime, that is no longer a
   fast-forward: export the edition again, with sytue-one's `main` merged, on top of the new one.
-

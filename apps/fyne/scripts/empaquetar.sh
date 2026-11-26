@@ -3252,8 +3252,15 @@ XML
     case "$glibc" in
       "") echo "::warning::no se pudo leer la versión de glibc que exige $destino (lector: ${lector:-ninguno})" >&2 ;;
       GLIBC_2.3[7-9]|GLIBC_2.[4-9][0-9])
-        echo "::error::$destino exige $glibc: no arranca en Debian 12 / Ubuntu 22.04. ¿Se compiló nativo en Ubuntu 24.04?" >&2
-        exit 1 ;;
+        # SYTUE_PARA_ESTE_EQUIPO=1 es un paquete para instalarlo en el equipo que lo compila
+        # (`./sytue-deploy --mode sytue-office` en sytue-suite): arranca aquí, que es lo que
+        # importa, y no se publica. Ningún workflow lo pone (lo vigila tools/pruebasfyne).
+        if [ "${SYTUE_PARA_ESTE_EQUIPO:-}" = 1 ]; then
+          echo "  glibc mínima: ${glibc#GLIBC_} (solo para este equipo: no se publica)"
+        else
+          echo "::error::$destino exige $glibc: no arranca en Debian 12 / Ubuntu 22.04. ¿Se compiló nativo en Ubuntu 24.04?" >&2
+          exit 1
+        fi ;;
       *) echo "  glibc mínima: ${glibc#GLIBC_}" ;;
     esac
     # AL BUNDLE, cada cosa donde la busca `instalar.sh`: el programa en bin/, su

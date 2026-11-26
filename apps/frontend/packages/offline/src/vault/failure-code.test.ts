@@ -24,6 +24,13 @@ test('el código del fallo dice qué comprobación fue, con lo que es fijo en el
     [new PrivateDriveError('not_ready'), 'drive.not_ready'],
     [new MatrixSecurityError('locked'), 'security.locked'],
     [new StorageRecordError('incomplete'), 'record.incomplete'],
+    // Lo que contestó el servicio al leer el registro: sin esto, `prepare/record.invalid`
+    // no decía cuál de treinta comprobaciones fue.
+    [
+      Object.assign(new StorageRecordError(), { check: 'get_404_pq_vault_not_found' }),
+      'record.invalid.get_404_pq_vault_not_found',
+    ],
+    [Object.assign(new StorageRecordError(), { check: secret }), 'record.invalid'],
     [new StorageMigrationError(), 'source.invalid'],
     [
       new HttpError(

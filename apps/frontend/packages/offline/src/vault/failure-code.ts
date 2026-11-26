@@ -63,7 +63,7 @@ export function vaultFailureCode(error: unknown): string {
     case 'MatrixSecurityError':
       return 'security.' + (reason || 'other');
     case 'StorageRecordError':
-      return 'record.' + (reason || 'other');
+      return 'record.' + (reason || 'other') + (check ? '.' + check : '');
     case 'StorageMigrationError':
       return 'source.invalid';
     case 'CipherBlobError':

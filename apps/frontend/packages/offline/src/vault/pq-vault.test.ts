@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 import { describe, expect, test } from 'bun:test';
 import type { PqcRuntime } from '../pqc/runtime.js';
+import { StorageRecordError } from '../matrix/storage.js';
 import { pqVaultProfile } from '../matrix/unlock-bridge.js';
 import {
   PqVault,
@@ -190,6 +191,64 @@ describe('PqVault (ADR 0086)', () => {
     }
     expect(full.records).toHaveLength(1);
     await owner.closeAndDrain();
+  });
+});
+
+describe('PqVault: leer un registro por su id (prepare/record.invalid en Drive)', () => {
+  // Astro descodifica la ruta con `decodeURI`, que deja `%24` como está: el BFF no
+  // reconocía `records/%24pqe_…` y contestaba 404. El arnés hace lo mismo.
+  test('el `$` del id va sin codificar y un rechazo dice qué operación y estado fue', async () => {
+    const core = createMockCore();
+    const h = createHarness();
+    const servir = h.fetchImpl;
+    const pedidas: string[] = [];
+    let negar = false;
+    const fetchImpl = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(String(input), 'https://drive.sytue.eu');
+      if (url.pathname.startsWith('/drive/api/pq-vault/records/')) {
+        pedidas.push(url.pathname);
+        if (negar) return Response.json({ error: { code: 'pq_vault_not_found' } }, { status: 404 });
+      }
+      return servir(input, init);
+    }) as unknown as typeof fetch;
+    const vault = await PqVault.open({
+      actor: 'user-1',
+      tenant: 'acme',
+      product: 'drive',
+      basePath: '/drive',
+      fetchImpl,
+      bridge: h.bridge,
+      createCore: () => core,
+    });
+    const repo = vault.storage();
+    await repo.prepare();
+    const target = repo.publicationTarget();
+    await repo.recoverable(target);
+    const payload = Buffer.from('{}').toString('base64');
+    const ref = await repo.exclusive((signal) =>
+      repo.putRecord(
+        'tx-id-1',
+        {
+          v: 1 as const,
+          scope: { tenant: 'acme', subject: 'user-1', product: 'drive' as const },
+          object_id: 'doc-1',
+          revision_id: 'rev-1',
+          role: 'index' as const,
+          payload,
+        },
+        signal,
+        target,
+      ),
+    );
+    expect((await repo.readRecord(ref, 'doc-1', 'index')).payload).toBe(payload);
+    expect(pedidas.length).toBeGreaterThan(0);
+    for (const ruta of pedidas) expect(ruta).toStartWith('/drive/api/pq-vault/records/$pqe_');
+
+    negar = true;
+    const fallo = await repo.readRecord(ref, 'doc-1', 'index').catch((e: unknown) => e);
+    expect(fallo).toBeInstanceOf(StorageRecordError);
+    expect((fallo as StorageRecordError).check).toBe('get_404_pq_vault_not_found');
+    await vault.closeAndDrain();
   });
 });
 

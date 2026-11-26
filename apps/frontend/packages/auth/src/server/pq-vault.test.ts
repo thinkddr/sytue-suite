@@ -110,6 +110,65 @@ describe('rutaBovedaPq', () => {
     ]);
   });
 
+  // Astro descodifica la ruta con `decodeURI`, que no toca `%24`: un cliente que pide
+  // `records/%24pqe_…` llega con el `%24` en `params.ruta`. Antes eso era un 404 y Drive
+  // se quedaba en `prepare/record.invalid` al releer lo que acababa de publicar.
+  test('lee un registro por su id venga el `$` tal cual o como `%24`', async () => {
+    const id = 'pqe_' + 'A'.repeat(26);
+    const vault = '!pqv_' + 'B'.repeat(26);
+    const scopeHeader = encodeStorageScopeHeader({
+      tenant: 'acme',
+      subject: 'sub-alice',
+      product: 'drive',
+    });
+    for (const ruta of ['records/$' + id, 'records/%24' + id]) {
+      const seen: string[] = [];
+      const handler = rutaBovedaPq({
+        bff: fakeBff(session),
+        env,
+        product: 'drive',
+        fetchImpl: (async (input: RequestInfo | URL) => {
+          seen.push(String(input));
+          return Response.json({ event_id: '$' + id });
+        }) as unknown as typeof fetch,
+      });
+      const req = new Request(`https://drive.sytue.eu/api/pq-vault/${ruta}?vault_id=${vault}`, {
+        method: 'GET',
+        headers: { [storageScopeHeader]: scopeHeader },
+      });
+      const res = await handler({
+        request: req,
+        url: new URL(req.url),
+        params: { ruta },
+        cookies: {} as never,
+      } as never);
+      expect(res.status).toBe(200);
+      expect(seen).toEqual([
+        'http://drive.internal/api/v1/pq-vault/drive/records/$' + id + '?vault_id=' + vault,
+      ]);
+    }
+  });
+
+  test('`%24` solo vale como el `$` de un id de registro', async () => {
+    const handler = rutaBovedaPq({
+      bff: fakeBff(session),
+      env,
+      product: 'drive',
+      fetchImpl: (async () => Response.json({})) as unknown as typeof fetch,
+    });
+    const otro = 'A'.repeat(26);
+    for (const ruta of ['records/%24otra_' + otro, '%24pqe_' + otro, 'records/%2524pqe_' + otro]) {
+      const req = new Request(`https://drive.sytue.eu/api/pq-vault/${ruta}`, { method: 'GET' });
+      const res = await handler({
+        request: req,
+        url: new URL(req.url),
+        params: { ruta },
+        cookies: {} as never,
+      } as never);
+      expect(res.status).toBe(404);
+    }
+  });
+
   test('signing-key va a Sytue ID con el token de la persona, solo GET y PUT', async () => {
     const seen: { url: string; method: string; auth: string | null }[] = [];
     const handler = rutaBovedaPq({

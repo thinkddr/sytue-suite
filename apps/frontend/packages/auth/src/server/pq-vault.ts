@@ -111,8 +111,17 @@ export function rutaBovedaPq(options: {
       return {};
     },
   });
-  return async (ctx) => {
-    const path = ctx.params.ruta ?? '';
+  return async (ctxRecibido) => {
+    // Astro descodifica la ruta con `decodeURI`, que deja los reservados como están:
+    // `records/%24pqe_…` llegaba así y no casaba con `recordIdPath` (404), y Drive se
+    // quedaba en `prepare/record.invalid`. Un `%24` delante de `pqe_` es el `$` del
+    // id; cualquier otra cosa sigue pasando por la misma validación estricta.
+    const recibida = ctxRecibido.params.ruta ?? '';
+    const path = recibida.replace(/^records\/%24(?=pqe_)/iu, 'records/$');
+    const ctx =
+      path === recibida
+        ? ctxRecibido
+        : contextoDerivado(ctxRecibido, { ...ctxRecibido.params, ruta: path });
     if (path === 'signing-key') {
       const origin = ctx.request.headers.get('origin');
       if (

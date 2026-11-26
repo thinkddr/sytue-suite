@@ -1214,8 +1214,11 @@ Guardianes que cuentan o listan `apps/fyne/cmd/*`. Ninguno ve un árbol hermano:
 Lo que **sí** alcanza a `cmd-local` y hay que atender:
 
 - `TestLasClavesQueElCodigoPideExisten` recorre todo `apps/fyne` (§5.14).
-- `make fyne-cmd-check` compila `./...` para `js/wasm`: los `cmd-local` llevan `//go:build
-  edicionlocal`, así que no entran. Se añade su propia comprobación (§7.3).
+- `make fyne-cmd-check` compila `./...` para `js/wasm`. Deja fuera todo paquete que dependa del
+  núcleo local (`apps/nucleo/local/…` o `apps/fyne/local`): `cmd-local/*`, `editor/enfichero` y
+  `local/*`, que usan el almacén en disco y en wasm no compilan. La etiqueta `edicionlocal` no
+  bastaba, porque no la llevan todos sus ficheros. Su propia comprobación es `fyne-local-check`
+  (§7.3).
 - El hook de pre-push excluye `/cmd/` de los tests, pero **no** `/cmd-local/`: sus tests corren en
   local. Se mantienen ligeros.
 

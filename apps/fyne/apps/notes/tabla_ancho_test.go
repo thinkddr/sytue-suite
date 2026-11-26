@@ -41,7 +41,7 @@ func TestLaTablaOcupaElAnchoDeLaNota(t *testing.T) {
 		if izq > 0.5 || der < ancho-0.5 {
 			t.Errorf("%s: la tabla va de %v a %v y no ocupa los %v de la nota", nombre, izq, der, ancho)
 		}
-		var bordes []float32
+		bordes := make([]float32, 0, len(xs))
 		for x := range xs {
 			bordes = append(bordes, x)
 		}

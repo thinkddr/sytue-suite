@@ -46,6 +46,7 @@ import { Nav } from './Nav.js';
 import { CAMPO_TACTIL } from '../lib/tactil.js';
 import { EsqueletoAlbumes } from './Esqueletos.js';
 import { AlbumesCifrados } from './AlbumesCifrados.js';
+import { OrganizarConIA, servicioDeFotos } from './OrganizarConIA.js';
 
 export const Albums = conAvisos(Albumes);
 
@@ -137,6 +138,7 @@ function Albumes({
     setFallo(null);
     albumes().then(setLista).catch(setFallo);
   };
+  const servicioOrganizar = useMemo(() => servicioDeFotos(user), [user]);
   useEffect(() => {
     cargar();
     obtenerAjustesOrganizacion()
@@ -267,6 +269,10 @@ function Albumes({
             ))}
           </ul>
         </section>
+        {/* «Organizar con IA» va aparte de las sugerencias: aquellas salen de los
+            vectores y se guardan de una en una; esto describe lo que falta, propone
+            títulos y crea de una vez lo que se acepte. */}
+        <OrganizarConIA locale={locale} servicio={servicioOrganizar} alCambiar={cargar} />
         {fallo !== null ? (
           <FalloDeCarga locale={locale} fallo={fallo} alReintentar={cargar} />
         ) : lista === null ? (

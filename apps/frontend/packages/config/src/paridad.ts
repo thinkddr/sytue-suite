@@ -272,7 +272,10 @@ export interface FuncionParidad {
 // 2026-11-25: +1 en las dos por «cast-marcas-de-tiempo» (capítulos, marcas pulsables,
 // «Empezar en…», J/L, Inicio/Fin y 0–9, «Repetir»): web entera; en Fyne, todo menos
 // las marcas de los comentarios, «Repetir» y abrir un enlace con «?t=».
-export const TOPE_DEUDA = { escritorio: 80, movil: 105 } as const;
+// 2026-11-26: +1 en las dos por «photos-organizar-ia» («Organizar en álbumes con IA»): web
+// y Fyne a la vez, con la misma instrucción y el mismo lector y sus tests en las dos;
+// falta verlo en una ventana real.
+export const TOPE_DEUDA = { escritorio: 81, movil: 106 } as const;
 
 /**
  * DÓNDE SE CIERRA LA DEUDA. Una sola sección y no tres cadenas: las tres que
@@ -757,6 +760,23 @@ export const FUNCIONES_PARIDAD: FuncionParidad[] = [
     producto: 'photos',
     web: true,
     // Sytue AI no está en Gio: se fue con `gui/ia.go`.
+    escritorio: 'planificado',
+    movil: 'planificado',
+    deuda: DEUDA_AMBAS,
+  },
+  {
+    id: 'photos-organizar-ia',
+    nombre: 'Organizar en álbumes con IA: propuesta revisable antes de crear y «Deshacer»',
+    producto: 'photos',
+    web: true,
+    // 2026-11-26: en «Álbumes», parte de las fotos que no están en ninguno (200 por
+    // pasada), describe las que no tienen nada (50, que se cobran), pide la propuesta en
+    // UNA llamada de texto y la enseña —título editable, cuántas, miniaturas y casilla—
+    // antes de crear; lo que se llama como un álbum que ya existe va a ese, y el aviso
+    // trae «Deshacer». Web (`OrganizarConIA.tsx`, `lib/organizarIA.ts`, `/api/agrupar`) y
+    // Fyne (`organizar.go`, `api.AgruparFotos`), con la misma instrucción y el mismo
+    // lector (los casos de `apps/nucleo/api/testdata/agrupar.json`) y sus tests en las
+    // dos. Las cifradas no entran, como en describir. Sin ventana real.
     escritorio: 'planificado',
     movil: 'planificado',
     deuda: DEUDA_AMBAS,

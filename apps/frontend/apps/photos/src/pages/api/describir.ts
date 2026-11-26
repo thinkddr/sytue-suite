@@ -18,23 +18,11 @@
  */
 import type { APIRoute } from 'astro';
 import { bff, toBffContext } from '../../lib/bff.js';
+import { idiomaParaIA } from '../../lib/idiomaIA.js';
 import { interpretarRespuesta } from '../../lib/respuestaIA.js';
 import { json, miniaturaEnBase64, urlDeIA, verLaFoto } from '../../lib/visionIA.js';
 
 export const prerender = false;
-
-/**
- * Nombre en inglés de cada idioma de producto, porque la instrucción está en
- * inglés. Lo que no está aquí cae al inglés base, como el resto de la interfaz:
- * así en la instrucción nunca entra texto que no esté escrito en este fichero.
- */
-const IDIOMAS: Record<string, string> = {
-  en: 'English',
-  de: 'German',
-  es: 'Spanish',
-  fr: 'French',
-  it: 'Italian',
-};
 
 /**
  * Lo que se le pide al modelo.
@@ -57,7 +45,8 @@ const IDIOMAS: Record<string, string> = {
  * Es la MISMA instrucción que `instruccionDescribir` de `apps/nucleo/api/photos_ia.go`.
  */
 function instruccion(locale: string): string {
-  const idioma = IDIOMAS[locale] ?? 'English';
+  // El nombre sale de `lib/idiomaIA.ts`, el mismo que usan los títulos de organizar.
+  const idioma = idiomaParaIA(locale);
   return [
     'Describe what is visible in this photo for use as alt text.',
     'Answer ONLY with a JSON object: {"descripcion": string, "etiquetas": string[]}.',

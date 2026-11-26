@@ -775,6 +775,9 @@ type Albumes struct {
 	// Cifrados es la sección de los álbumes cifrados (ADR 0086), ya montada; nil, no
 	// hay. Va también sin álbumes en el servidor.
 	Cifrados fyne.CanvasObject
+
+	// Organizar es «Organizar con IA» (organizar.go); nil, no se ofrece.
+	Organizar *OrganizarIA
 }
 
 // PantallaAlbumes monta «Álbumes»: el formulario de crear, las sugerencias y la
@@ -839,6 +842,12 @@ func PantallaAlbumes(v Vista, d Albumes) *fyne.Container {
 	}
 	seccion[len(seccion)-1].Margen = 0
 	bloques = append(bloques, ui.Bloque{Obj: ui.PilaBloques(seccion...), Margen: SeparacionSeccion})
+	// «Organizar con IA» va aparte de las sugerencias: aquellas salen de los vectores y
+	// se guardan de una en una; esta describe lo que falta, propone títulos y crea de una
+	// vez lo que se acepte. Es otra `<section class="mb-6">`, como en Albums.tsx.
+	if d.Organizar != nil {
+		bloques = append(bloques, ui.Bloque{Obj: SeccionOrganizar(v, d.Organizar), Margen: SeparacionSeccion})
+	}
 
 	vacio := EstadoVacio(v, "albums.empty.title", "albums.empty.description", nil)
 	if cuerpo := CuerpoConEsqueleto(v, vacio, func() *ui.BloquesEsqueleto {

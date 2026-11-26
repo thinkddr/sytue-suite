@@ -1,0 +1,49 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Daniel Delgado Ramos
+name: Security inventory
+
+on:
+  workflow_dispatch:
+    inputs:
+      analysis_ref:
+        description: Optional branch or PR merge ref for Go trace diagnostics
+        type: string
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  inventory:
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      security-events: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Read default-branch alert inventory
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          INVENTORY_PATH: ${{ runner.temp }}/security-inventory/inventory.json
+        run: node .github/scripts/security-inventory.mjs
+      - name: Read Go analysis traces for source-level remediation
+        if: inputs.analysis_ref != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          TRACES_PATH: ${{ runner.temp }}/security-inventory/go-traces.json
+          ANALYSIS_REF: ${{ inputs.analysis_ref }}
+        run: node .github/scripts/security-traces.mjs
+      - name: Retain metadata for remediation and closure verification
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: security-inventory
+          path: ${{ runner.temp }}/security-inventory/*.json
+          if-no-files-found: error
+          retention-days: 1

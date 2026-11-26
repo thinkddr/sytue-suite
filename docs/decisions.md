@@ -6396,12 +6396,12 @@ what is done, app by app, [`apps/fyne/SYTUE-OFFICE.md`](../apps/fyne/SYTUE-OFFIC
 
 **Decision.**
 
-1. **Rules, each with its guard test.** *R-ADITIVA*: the connected apps (`apps/fyne/cmd/*`) do
-   not change behaviour; shared code only gains additions. *R-RED*: a binary of the edition
+1. **Rules, each with its guard test.** _R-ADITIVA_: the connected apps (`apps/fyne/cmd/*`) do
+   not change behaviour; shared code only gains additions. _R-RED_: a binary of the edition
    contacts no host the person has not configured (no telemetry, no updater, never falls back to
-   the web); everything goes through one network gatekeeper that denies by default. *R-NO-COPIAR*:
+   the web); everything goes through one network gatekeeper that denies by default. _R-NO-COPIAR_:
    what the server did and the device now needs (mail, DAV, Graph, Slack, AI providers, Bases and
-   ERP logic) moves to `apps/nucleo` and both use it. *R-CONVIVE*: different identifiers, schemes,
+   ERP logic) moves to `apps/nucleo` and both use it. _R-CONVIVE_: different identifiers, schemes,
    executables and data folders, so both editions install side by side.
 2. **The same screens, other back ends.** Each `cmd-local/<app>` mounts the screens of the connected
    app over local implementations: records in the clear (`local/almacen`), documents as files
@@ -8149,7 +8149,6 @@ proof is an HMAC, which the server cannot verify.
      - Make sure mail arriving for a retired Matrix account before it moves is not lost (for
        example, deferring its SMTP delivery with a 4xx until the handover, which the sender
        retries). Not done: today it stays unreadable in the queue.
-
 
 **Consequences.**
 

@@ -130,8 +130,9 @@ var sistemasDeLaEdicion = []struct{ goos, goarch, etiquetas string }{
 
 // importadoresDeAuthEnRooms son los ÚNICOS paquetes por los que `nucleo/auth` entra en
 // Rooms: su pantalla compartida (`apps/rooms`) importa `cifrado` y el cliente de Matrix,
-// y `cifrado` la sesión de la suite, que trae los demás. Se compara por igualdad: uno que
-// deje de importarlo se borra de aquí.
+// y `cifrado` la sesión de la suite, que trae los demás (también `widgets/fuentes`, la
+// fuente privada de los widgets de las apps de registros, que la sesión monta). Se compara
+// por igualdad: uno que deje de importarlo se borra de aquí.
 var importadoresDeAuthEnRooms = []string{
 	"git.sytue.eu/sytue/one/apps/fyne/cifrado",
 	"git.sytue.eu/sytue/one/apps/fyne/sesion",
@@ -139,6 +140,7 @@ var importadoresDeAuthEnRooms = []string{
 	"git.sytue.eu/sytue/one/apps/nucleo/matrix",
 	"git.sytue.eu/sytue/one/apps/nucleo/nube",
 	"git.sytue.eu/sytue/one/apps/nucleo/widgets",
+	"git.sytue.eu/sytue/one/apps/nucleo/widgets/fuentes",
 }
 
 // TestAuthNoEntraEnLasApps: ningún `cmd-local/*` enlaza `nucleo/auth`, en ningún

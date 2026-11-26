@@ -31,7 +31,7 @@ iphonesimulator) objetivo="arm64-apple-ios$minimo-simulator" plataforma=iPhoneSi
 *) echo "::error::SDK «$sdk»: iphoneos o iphonesimulator" >&2; exit 1 ;;
 esac
 
-[ "$(uname -s)" = Darwin ] && command -v xcrun >/dev/null 2>&1 || {
+{ [ "$(uname -s)" = Darwin ] && command -v xcrun >/dev/null 2>&1; } || {
   echo "::error::SytueIA.framework solo se construye en macOS con Xcode (runner sytue-macos o Xcode Cloud)." >&2
   exit 1
 }

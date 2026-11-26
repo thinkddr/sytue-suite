@@ -468,7 +468,7 @@ grupo_office_apple() {
 derechos_office() { # <dir> <equipo>
   local appid equipo="${2:-}" grupo
   appid="$(metadato "$1" ID)"
-  [[ "$appid" =~ ^eu\.sytue\.office\.[a-z]+$ ]] && [[ "$equipo" =~ ^[A-Z0-9]{10}$ ]] || {
+  [[ "$appid" =~ ^eu\.sytue\.office\.[a-z]+$ && "$equipo" =~ ^[A-Z0-9]{10}$ ]] || {
     echo "::error::derechos de Sytue Office: $1 no es una app de cmd-local o «$equipo» no es un Team ID" >&2
     return 1
   }
@@ -1947,7 +1947,7 @@ verificar_office() { # <aab> <paquete> <manifiesto volcado>
   rm -f "$f"
   justificados="android.permission.INTERNET android.permission.POST_NOTIFICATIONS ${permisos_extra[*]+${permisos_extra[*]}}"
   [ -z "${MLKIT:-}" ] || justificados="$justificados com.google.android.apps.aicore.service.BIND_SERVICE"
-  justificados="$(printf '%s\n' $justificados | sort -u | tr '\n' ' ')"
+  justificados="$(tr -s ' ' '\n' <<<"$justificados" | sed '/^$/d' | sort -u | tr '\n' ' ')"
   pedidos="$(grep -o '<uses-permission [^>]*android:name="[^"]*"' <<<"$m" | sed 's/.*android:name="//; s/"$//' | sort -u | tr '\n' ' ')"
   [ "$pedidos" = "$justificados" ] || {
     echo "::error::$1 pide «$pedidos» y lo único justificado es «$justificados»." >&2
@@ -1977,7 +1977,7 @@ verificar_office() { # <aab> <paquete> <manifiesto volcado>
       if grep -qa 'Lcom/google/mlkit/genai/prompt/Generation;' "$f"; then ia=si; fi
     done
     rm -rf "$d"
-    [ "$ia" = si ] && [ "$dex" -gt 1 ] || {
+    { [ "$ia" = si ] && [ "$dex" -gt 1 ]; } || {
       echo "::error::$1 no lleva las clases de la Prompt API de ML Kit en su dex." >&2
       return 1
     }

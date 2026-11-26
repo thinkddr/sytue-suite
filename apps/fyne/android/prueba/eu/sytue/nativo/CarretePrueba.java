@@ -146,7 +146,9 @@ public final class CarretePrueba {
     private static void guardar() throws Exception {
         Build.VERSION.SDK_INT = 36;
         Context ctx = new Context();
-        File f = File.createTempFile("carrete-prueba", ".jpg");
+        // Files.createTempFile y no File.createTempFile: el fichero nace solo para su dueño
+        // (CodeQL, «Local information disclosure in a temporary directory»).
+        File f = Files.createTempFile("carrete-prueba", ".jpg").toFile();
         try {
             Files.write(f.toPath(), "jpeg".getBytes(StandardCharsets.UTF_8));
             String id = Carrete.guardar(ctx, f.getPath(), "foto.jpg", "image/jpeg");

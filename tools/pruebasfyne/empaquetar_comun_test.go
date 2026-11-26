@@ -384,3 +384,47 @@ func empaquetarPlistDe(t *testing.T, env []string, args ...string) (map[string]a
 	p, err := empaquetarPlist(t, r.Salida)
 	return p, err == nil
 }
+
+// BASH 3.2 Y LAS LISTAS VACÍAS: lo que corre en el Mac lo lee el bash de macOS, y con
+// `set -u` ese bash da «lista[@]: unbound variable» al expandir una lista vacía (el de
+// Linux, desde 4.4, no). Así paró el primer `office.yml` de sytue-suite en macOS: las apps
+// sin `esquemas_extra` dejaban vacía la lista de esquemas_extra_de. Aquí no hay bash 3.2,
+// y `BASH_COMPAT` no devuelve ese fallo, así que se mira la forma: una lista que nace
+// vacía (`x=()`) solo se expande como `${x[@]+"${x[@]}"}`, o con su tamaño comprobado
+// antes (`"${#x[@]}" -gt 0`).
+func TestEmpaquetarSinListasVaciasQueBash32NoExpande(t *testing.T) {
+	d := empaquetarDirs(t)
+	acciones, _ := filepath.Glob(empaquetarUnir(d.raiz, ".github/actions/toolchain/*.sh"))
+	ficheros := append([]string{
+		d.guion, empaquetarUnir(d.aqui, "apple-firma.sh"),
+		empaquetarUnir(d.raiz, "deploy/sytue-git/bin/publicar-asset.sh"),
+	}, acciones...)
+	vacia := regexp.MustCompile(`(?:^|[^\w$])([A-Za-z_]\w*)=\(\)`)
+	vistos := 0
+	for _, f := range ficheros {
+		guion := empaquetarLeer(f) // un fichero que falte (el árbol público) no cuenta
+		nombres := map[string]bool{}
+		for _, m := range vacia.FindAllStringSubmatch(guion, -1) {
+			nombres[m[1]] = true
+		}
+		for n := range nombres {
+			q := regexp.QuoteMeta(n)
+			if regexp.MustCompile(`\$\{#` + q + `\[@\]\}"?\s+-(gt|ne)\s+0`).MatchString(guion) {
+				continue
+			}
+			vistos++
+			// Fuera las formas guardadas, y lo que quede no puede expandirla.
+			limpio := regexp.MustCompile(`\$\{`+q+`\[[@*]\]\+("\$\{`+q+`\[[@*]\]\}"|\$\{`+q+`\[[@*]\]\}|[^}\n]*)\}`).ReplaceAllString(guion, "")
+			suelta := regexp.MustCompile(`\$\{` + q + `\[[@*]\]\}`)
+			for i, l := range strings.Split(limpio, "\n") {
+				if suelta.MatchString(l) {
+					t.Errorf("%s:%d: «%s» nace vacía y se expande sin ${%s[@]+…}: el bash 3.2 de macOS para con «unbound variable»: %s",
+						filepath.Base(f), i+1, n, n, strings.TrimSpace(l))
+				}
+			}
+		}
+	}
+	if vistos == 0 {
+		t.Fatal("no se encontró ninguna lista que naciera vacía: la prueba ya no mira nada")
+	}
+}

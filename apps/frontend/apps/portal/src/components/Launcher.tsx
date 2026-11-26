@@ -62,6 +62,7 @@ import {
 import { appsRecordadas, detalleDe, recordarApps } from '@sytue/shell';
 import { appUrl, esSoloDeOrganizaciones, orgActual, suiteApex } from '@sytue/config';
 import type { SearchResult } from '@sytue/api-clients';
+import { Saludo } from './Saludo.js';
 
 /**
  * El Hub no se lanza desde el Hub: es la única exclusión de esta galería.
@@ -271,11 +272,12 @@ export function Launcher({
   // decide al montar. Hasta entonces el título reserva su línea, sin texto que cambie.
   const [momento, setMomento] = useState<Momento | null>(null);
   useEffect(() => setMomento(momentoDelDia(new Date().getHours())), []);
-  const saludo = momento
-    ? nombre
-      ? `${t(`launcher.greeting.${momento}`)}, ${nombre}`
-      : t(`launcher.greeting.${momento}`)
-    : '\u00a0';
+  // El nombre va entero, sin partirlo con guion (ver `Saludo`).
+  const saludo = momento ? (
+    <Saludo texto={t(`launcher.greeting.${momento}`)} nombre={nombre} />
+  ) : (
+    '\u00a0'
+  );
   const ahora = useAhora();
   // Qué productos levanta esta instalación (BFF → Hub). Si SSR ya los resolvió,
   // se usan directamente (cero desfase de hidratación). Si no, arranca con lo que

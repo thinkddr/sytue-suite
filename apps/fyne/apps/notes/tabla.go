@@ -19,8 +19,10 @@ import (
 // tiene reglas de tabla, así que lo que se ve allí es la tabla del navegador con el
 // `preflight` (`border-collapse: collapse`):
 //
-//   - `table-layout: auto`, con el ancho de lo que lleva y no el del cuerpo;
-//   - `<th>` en negrita y centrada, y cada celda centrada en vertical en su caja;
+//   - a todo el ancho de la nota y con las columnas a partes iguales (`w-full` y
+//     `table-layout: fixed` de `.sytue-prose table`), lleve lo que lleve;
+//   - `<th>` en negrita, sobre `bg-subtle` y a la izquierda (`text-left`), y cada celda
+//     centrada en vertical en su caja;
 //   - sin margen propio: el `mb-2` del párrafo de antes es lo único que la separa;
 //   - `colspan` y `rowspan` ocupan sus ranuras, y el fondo, el color y la alineación de
 //     la celda, la fila, la sección o la tabla se heredan en ese orden (el saneador
@@ -98,8 +100,10 @@ func estiloCeldaDe(t *Tabla, f, c int) estiloCelda {
 		fondo: heredado(t, f, c, "background-color"), tinta: heredado(t, f, c, "color"),
 		alinear: heredado(t, f, c, "text-align"), cabecera: celda.Cabecera,
 	}
-	if e.alinear == "" && e.cabecera {
-		e.alinear = "center"
+	// La cabecera, a la izquierda salvo que ella misma diga otra cosa: la web la pinta
+	// con `.sytue-prose th { text-left }`, que pisa lo que herede de la fila o la tabla.
+	if e.cabecera {
+		e.alinear = propiedad(attr(celda.Atributos, "style"), "text-align")
 	}
 	propio := attr(celda.Atributos, "style")
 	// `border: 1px solid #d4d0c8`: el grueso y el color, que es lo que escribe la barra.
@@ -123,9 +127,6 @@ func estiloCeldaDe(t *Tabla, f, c int) estiloCelda {
 		e.fondoToken, _ = coloresEstado(f)
 	case e.cabecera && e.fondo == "":
 		e.fondoToken = "bg-subtle"
-	}
-	if e.cabecera && attr(celda.Atributos, "scope") == "row" && heredado(t, f, c, "text-align") == "" {
-		e.alinear = "" // la cabecera de una fila se lee como su texto, a la izquierda
 	}
 	// `padding` con uno, dos, tres o cuatro valores, como en CSS.
 	if v := strings.Fields(propiedad(propio, "padding")); len(v) > 0 {
@@ -257,60 +258,17 @@ func (e estiloCelda) horizontal() float32 { return e.relleno[1] + e.relleno[3] }
 // vertical es lo que le quitan de alto.
 func (e estiloCelda) vertical() float32 { return e.relleno[0] + e.relleno[2] }
 
-// anchosDeColumna es el `table-layout: auto` a ese ancho: cada columna, lo que pide su
-// celda más ancha sin partir (y una que ocupa varias reparte lo que les falte a partes
-// iguales); si no caben todas, se reparte lo que sobra del ancho mínimo (el de la
-// palabra más larga) en proporción a lo que a cada una le falta. Con `llenar` (el
-// `width: 100%`), lo que sobra del ancho se reparte en proporción a lo que pide cada una.
-func anchosDeColumna(celdas []celdaPuesta, columnas int, ancho, lineas float32, llenar bool, v tema.Variante) []float32 {
-	minimos, maximos := make([]float32, columnas), make([]float32, columnas)
-	medir := func(p celdaPuesta) (float32, float32) {
-		h := p.estilo.horizontal()
-		return anchoMaquetado(Maquetar(p.doc, 1, v)) + h, anchoMaquetado(Maquetar(p.doc, anchoMaximo, v)) + h
-	}
-	// Primero las de una columna, y luego las que ocupan varias sobre lo ya repartido.
-	for _, varias := range []bool{false, true} {
-		for _, p := range celdas {
-			if (p.cols > 1) != varias {
-				continue
-			}
-			mn, mx := medir(p)
-			var sumMn, sumMx float32
-			for c := p.col; c < p.col+p.cols; c++ {
-				sumMn, sumMx = sumMn+minimos[c], sumMx+maximos[c]
-			}
-			hueco := float32(p.cols-1) * lineas
-			for c := p.col; c < p.col+p.cols; c++ {
-				minimos[c] += max(mn-hueco-sumMn, 0) / float32(p.cols)
-				maximos[c] += max(mx-hueco-sumMx, 0) / float32(p.cols)
-			}
-		}
-	}
-	var sumaMin, sumaMax float32
-	for j := range maximos {
-		maximos[j] = max(maximos[j], minimos[j])
-		sumaMin, sumaMax = sumaMin+minimos[j], sumaMax+maximos[j]
-	}
-	disponible := ancho - float32(columnas+1)*lineas
-	switch {
-	case sumaMax <= disponible && !llenar:
-		return maximos
-	case sumaMax <= disponible:
-		out := make([]float32, columnas)
-		for j := range maximos {
-			parte := 1 / float32(columnas)
-			if sumaMax > 0 {
-				parte = maximos[j] / sumaMax
-			}
-			out[j] = maximos[j] + (disponible-sumaMax)*parte
-		}
-		return out
-	case sumaMin >= disponible || sumaMax == sumaMin:
-		return minimos
-	}
+// anchosDeColumna es lo que pinta la web (`.sytue-prose table`: `w-full` y
+// `table-layout: fixed`): la tabla ocupa todo el ancho de la nota y las columnas se
+// lo reparten a partes iguales, lleven lo que lleven. Antes era `table-layout: auto`
+// —el ancho de lo que lleva, salvo con `width: 100%` en su `style`—, y una tabla sin
+// texto salía como una tira estrecha ajustada a sus celdas vacías (lo vio el dueño,
+// 2026-11-26) mientras la web la pintaba a lo ancho.
+func anchosDeColumna(columnas int, ancho, lineas float32) []float32 {
 	out := make([]float32, columnas)
-	for j := range maximos {
-		out[j] = minimos[j] + (disponible-sumaMin)*(maximos[j]-minimos[j])/(sumaMax-sumaMin)
+	cada := max(ancho-float32(columnas+1)*lineas, 0) / float32(columnas)
+	for j := range out {
+		out[j] = cada
 	}
 	return out
 }
@@ -333,14 +291,13 @@ func (m *Maquetado) tabla(bloques []Bloque, indice func(int) int, y, ancho float
 	for _, p := range celdas {
 		lineas = max(lineas, p.estilo.borde)
 	}
-	llenar := strings.TrimSpace(propiedad(attr(t.Atributos, "style"), "width")) == "100%"
 	// Las filas numeradas (`table[data-numerada]`) llevan delante una columna más, la
 	// del número: `w-10`, como el `tr::before` de app.css.
 	var gutter float32
 	if numerada(t) {
 		gutter = anchoNumeroFila + max(lineas, tema.Borde)
 	}
-	anchos := anchosDeColumna(celdas, columnas, ancho-gutter, lineas, llenar, v)
+	anchos := anchosDeColumna(columnas, ancho-gutter, lineas)
 	xs := make([]float32, columnas+1)
 	xs[0] = lineas + gutter
 	for c := range columnas {

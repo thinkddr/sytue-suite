@@ -119,3 +119,29 @@ func TestUnHEICSeMideYSeDecodifica(t *testing.T) {
 		t.Errorf("render: %v", err)
 	}
 }
+
+// La lista de índices de un elemento de `ipma`: de 7 y de 15 bits, y un recuento que dice
+// más índices de los que caben en lo que queda (un fichero cortado o que miente) se
+// rechaza antes de reservar nada por él.
+func TestIndicesIpma(t *testing.T) {
+	if got, resto, ok := indicesIpma([]byte{2, 0x81, 0x03, 9}, 0); !ok || len(got) != 2 || got[0] != 1 || got[1] != 3 || len(resto) != 1 {
+		t.Errorf("7 bits: %v, resto %v, %v", got, resto, ok)
+	}
+	if got, _, ok := indicesIpma(append([]byte{1}, u16(0x8000|300)...), 1); !ok || len(got) != 1 || got[0] != 300 {
+		t.Errorf("15 bits: %v, %v", got, ok)
+	}
+	for nombre, b := range map[string][]byte{
+		"vacía":                nil,
+		"recuento que miente":  {255, 0x81},
+		"15 bits sin terminar": {2, 0x80, 0x01, 0x80},
+		"7 bits sin terminar":  {3, 0x81, 0x82},
+	} {
+		anchos := byte(0)
+		if nombre == "15 bits sin terminar" {
+			anchos = 1
+		}
+		if got, _, ok := indicesIpma(b, anchos); ok {
+			t.Errorf("%s: %v, aceptada", nombre, got)
+		}
+	}
+}

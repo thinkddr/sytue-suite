@@ -1,0 +1,41 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Daniel Delgado Ramos
+name: Account security inventory
+on:
+  workflow_dispatch:
+    inputs:
+      public_key:
+        description: Public RSA key for encrypting private repository metadata
+        type: string
+        required: true
+      expected_repositories:
+        description: Expected number of other owned repositories; refuse incomplete discovery
+        type: string
+        required: true
+permissions:
+  contents: read
+jobs:
+  inventory:
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Read owned repositories and encrypt only projected alert metadata
+        env:
+          SECURITY_ALERTS_TOKEN: ${{ secrets.SECURITY_ALERTS_TOKEN }}
+          INVENTORY_PUBLIC_KEY: ${{ inputs.public_key }}
+          EXPECTED_REPOSITORIES: ${{ inputs.expected_repositories }}
+          INVENTORY_PATH: ${{ runner.temp }}/account-security/inventory.enc.json
+        run: node .github/scripts/security-account-inventory.mjs
+      - name: Retain encrypted inventory for its intended recipient
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: account-security-inventory-encrypted
+          path: ${{ runner.temp }}/account-security/inventory.enc.json
+          retention-days: 1
+          if-no-files-found: error

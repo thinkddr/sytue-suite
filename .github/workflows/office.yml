@@ -1,0 +1,311 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Daniel Delgado Ramos
+#
+# Compila SYTUE OFFICE —la edición local de las apps de Fyne: sin cuenta, sin cifrado
+# propio y sin servidor (apps/fyne/SYTUE-OFFICE.md)— cuando se publica una release de la
+# suite, y le adjunta los paquetes, SIN FIRMAR, con sus sumas SHA-256 (SHA256SUMS):
+#
+#   Linux x86-64 y ARM64   sytue-office-linux-<arch>.tar.xz (las 15 apps y su instalar.sh)
+#   Windows x86-64         sytue-office-windows-amd64-installer.exe (NSIS, por usuario)
+#   macOS universal        sytue-office-macos-universal.dmg (.app sin notarizar)
+#   Android                por app: el AAB y un APK universal, los dos sin firmar
+#
+# Las herramientas (Go, NSIS, MinGW, el SDK de Android…) llevan la versión y el sha256 de
+# deploy/sytue-git/versions.env y las instala el mismo .github/actions/toolchain/accion.sh
+# que usa sytue-one; la CLI de Fyne, compilada contra el mismo fork que las apps
+# (fyne-cli.sh). Quien empaqueta es apps/fyne/scripts/empaquetar.sh, también el de
+# sytue-one. Todo eso llega con la sincronización (tools/publicar-suite/incluir.txt de
+# sytue-one); este workflow es de la suite y no se sincroniza.
+#
+# En un equipo, lo mismo sin release: `./sytue-deploy --mode sytue-office`.
+#
+# SOLO RUNNERS ALOJADOS DE GITHUB. Este repositorio es PÚBLICO: cualquiera puede abrir un PR
+# y, con él, ejecutar código en el runner. Los runners propios de Sytue (los de sytue-one)
+# tienen acceso a la red y a la caché de su anfitrión y no deben correr NADA de aquí: no
+# se nombra ninguna de sus etiquetas, y en la organización su grupo de runners no admite
+# repositorios públicos. Los alojados estrenan máquina en cada job y no tienen secretos.
+#
+# Este repositorio no tiene certificados de firma (Authenticode, Developer ID, clave de
+# subida de Play: los tiene sytue-one), así que nada se firma y la release lo dice (job
+# `sumas`).
+name: office
+
+on:
+  release:
+    types: [published]
+  # En un PR que cambia este workflow: compila todo, sin adjuntar nada a ninguna release.
+  # Así se prueba antes de la primera release que lo use (las herramientas, el contenedor
+  # y empaquetar.sh), que es cuando más caro sale descubrir que algo falla.
+  pull_request:
+    paths:
+      - .github/workflows/office.yml
+  # A mano, para volver a compilar una release ya publicada (un job que falló a medias).
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Etiqueta vX.Y.Z de una release ya publicada"
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: office-${{ inputs.tag || github.event.release.tag_name || github.ref }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  # Vacío en un PR: empaquetar.sh numera los paquetes 0.0.0 y no se adjunta nada.
+  TAG: ${{ inputs.tag || github.event.release.tag_name }}
+  # El árbol de apps de Sytue Office (apps/fyne/cmd-local) en empaquetar.sh.
+  SYTUE_ARBOL: cmd-local
+  # El Go fijado, sin cambiar de versión por su cuenta (lo instala accion.sh con su sha256).
+  GOTOOLCHAIN: local
+  # Los forks de apps/fyne/go.mod (Fyne, GLFW, typesetting) son públicos y se bajan de
+  # GitHub: empaquetar.sh pide que GOPRIVATE los cubra para no pasar por el proxy.
+  GOPRIVATE: github.com/thinkddr/*
+  # El checkout lo escribe el runner (uid 1001) y los pasos corren como root dentro del
+  # `container:`: git ve un propietario ajeno, se niega («dubious ownership») y `go build`
+  # muere con «error obtaining VCS status». Igual que en el ci-desktop.yml de sytue-one.
+  GIT_CONFIG_COUNT: "1"
+  GIT_CONFIG_KEY_0: safe.directory
+  GIT_CONFIG_VALUE_0: "*"
+
+jobs:
+  # Linux y Windows: en el mismo Debian 12 (glibc 2.36) que sytue-one, fijado por digest y
+  # para las dos arquitecturas. El guardián de empaquetar.sh rechaza un binario que exija
+  # una glibc más nueva (Ubuntu 24.04 da 2.39); Windows se cruza desde Linux con MinGW y
+  # NSIS, como en sytue-one.
+  escritorio:
+    name: ${{ matrix.nombre }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - nombre: Linux x86-64
+            runner: ubuntu-24.04
+            plataforma: linux
+            arch: amd64
+          - nombre: Linux ARM64
+            runner: ubuntu-24.04-arm
+            plataforma: linux
+            arch: arm64
+          - nombre: Windows x86-64
+            runner: ubuntu-24.04
+            plataforma: windows
+            arch: amd64
+    runs-on: ${{ matrix.runner }}
+    container:
+      image: node:24-bookworm@sha256:64af3819f9275802414d7cdc38c27e9d82bd564dec4d4da87d008255d36c63b4
+    timeout-minutes: 90
+    permissions:
+      contents: write
+    steps:
+      - name: Clonar la etiqueta
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event_name != 'pull_request' && format('refs/tags/{0}', env.TAG) || '' }}
+          persist-credentials: false
+
+      - name: Comprobar la etiqueta
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_EVENT_NAME" != pull_request ]; then
+            case "$TAG" in v[0-9]*.[0-9]*.[0-9]*) ;; *)
+              echo "::error::«$TAG» no es una etiqueta vX.Y.Z" >&2; exit 1 ;; esac
+          fi
+          [ -d apps/fyne/cmd-local ] || { echo "::error::${TAG:-este PR} no trae Sytue Office (apps/fyne/cmd-local)" >&2; exit 1; }
+
+      - name: Herramientas (Go, cabeceras, NSIS, MinGW, jq)
+        run: .github/actions/toolchain/accion.sh go escritorio jq
+
+      - name: CLI de Fyne (contra el mismo fork que las apps)
+        run: bash .github/actions/toolchain/fyne-cli.sh apps/fyne "$(sed -n 's/^FYNE_TOOLS_VERSION=//p' deploy/sytue-git/versions.env)" >>"$GITHUB_PATH"
+
+      - name: Empaquetar
+        env:
+          SYTUE_LINUX_ARCH: ${{ matrix.arch }}
+        run: bash apps/fyne/scripts/empaquetar.sh "${{ matrix.plataforma }}"
+
+      - name: Adjuntar a la release (en un PR, solo la lista y sus sumas)
+        env:
+          SYTUE_GIT_TOKEN: ${{ github.token }}
+          SYTUE_LINUX_ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          # La lista la da empaquetar.sh, que es quien los arma, y es rojo si falta alguno.
+          lista="$(bash apps/fyne/scripts/empaquetar.sh publicables "${{ matrix.plataforma }}" apps/fyne/dist)"
+          mapfile -t publicables <<<"$lista"
+          (cd apps/fyne/dist && sha256sum -- "${publicables[@]##*/}") | tee -a "$GITHUB_STEP_SUMMARY"
+          # En un PR basta con que estén todos (la lista es roja si falta alguno).
+          [ "$GITHUB_EVENT_NAME" = pull_request ] || bash deploy/sytue-git/bin/publicar-asset.sh "$TAG" "${publicables[@]}"
+
+  macos:
+    name: macOS universal
+    runs-on: macos-15
+    timeout-minutes: 90
+    permissions:
+      contents: write
+    steps:
+      - name: Clonar la etiqueta
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event_name != 'pull_request' && format('refs/tags/{0}', env.TAG) || '' }}
+          persist-credentials: false
+
+      - name: Comprobar la etiqueta
+        run: |
+          [ -d apps/fyne/cmd-local ] || { echo "::error::${TAG:-este PR} no trae Sytue Office (apps/fyne/cmd-local)" >&2; exit 1; }
+
+      - name: Go fijado
+        run: .github/actions/toolchain/accion.sh go
+
+      - name: CLI de Fyne (contra el mismo fork que las apps)
+        run: bash .github/actions/toolchain/fyne-cli.sh apps/fyne "$(sed -n 's/^FYNE_TOOLS_VERSION=//p' deploy/sytue-git/versions.env)" >>"$GITHUB_PATH"
+
+      # Sin SYTUE_MACOS_IDENTIDAD no se firma con Developer ID ni se notariza: el .app
+      # universal (arm64 + x86_64) va en el DMG tal cual.
+      - name: Empaquetar
+        run: bash apps/fyne/scripts/empaquetar.sh macos
+
+      - name: Adjuntar a la release (en un PR, solo la lista y sus sumas)
+        env:
+          SYTUE_GIT_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          lista="$(bash apps/fyne/scripts/empaquetar.sh publicables macos apps/fyne/dist)"
+          publicables=()
+          while IFS= read -r f; do publicables+=("$f"); done <<<"$lista"
+          (cd apps/fyne/dist && shasum -a 256 -- "${publicables[@]##*/}") | tee -a "$GITHUB_STEP_SUMMARY"
+          # En un PR basta con que estén todos (la lista es roja si falta alguno).
+          [ "$GITHUB_EVENT_NAME" = pull_request ] || bash deploy/sytue-git/bin/publicar-asset.sh "$TAG" "${publicables[@]}"
+
+  android:
+    name: Android
+    runs-on: ubuntu-24.04
+    container:
+      image: node:24-bookworm@sha256:64af3819f9275802414d7cdc38c27e9d82bd564dec4d4da87d008255d36c63b4
+    timeout-minutes: 150
+    permissions:
+      contents: write
+    steps:
+      - name: Clonar la etiqueta
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event_name != 'pull_request' && format('refs/tags/{0}', env.TAG) || '' }}
+          persist-credentials: false
+
+      - name: Comprobar la etiqueta
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_EVENT_NAME" != pull_request ]; then
+            case "$TAG" in v[0-9]*.[0-9]*.[0-9]*) ;; *)
+              echo "::error::«$TAG» no es una etiqueta vX.Y.Z" >&2; exit 1 ;; esac
+          fi
+          [ -d apps/fyne/cmd-local ] || { echo "::error::${TAG:-este PR} no trae Sytue Office (apps/fyne/cmd-local)" >&2; exit 1; }
+
+      - name: Herramientas (Go, JDK, SDK y NDK de Android, bundletool, jq)
+        run: .github/actions/toolchain/accion.sh go jdk bundletool android-sdk jq
+
+      - name: CLI de Fyne (contra el mismo fork que las apps)
+        run: bash .github/actions/toolchain/fyne-cli.sh apps/fyne "$(sed -n 's/^FYNE_TOOLS_VERSION=//p' deploy/sytue-git/versions.env)" >>"$GITHUB_PATH"
+
+      # Un AAB sin firmar por app (el de Google Play lo firma sytue-one con su clave de
+      # subida; aquí no hay ninguna). Sin ML Kit (SYTUE_MLKIT): sus bibliotecas son
+      # propietarias de Google y no se redistribuyen desde aquí.
+      - name: Empaquetar
+        run: bash apps/fyne/scripts/empaquetar.sh android
+
+      # Del AAB, el APK universal (todas las piezas en uno, para instalarlo a mano). Sin
+      # --ks y sin ~/.android/debug.keystore, bundletool no lo firma: hay que firmarlo
+      # (apksigner) antes de instalarlo, igual que el AAB antes de subirlo a una tienda.
+      - name: APK universal de cada AAB
+        run: |
+          set -euo pipefail
+          [ ! -e "$HOME/.android/debug.keystore" ] || { echo "::error::hay una clave de depuración: el APK saldría firmado con ella" >&2; exit 1; }
+          lista="$(bash apps/fyne/scripts/empaquetar.sh publicables android-sin-firmar apps/fyne/dist)"
+          while IFS= read -r aab; do
+            apks="$RUNNER_TEMP/$(basename "$aab" .aab).apks"
+            bundletool build-apks --bundle="$aab" --output="$apks" --mode=universal --overwrite
+            unzip -p "$apks" universal.apk >"${aab%-sin-firmar.aab}-universal-sin-firmar.apk"
+          done <<<"$lista"
+
+      - name: Adjuntar a la release (en un PR, solo la lista y sus sumas)
+        env:
+          SYTUE_GIT_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          lista="$(bash apps/fyne/scripts/empaquetar.sh publicables android-sin-firmar apps/fyne/dist)"
+          publicables=()
+          while IFS= read -r aab; do
+            apk="${aab%-sin-firmar.aab}-universal-sin-firmar.apk"
+            [ -s "$apk" ] || { echo "::error::falta $apk" >&2; exit 1; }
+            publicables+=("$aab" "$apk")
+          done <<<"$lista"
+          (cd apps/fyne/dist && sha256sum -- "${publicables[@]##*/}") | tee -a "$GITHUB_STEP_SUMMARY"
+          # En un PR basta con que estén todos (la lista es roja si falta alguno).
+          [ "$GITHUB_EVENT_NAME" = pull_request ] || bash deploy/sytue-git/bin/publicar-asset.sh "$TAG" "${publicables[@]}"
+
+  # SHA256SUMS de TODO lo adjunto, aunque una plataforma haya fallado (se vuelve a
+  # calcular al relanzar los jobs fallidos), y el aviso de «sin firmar» en la release.
+  sumas:
+    name: SHA256SUMS y aviso
+    needs: [escritorio, macos, android]
+    if: ${{ !cancelled() && github.event_name != 'pull_request' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - name: Clonar la etiqueta
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event_name != 'pull_request' && format('refs/tags/{0}', env.TAG) || '' }}
+          persist-credentials: false
+
+      - name: Bajar lo adjunto y escribir SHA256SUMS
+        env:
+          TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/activos"
+          curl -fsS --max-time 60 --retry 3 -H "Authorization: Bearer $TOKEN" \
+            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/releases?per_page=100" |
+            jq --arg t "$TAG" '[.[] | select(.tag_name == $t)][0] // error("no hay release \($t)")' >"$RUNNER_TEMP/release.json"
+          jq -r '.assets[] | select(.name != "SHA256SUMS") | "\(.url) \(.name)"' "$RUNNER_TEMP/release.json" |
+            while read -r url nombre; do
+              curl -fsSL --max-time 900 --retry 3 -H "Authorization: Bearer $TOKEN" \
+                -H 'Accept: application/octet-stream' -o "$RUNNER_TEMP/activos/$nombre" "$url"
+            done
+          [ -n "$(ls -A "$RUNNER_TEMP/activos")" ] || { echo "::error::la release $TAG no tiene nada adjunto" >&2; exit 1; }
+          (cd "$RUNNER_TEMP/activos" && sha256sum -- *) >SHA256SUMS
+          tee -a "$GITHUB_STEP_SUMMARY" <SHA256SUMS
+
+      - name: Adjuntar SHA256SUMS
+        env:
+          SYTUE_GIT_TOKEN: ${{ github.token }}
+        run: bash deploy/sytue-git/bin/publicar-asset.sh "$TAG" SHA256SUMS
+
+      # El aviso va al final de la nota de la release, una vez: se busca la marca.
+      - name: Avisar de que va sin firmar
+        env:
+          TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cuerpo="$(jq -r '.body // ""' "$RUNNER_TEMP/release.json")"
+          grep -qF -- '<!-- sytue-office:sin-firmar -->' <<<"$cuerpo" && exit 0
+          aviso="$(cat <<'AVISO'
+          <!-- sytue-office:sin-firmar -->
+          **Sytue Office, sin firmar.** Los paquetes de Sytue Office de esta release (las apps en tu equipo, sin servidor) no van firmados: el instalador de Windows, el DMG de macOS (sin notarizar) y los AAB y APK de Android. Comprueba cada fichero con `SHA256SUMS`, o compílalo tú con `./sytue-deploy --mode sytue-office`.
+
+          **Sytue Office, unsigned.** This release's Sytue Office packages (the apps on your computer, no server) are unsigned: the Windows installer, the macOS DMG (not notarized) and the Android AABs and APKs. Check each file against `SHA256SUMS`, or build them yourself with `./sytue-deploy --mode sytue-office`.
+          AVISO
+          )"
+          jq -n --arg b "${cuerpo:+$cuerpo$'\n\n'}$aviso" '{body: $b}' |
+            curl -fsS --max-time 60 --retry 3 -X PATCH -H "Authorization: Bearer $TOKEN" \
+              -H 'Accept: application/vnd.github+json' --data @- \
+              "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/releases/$(jq -r .id "$RUNNER_TEMP/release.json")" >/dev/null

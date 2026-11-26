@@ -368,3 +368,19 @@ func empaquetarClaves(plist string) string {
 	}
 	return strings.Join(claves, " ") + " "
 }
+
+// El equipo de Apple de la suite. Aquí y no en empaquetar_apple_tienda_test.go (que no
+// se publica en sytue-suite) porque lo usan también las pruebas de Sytue Office, que sí.
+const empaquetarEquipo = "VHC5QW7BZ3"
+
+// empaquetarPlistDe ejecuta una orden de empaquetar.sh que imprime un plist y lo lee
+// (subprocess.check_output + plistlib.loads del original).
+func empaquetarPlistDe(t *testing.T, env []string, args ...string) (map[string]any, bool) {
+	t.Helper()
+	r := empaquetarCon(t, env, args...)
+	if r.Codigo != 0 {
+		return nil, false
+	}
+	p, err := empaquetarPlist(t, r.Salida)
+	return p, err == nil
+}

@@ -187,6 +187,8 @@ type App struct {
 	fundidos       []Ocurrencia
 	huellaFundidos []huellaCalendario
 	sinRedFundidos bool
+	// rechazadosFundidos es el ajuste con el que se fundió: cambiarlo rehace la lista.
+	rechazadosFundidos bool
 	// diaPintado es el día de hoy del último pintado: si el sondeo de recordatorios no
 	// trae nada nuevo solo se repinta para que «hoy» pase al día siguiente.
 	diaPintado time.Time
@@ -216,12 +218,16 @@ func (a *App) eventosFundidos() []Ocurrencia {
 		}
 		huella = append(huella, h)
 	}
-	if a.huellaFundidos != nil && a.sinRedFundidos == p.SinConexion && slices.Equal(huella, a.huellaFundidos) {
+	rechazados := p.ajustes().Rechazados
+	if a.huellaFundidos != nil && a.sinRedFundidos == p.SinConexion && a.rechazadosFundidos == rechazados && slices.Equal(huella, a.huellaFundidos) {
 		return a.fundidos
 	}
 	eventos := Fundir(cals, p.Visibles, a.porCal, p.SinConexion)
+	if !rechazados {
+		eventos = slices.DeleteFunc(eventos, func(o Ocurrencia) bool { return OcultoPorRechazo(p.ajustes(), o, a.Correo) })
+	}
 	ordenar(eventos)
-	a.fundidos, a.huellaFundidos, a.sinRedFundidos = eventos, huella, p.SinConexion
+	a.fundidos, a.huellaFundidos, a.sinRedFundidos, a.rechazadosFundidos = eventos, huella, p.SinConexion, rechazados
 	return eventos
 }
 
@@ -287,11 +293,15 @@ func NuevaAppConVida(parent context.Context, p *Pantalla, cal *api.Calendars) *A
 	p.AlCambiarAjustes = a.cambiarAjustes
 	p.AlAbrirAjustes = func() { p.EnAjustes = true; a.pintar() }
 	p.AlCerrarAjustes = func() { p.EnAjustes = false; a.pintar() }
+	if a.Cal != nil {
+		p.AlCompartirDisponibilidad = a.compartirDisponibilidad
+	}
 	// El mes del teléfono: cruzar el corte de 640 reconstruye la pantalla, pero NO dentro
 	// del Layout del armazón que lo mide; y la rama de recordatorios del
 	// cajón salta y descarta como el panel de la campana.
 	p.AlRehacer = func() { a.lanzar(func(context.Context) { a.enUI(a.pintar) }) }
 	p.saltarRec, p.descartRec = a.saltarA, a.descartar
+	p.posponerRec, p.alternarRec = a.posponer, a.alternarPosponer
 	// En el teléfono, lo que se activa en el menú lo CIERRA (el `onClick` del `<aside>`
 	// de AppShell): elegir un día, cambiar de mes, crear… Conmutar un calendario no,
 	// que es una casilla y no un botón, y el kebab tampoco (`data-mantiene-nav`).

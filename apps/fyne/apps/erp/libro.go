@@ -65,8 +65,12 @@ type Libro struct {
 
 	// El cierre del ejercicio (cierre.go). Cierre es lo que dice el servicio; nil, sin
 	// leer (y sin franja). PuedeCerrar ofrece cerrar y reabrir; los Al* son sus botones.
-	Cierre          *api.ERPCierre
-	PuedeCerrar     bool
+	Cierre      *api.ERPCierre
+	PuedeCerrar bool
+	// AlMayor abre el libro mayor de una cuenta (cartera.go); nil, sin selector. selMayor
+	// es el mismo selector de una pintada a otra, como selPeriodo.
+	AlMayor         func(cuenta string)
+	selMayor        *ui.Selector
 	VerHistorial    bool
 	AlCerrarPeriodo func()
 	AlReabrir       func()
@@ -260,9 +264,40 @@ func (b *Libro) ObjetoBalance(v tema.Variante) fyne.CanvasObject {
 	} else {
 		o, alto := b.tablaBalance(v, ancho)
 		p.add(o, alto, TituloLibroMB)
+		if s := b.selectorMayor(); s != nil {
+			p.add(s, s.MinSize().Height, TituloLibroMB)
+		}
 	}
 	o, alto := p.objeto()
 	return enPagina(o, alto, AnchoBalance)
+}
+
+// selectorMayor es «Mayor de la cuenta…» bajo el sumas y saldos: elegir una abre su
+// mayor, con el período de la cabecera. La web lo abre pulsando la cuenta en su fila; la
+// tabla de aquí es un solo dibujo y sus celdas no se pulsan, así que va en un selector.
+func (b *Libro) selectorMayor() *ui.Selector {
+	if b.AlMayor == nil || b.Balance == nil || len(b.Balance.Cuentas) == 0 {
+		return nil
+	}
+	opciones := []string{b.tr.T("ledger.account", nil)}
+	for _, c := range b.Balance.Cuentas {
+		opciones = append(opciones, c.Cuenta)
+	}
+	if b.selMayor == nil {
+		b.selMayor = ui.NuevoSelector(nil, nil)
+	}
+	s := b.selMayor
+	s.Opciones, s.Elegida = opciones, 0
+	s.Rotulo = b.tr.T("ledger.account", nil)
+	s.AlElegir = func(i int) {
+		if i > 0 && i < len(opciones) {
+			b.AlMayor(opciones[i])
+		}
+		s.Elegida = 0
+		s.Refresh()
+	}
+	s.Refresh()
+	return s
 }
 
 // Altos de las filas del balance, medidos: la cabecera en versalitas (28,5 con medio

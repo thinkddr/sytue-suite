@@ -94,6 +94,12 @@ type App struct {
 	w   fyne.Window
 	v   Vista
 
+	// anyadir es «Añadir fotos», el «+» flotante de la galería (`BotonFlotante` en
+	// PhotosApp.tsx), en todos los anchos; capaAnyadir lo coloca y se esconde fuera de la
+	// galería y sin sesión.
+	anyadir     *ui.BotonFlotante
+	capaAnyadir *fyne.Container
+
 	// Drive es el cliente de Sytue Drive, donde viven los originales: subir es dejar el
 	// fichero en «/Fotos» y luego indexarlo. nil: no se puede subir.
 	Drive *api.Drive
@@ -346,8 +352,11 @@ func Nueva(cli *api.Photos, v Vista, w fyne.Window) *App {
 		Revision:   func() uint64 { return ui.RevisionLista(a.gen) },
 		Actualizar: a.refrescarLista,
 	})
+	a.anyadir = ui.NuevoBotonFlotante(v.Traduce("gallery.add"), a.elegirFicheros)
+	a.capaAnyadir = container.New(ui.CapaFlotante{}, a.anyadir)
+	a.capaAnyadir.Hide()
 	// La pila de avisos es HERMANA del contenido, no una capa (ver ui/aviso.go).
-	a.raiz = container.New(&raizLayout{a: a}, refresco, a.peg.capa, a.avisos)
+	a.raiz = container.New(&raizLayout{a: a}, refresco, a.peg.capa, a.capaAnyadir, a.avisos)
 	a.corte = claseVentana(v.Ventana)
 	// El tema se cambia en caliente desde el menú de cuenta (o desde otra app de la
 	// suite): las pantallas de Photos se arman con colores ya resueltos, así que hay que
@@ -550,6 +559,10 @@ func (a *App) pintar() {
 	case RutaCompartido:
 		o = a.pantallaCompartido()
 	}
+	a.ponerAnyadir()
+	if a.capaAnyadir.Visible() {
+		o = ui.ConReservaFlotante(o) // que el «+» no tape la última fila de fotos
+	}
 	a.scroll.Content = o
 	a.scroll.Refresh()
 	a.pegar()
@@ -558,6 +571,23 @@ func (a *App) pintar() {
 	}
 	if a.ed != nil {
 		a.pintarEditor()
+	}
+}
+
+// ponerAnyadir enseña el «+» de «Añadir fotos» donde la web lo pinta —la galería y sus
+// favoritas, con sesión— y lo apaga mientras sube algo, como lo estaba el botón de la
+// barra.
+func (a *App) ponerAnyadir() {
+	g := a.g
+	ver := (a.ruta == RutaFotos || a.ruta == RutaFavoritas) && a.vistaDe(g.estadoCarga, false, false).Estado != SinSesion
+	if ver {
+		a.capaAnyadir.Show()
+	} else {
+		a.capaAnyadir.Hide()
+	}
+	if inerte := g.subida != nil || a.reanudandoImportaciones; inerte != a.anyadir.Inerte {
+		a.anyadir.Inerte = inerte
+		a.anyadir.Refresh()
 	}
 }
 
@@ -797,6 +827,10 @@ func (a *App) quizaMas() {
 		return
 	}
 	falta := a.scroll.Content.MinSize().Height - (a.scroll.Offset.Y + a.scroll.Size().Height)
+	if a.capaAnyadir.Visible() {
+		// Lo que falta es hasta la última foto, no hasta el final del hueco del «+».
+		falta -= ui.ReservaFlotante
+	}
 	if falta < AntesDelFinal {
 		a.cargarMas()
 	}
@@ -998,6 +1032,12 @@ func (a *App) runaSuelta(r rune) {
 	case atajoSubir:
 		if a.g.subida == nil {
 			a.elegirFicheros()
+		}
+	case atajoBuscar:
+		// El buscador de la galería, con lo escrito seleccionado para reemplazarlo.
+		if a.w != nil && a.buscador != nil {
+			a.w.Canvas().Focus(a.buscador)
+			a.buscador.TypedShortcut(&fyne.ShortcutSelectAll{})
 		}
 	case atajoAyuda:
 		a.verAtajos()

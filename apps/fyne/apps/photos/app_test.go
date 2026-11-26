@@ -95,6 +95,8 @@ func (s *servicioFalso) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	case r.Method == http.MethodGet && r.URL.Path == "/api/v1/trash":
 		escribir(map[string]any{"items": s.papelera, "retentionDays": s.retencion})
+	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/trash/restore":
+		escribir(map[string]int{"restored": len(s.papelera)})
 	case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/restore"):
 		if s.noRestaura[strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/api/v1/assets/"), "/restore")] {
 			w.WriteHeader(http.StatusForbidden)

@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"slices"
 	"strings"
@@ -29,6 +30,20 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
+// uriSinDia es la petición sin `today`: el día del dispositivo viaja en cada lectura y en
+// cada alta y cambia con el reloj, así que los tests que comparan peticiones lo apartan;
+// TestElDiaDelDispositivoViajaEnLecturasYAltas comprueba aparte que va.
+func uriSinDia(u *url.URL) string {
+	q := u.Query()
+	if !q.Has("today") {
+		return u.RequestURI()
+	}
+	q.Del("today")
+	c := *u
+	c.RawQuery = q.Encode()
+	return c.RequestURI()
+}
+
 // doble es un servicio de Bases de pega: contesta con lo que se le deja en `rutas`
 // (método y ruta → cuerpo) y apunta lo que recibe.
 type doble struct {
@@ -40,7 +55,7 @@ type doble struct {
 func (d *doble) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	cuerpo, _ := io.ReadAll(r.Body)
 	d.mu.Lock()
-	d.vistas = append(d.vistas, strings.TrimSpace(r.Method+" "+strings.TrimPrefix(r.URL.RequestURI(), "/api/v1")+" "+string(cuerpo)))
+	d.vistas = append(d.vistas, strings.TrimSpace(r.Method+" "+strings.TrimPrefix(uriSinDia(r.URL), "/api/v1")+" "+string(cuerpo)))
 	resp, ok := d.rutas[r.Method+" "+strings.TrimPrefix(r.URL.Path, "/api/v1")]
 	d.mu.Unlock()
 	switch {

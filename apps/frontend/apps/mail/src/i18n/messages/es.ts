@@ -1021,4 +1021,14 @@ export const es: AppCatalog<typeof en> = {
     'El sistema anterior del correo ya no está disponible. Hasta que pases tu correo a la bóveda no recibirás correo nuevo: lo que te envíen mientras tanto espera en el servidor de quien lo envía, que lo vuelve a intentar durante unos días. Si pasas a tiempo, te llegará después; si no, a quien lo envió le avisarán de que no se pudo entregar. Lo que ya estaba cifrado con el sistema anterior, como el correo que ya tenías, no se podrá leer: no se borra, pero nadie podrá abrirlo. Al pasar, el correo vuelve a llegarte y se abre con tu inicio de sesión de Sytue ID, como el resto de las aplicaciones.',
   'privateMail.vaultMoveCheckFailed':
     'No se ha podido comprobar el estado de tu correo. Inténtalo de nuevo en un momento.',
+  'shortcuts.goInbox': 'Ir a Recibidos',
+  'shortcuts.goSent': 'Ir a Enviados',
+  'shortcuts.goDrafts': 'Ir a Borradores',
+  'shortcuts.goArchive': 'Ir a Archivo',
+  'compose.sendAndArchive': 'Enviar y archivar',
+  'reader.copyAddress': 'Copiar la dirección',
+  'reader.addressCopied': 'Dirección copiada',
+  'reader.copyAddressFailed': 'No se ha podido copiar la dirección',
+  'reader.viewPlain': 'Ver como texto sin formato',
+  'reader.viewFormatted': 'Ver con formato',
 };

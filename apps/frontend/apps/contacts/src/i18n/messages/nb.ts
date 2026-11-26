@@ -328,4 +328,10 @@ export const nb: AppCatalog<typeof en> = {
   'relation.coworker': 'Kollega',
   'relation.emergency': 'Nødkontakt',
   'relation.other': 'Annen',
+  'batch.copyEmails': 'Kopier e-postadressene',
+  'batch.emailsCopied': 'E-postadressene er kopiert',
+  'birthdays.anniversary': 'Merkedag',
+  'list.sortByLastName': 'Sorter etter etternavn',
+  'list.sortByFirstName': 'Sorter etter fornavn',
+  'detail.shareByEmail': 'Del via e-post',
 };

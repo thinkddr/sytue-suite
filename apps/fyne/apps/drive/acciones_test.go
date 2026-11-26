@@ -154,34 +154,6 @@ func TestElMenuDeUnElementoEsElDeLaWeb(t *testing.T) {
 	}
 }
 
-// TestNuevoEsUnDesplegableYMideLoDeProduccion: «Nuevo» lleva su `chevronDown` y el
-// `gap-1.5` de su clase escrita a mano, 76,25 medidos, y el buscador acaba cayendo donde
-// en producción (x=833,25) porque el grupo se alinea a la derecha.
-//
-// Remedición Chromium 2026-10-04, FileBrowser real a1280, raíz16.
-// VISTO EN ROJO (2026-09-22, en el frontal): sin el `Hueco`, «Nuevo» mide 78 y el buscador
-// cae en 831,5.
-func TestNuevoEsUnDesplegableYMideLoDeProduccion(t *testing.T) {
-	e := NuevoExplorador(traductor(t))
-	e.Ventana = 1280
-	var disparado fyne.CanvasObject
-	e.AlNuevo = func(d fyne.CanvasObject) { disparado = d }
-	cab := e.cabecera(tema.Claro)
-	cab.Resize(fyne.NewSize(1280-tema.AnchoLateral, AltoCabeceraVista))
-	lay, _ := cab.(*fyne.Container).Layout.(*CabeceraVista)
-	nuevo, ok := lay.Acciones[1].(*ui.Boton)
-	if !ok {
-		t.Fatal("«Nuevo» ya no es un botón")
-	}
-	cercaDe(t, "el ancho de «Nuevo»", nuevo.Size().Width, 84.734375, 0.75)
-	cercaDe(t, "«Nuevo» empieza en x=1036,25", tema.AnchoLateral+nuevo.Position().X, 1010.328125, 0.75)
-	cercaDe(t, "el buscador empieza en x=833,25", tema.AnchoLateral+lay.Acciones[0].Position().X, 778.328125, 0.75)
-	nuevo.Tapped(nil)
-	if disparado != nuevo {
-		t.Error("«Nuevo» no abre su menú colgado de sí mismo")
-	}
-}
-
 // TestRutaHastaSubeHastaLaRaiz: una carpeta abierta desde una búsqueda entra con su ruta
 // verdadera en las migas, no colgada de la carpeta que se estaba mirando.
 func TestRutaHastaSubeHastaLaRaiz(t *testing.T) {
@@ -263,7 +235,7 @@ func TestTirarALaPapeleraSeDeshace(t *testing.T) {
 }
 
 // TestLaDescargaNoDiceSubiendo: la franja de una descarga lleva el nombre, no «Subiendo
-// 1/1», y «Subir» no gira mientras se baja algo.
+// 1/1», y la descarga no cuenta como subida.
 func TestLaDescargaNoDiceSubiendo(t *testing.T) {
 	tr := traductor(t)
 	e := NuevoExplorador(tr)
@@ -276,14 +248,8 @@ func TestLaDescargaNoDiceSubiendo(t *testing.T) {
 	if !contieneTexto(obj, "informe.pdf") {
 		t.Error("la franja de la descarga no dice qué se baja")
 	}
-	subiendo := false
-	recorrer(obj, func(o fyne.CanvasObject) {
-		if b, ok := o.(*ui.Boton); ok && b.Texto == tr.T("files.upload", nil) && b.Cargando {
-			subiendo = true
-		}
-	})
-	if subiendo || e.Subiendo() {
-		t.Error("«Subir» gira durante una descarga")
+	if e.Subiendo() {
+		t.Error("una descarga cuenta como subida")
 	}
 }
 

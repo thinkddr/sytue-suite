@@ -124,17 +124,26 @@ function rotulo(tecla: string, t: T, mac: boolean): string {
   return tecla;
 }
 
-/** Los grupos de la hoja de «?», en el idioma de `t` y con las teclas de este sistema. */
-export function gruposDeAtajos(t: T, mac: boolean = esMac()): GrupoDeAtajos[] {
+/** Los grupos de la hoja de «?», en el idioma de `t` y con las teclas de este sistema.
+ *  `solo` deja las acciones que la vista atiende de verdad (el Drive de la bóveda no
+ *  selecciona, y una hoja con «Supr» o «⌘A» que no hacen nada engaña); un grupo que se
+ *  queda sin ninguna no sale. */
+export function gruposDeAtajos(
+  t: T,
+  mac: boolean = esMac(),
+  solo?: readonly AccionAtajo[],
+): GrupoDeAtajos[] {
   return GRUPOS.map((g) => ({
     titulo: t(g.titulo),
-    atajos: g.atajos.map((a) => ({
-      // En un Mac no hay Supr: se enseña solo ⌫. En el resto, solo Supr: «Retroceso»
-      // también funciona, pero es la tecla que nadie espera que tire nada.
-      teclas: a.teclas
-        .filter((k) => (k === 'Delete' ? !mac : k === 'Backspace' ? mac : true))
-        .map((k) => rotulo(k, t, mac)),
-      descripcion: t(a.descripcion),
-    })),
-  }));
+    atajos: g.atajos
+      .filter((a) => !solo || solo.includes(a.accion))
+      .map((a) => ({
+        // En un Mac no hay Supr: se enseña solo ⌫. En el resto, solo Supr: «Retroceso»
+        // también funciona, pero es la tecla que nadie espera que tire nada.
+        teclas: a.teclas
+          .filter((k) => (k === 'Delete' ? !mac : k === 'Backspace' ? mac : true))
+          .map((k) => rotulo(k, t, mac)),
+        descripcion: t(a.descripcion),
+      })),
+  })).filter((g) => g.atajos.length > 0);
 }

@@ -107,8 +107,11 @@ func (p *Pantalla) ficha() fyne.CanvasObject {
 		ui.Espaciador(MargenTarjetaFicha),
 		p.tarjetaDatos(c, v),
 	)
-	// `mx-auto w-full max-w-3xl p-*`: la ficha se centra y se acota.
-	return container.NewVScroll(container.New(&acotado{Max: AnchoFicha, Relleno: RellenoFicha(p.Ventana)}, cuerpo))
+	// `mx-auto w-full max-w-3xl p-*`: la ficha se centra y se acota. Con el hueco del «+»
+	// al final (`sytue-reserva-flotante` en ContactDetail.tsx): en escritorio flota sobre
+	// la ficha, y sin él el final de la ficha se quedaba debajo.
+	ficha := container.New(&acotado{Max: AnchoFicha, Relleno: RellenoFicha(p.Ventana)}, cuerpo)
+	return container.NewVScroll(ui.ConReservaFlotante(ficha))
 }
 
 // huellaAncho son las medidas que la pantalla toma del ancho de la ventana AL ARMARSE,
@@ -256,6 +259,9 @@ func (p *Pantalla) elementosMas(c api.Contact, correo string) []fyne.CanvasObjec
 			p.AlExportar(c)
 		}
 	})
+	if p.AlCompartir != nil {
+		accion("detail.shareByEmail", func() { p.AlCompartir(c) })
+	}
 	if p.AlCombinar != nil && !p.SinConexion && p.Total > 1 {
 		accion("detail.merge", func() { p.AlCombinar(c) })
 	}

@@ -489,3 +489,75 @@ test('la ficha avisa de lo escrito sin guardar, y deja de avisar al deshacerlo o
   await act(async () => render(null, host));
   expect(avisos.at(-1)).toBe(false);
 });
+
+test('los totales de la barra y la exportación siguen la búsqueda, el estado y el orden de la lista', async () => {
+  const pedidas: string[] = [];
+  globalThis.fetch = (async (input: RequestInfo | URL) => {
+    const url = new URL(String(input), 'https://erp.example.test');
+    pedidas.push(url.pathname + url.search);
+    return new Response(
+      JSON.stringify({ modelo: 'factura_venta', total: 9, filtrados: 2, por_estado: {} }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    );
+  }) as typeof fetch;
+  await act(async () =>
+    render(
+      <ToastProvider>
+        <Lista
+          modelo={modelo}
+          pagina={pagina}
+          cargando={false}
+          masCargando={false}
+          busqueda="acme"
+          estado="pagado"
+          orden={{ campo: 'cliente', asc: true }}
+          papelera={false}
+          locale="es"
+          onBuscar={() => {}}
+          onEstado={() => {}}
+          onOrden={() => {}}
+          onPapelera={() => {}}
+          onAbrir={() => {}}
+          onNueva={() => {}}
+          onMas={() => {}}
+          onInvalidar={() => {}}
+          puedeAccion={() => true}
+          soloLectura={false}
+          revision={0}
+          t={t}
+        />
+      </ToastProvider>,
+      host,
+    ),
+  );
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 0));
+  });
+  expect(pedidas).toContain('/api/factura_venta/estadisticas?q=acme&estado=pagado');
+  // El recuento es lo que la lista enseña, no el modelo entero.
+  expect(host.textContent).toContain(t('list.recordsLoaded', { count: 2 }));
+  const exportar = host.querySelector<HTMLAnchorElement>('a[href*="/export"]');
+  expect(exportar?.getAttribute('href')).toContain('orden=cliente');
+  expect(exportar?.getAttribute('href')).toContain('dir=asc');
+});
+
+test('una factura abierta y vencida lleva su insignia en la lista; una pagada, no', async () => {
+  const vencida = {
+    ...registro('f1', 'Acme'),
+    estado: 'confirmado',
+    data: { cliente: 'Acme', vencimiento: '2020-01-01' },
+  };
+  const pagada = {
+    ...registro('f2', 'Globex'),
+    estado: 'pagado',
+    data: { cliente: 'Globex', vencimiento: '2020-01-01' },
+  };
+  await pintarLista(() => {}, {
+    conPagina: { registros: [vencida, pagada] },
+  });
+  const insignias = [...host.querySelectorAll('[data-vencida]')].map((e) =>
+    e.closest('tr, li')?.textContent?.includes('Acme'),
+  );
+  expect(insignias.length).toBeGreaterThan(0);
+  expect(insignias.every(Boolean)).toBe(true);
+});

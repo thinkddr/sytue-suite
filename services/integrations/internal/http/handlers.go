@@ -188,6 +188,20 @@ func (h *Handlers) CreateInstance(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	// Una cuenta de la que se traen datos se conecta UNA vez: si el formulario ya dice
+	// cuál es y la organización la tiene, se señala la que hay en vez de crear otra
+	// (import_account.go). Sin cuenta declarada lo decide el consentimiento.
+	if _, ok := selfImportSource(strings.TrimSpace(req.TemplateKey)); ok {
+		instances, err := h.store.ListInstances(r.Context())
+		if err != nil {
+			httpx.Fail(w, r, toAPIError(err))
+			return
+		}
+		if taken := declaredImportAccountTaken(instances, strings.TrimSpace(req.TemplateKey), cfg); taken != nil {
+			httpx.Fail(w, r, taken)
+			return
+		}
+	}
 	inst, err := h.store.CreateInstance(r.Context(), strings.TrimSpace(req.TemplateKey), name, cfg, req.LevelEnabled)
 	if err != nil {
 		httpx.Fail(w, r, toAPIError(err))

@@ -96,11 +96,12 @@ func NuevoConmutadorVista(grupo, lista, rejilla string, enRejilla bool, alCambia
 type CabeceraVista struct {
 	// Ruta son las migas, de la raíz a la carpeta actual.
 	Ruta *ui.Migas
-	// Acciones van a la derecha, en el orden de la web: buscador, «Nuevo», «Subir» y
-	// el conmutador de vista.
+	// Acciones van a la derecha, en el orden de la web: el buscador y, detrás, el
+	// conmutador de vista. «Nuevo» y «Subir» estaban aquí hasta el 2026-11-25: ahora son
+	// el «+» flotante de la pantalla.
 	Acciones []fyne.CanvasObject
 	// Conmutador va el último y se separa con `ml-1` ADEMÁS del `gap-2` del grupo:
-	// 10,5 en total. Medido: «Subir» acaba en 1190,5 y el conmutador empieza en 1201.
+	// 10,5 en total. Medido: «Subir» acababa en 1190,5 y el conmutador empezaba en 1201.
 	Conmutador fyne.CanvasObject
 	// Orden es el selector «Ordenar» (`SelectorOrden` de la web), delante del
 	// conmutador: en la cuadrícula, que no tiene cabeceras de columna, y en la lista por
@@ -138,75 +139,38 @@ func (c *CabeceraVista) Objeto(v tema.Variante) fyne.CanvasObject {
 }
 
 // enRejilla dice si la cabecera va en las DOS FILAS de la web por debajo de 768
-// (`max-md:grid max-md:grid-cols-[minmax(0,1fr)_auto_auto]` en FileBrowser.tsx): las migas
-// y el conmutador de vista arriba; el buscador, «Nuevo» y «Subir» abajo. Era una fila que
-// envolvía, y a 360 daba tres.
+// (`max-md:grid max-md:grid-cols-[minmax(0,1fr)_auto_auto]` en FileBrowser.tsx): las migas,
+// el selector «Ordenar» y el conmutador de vista arriba; el buscador abajo, a todo el
+// ancho (`max-md:col-span-full`). Era una fila que envolvía, y a 360 daba tres. Abajo iban
+// también «Nuevo» y «Subir», que desde el 2026-11-25 son el «+» flotante.
 func (c *CabeceraVista) enRejilla() bool {
-	return c.Ventana > 0 && c.Ventana < ui.Estrecho && c.Ruta != nil && c.Conmutador != nil && len(c.Acciones) == 3
+	return c.Ventana > 0 && c.Ventana < ui.Estrecho && c.Ruta != nil && c.Conmutador != nil && len(c.Acciones) == 1
 }
 
 // AltoCabeceraRejilla es lo que mide en dos filas: la de arriba la estira el conmutador
-// con su borde y la de abajo mide lo que sus controles. Medido en la web a 360 y a 390:
-// 95.
+// con su borde y la de abajo mide lo que el buscador. Medido en la web a 360 y a 390: 95.
 const AltoCabeceraRejilla float32 = 2*RellenoYCabecera + AltoLineaCabecera + HuecoAcciones + AltoControlCromo + tema.Borde
-
-// columnasRejilla mide las tres columnas: el buscador crece y las otras dos
-// conservan lo más ancho de «Nuevo» y el selector «Ordenar», y de «Subir» y el
-// conmutador de vista (`auto` en la rejilla de la web).
-func (c *CabeceraVista) columnasRejilla(ancho float32) [3]float32 {
-	col2 := c.Acciones[1].MinSize().Width
-	if c.Orden != nil {
-		col2 = max(col2, c.Orden.MinSize().Width)
-	}
-	col3 := max(c.Acciones[2].MinSize().Width, c.Conmutador.MinSize().Width)
-	col1 := max(ancho-2*CanalonCabecera(c.Ventana)-col2-col3-2*HuecoAcciones, 0)
-	return [3]float32{col1, col2, col3}
-}
-
-func (c *CabeceraVista) buscadorEnFilaPropia(ancho float32) bool {
-	columnas := c.columnasRejilla(ancho)
-	// El mínimo del widget solo deja un cuadratín para escribir. El buscador
-	// necesita tres para poder leer parte de la consulta junto a su icono.
-	return columnas[0] < ui.MedidaEntrada(ui.CampoCromo, 0, true).Width+2*tema.Rem
-}
 
 func (c *CabeceraVista) colocarRejilla(ancho float32) {
 	canalon := CanalonCabecera(c.Ventana)
-	columnas := c.columnasRejilla(ancho)
-	col1, col2 := columnas[0], columnas[1]
 
-	// Las migas ocupan las dos primeras columnas (`col-span-2`) y se recortan si no caben;
-	// con el selector «Ordenar» le ceden la segunda, donde va pegado a la derecha
-	// (`max-md:col-start-2 max-md:row-start-1 max-md:justify-self-end`).
+	// Arriba, el conmutador en la tercera columna, pegado al canalón; el selector
+	// «Ordenar» en la segunda, pegado a la derecha (`max-md:col-start-2 max-md:row-start-1
+	// max-md:justify-self-end`), y las migas en lo que quede, recortadas si no caben.
 	y := RellenoYCabecera
-	migas := col1 + HuecoAcciones + col2
-	if c.Orden != nil {
-		migas = col1
-		w := c.Orden.MinSize().Width
-		centrarEnLinea(c.Orden, canalon+col1+HuecoAcciones+col2-w, y, w)
-	}
-	centrarEnLinea(c.Ruta, canalon, y, min(c.Ruta.MinSize().Width, migas))
 	conmutador := c.Conmutador.MinSize().Width
-	centrarEnLinea(c.Conmutador, ancho-canalon-conmutador, y, conmutador)
+	x := ancho - canalon - conmutador
+	centrarEnLinea(c.Conmutador, x, y, conmutador)
+	if c.Orden != nil {
+		w := c.Orden.MinSize().Width
+		x -= HuecoAcciones + w
+		centrarEnLinea(c.Orden, x, y, w)
+	}
+	centrarEnLinea(c.Ruta, canalon, y, min(c.Ruta.MinSize().Width, max(x-HuecoAcciones-canalon, 0)))
 
+	// Abajo, el buscador de canalón a canalón.
 	y += AltoLineaCabecera + HuecoAcciones
-	if c.buscadorEnFilaPropia(ancho) {
-		// El carril móvil y el área segura pueden dejar menos que el propio
-		// relleno del campo. Conservar una columna casi vacía impide escribir.
-		centrarEnLinea(c.Acciones[0], canalon, y, max(ancho-2*canalon, 0))
-		y += AltoControlCromo + HuecoAcciones
-		x := ancho - canalon - columnas[1] - columnas[2] - HuecoAcciones
-		for i := 1; i < len(columnas); i++ {
-			centrarEnLinea(c.Acciones[i], x, y, columnas[i])
-			x += columnas[i] + HuecoAcciones
-		}
-		return
-	}
-	x := canalon
-	for i, w := range columnas {
-		centrarEnLinea(c.Acciones[i], x, y, w)
-		x += w + HuecoAcciones
-	}
+	centrarEnLinea(c.Acciones[0], canalon, y, max(ancho-2*canalon, 0))
 }
 
 // MinSize es el alto de las líneas que ocupa en el ancho de la última vez que se colocó
@@ -223,11 +187,7 @@ func (c *CabeceraVista) MinSize([]fyne.CanvasObject) fyne.Size {
 // con el ancho útil de la hoja en vez de conservar el de la ventana anterior.
 func (c *CabeceraVista) AltoCon(_ []fyne.CanvasObject, ancho float32) float32 {
 	if c.enRejilla() {
-		alto := AltoCabeceraRejilla
-		if c.buscadorEnFilaPropia(ancho) {
-			alto += AltoControlCromo + HuecoAcciones
-		}
-		return alto
+		return AltoCabeceraRejilla
 	}
 	return AltoCabeceraEn(len(c.lineas(ancho)))
 }

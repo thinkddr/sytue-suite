@@ -386,4 +386,9 @@ export const de: AppCatalog<typeof en> = {
   'gallery.encrypted.editHint':
     'Die Bearbeitung erfolgt auf diesem Gerät und wird verschlüsselt als neue Version des Fotos gespeichert.',
   'gallery.encrypted.albumEmpty': 'Dieses verschlüsselte Album enthält noch keine Fotos.',
+  'shortcuts.favorite': 'Als Favorit markieren oder entfernen',
+  'trash.restoreAll': 'Alles wiederherstellen',
+  'trash.restoredAll': 'Zurück in deinen Fotos: {count}',
+  'album.download': 'Album herunterladen',
+  'viewer.openInDrive': 'Original in Sytue Drive ansehen',
 };

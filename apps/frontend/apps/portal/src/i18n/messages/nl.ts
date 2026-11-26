@@ -763,4 +763,17 @@ export const nl: AppCatalog<typeof en> = {
   'search.loadMoreFailed': 'Er konden geen extra resultaten worden geladen. Probeer het opnieuw.',
   'privacy.notice':
     'We verkopen je gegevens niet en delen ze niet met derden. We gebruiken ze niet om je te profileren, voor advertenties of om onze diensten of die van anderen te trainen of te verbeteren. Ze worden versleuteld tijdens verzending en opslag, en verlaten onze Europese infrastructuur alleen waar dat strikt nodig is om je te factureren en in de integraties die je inschakelt, waarbij de derde partij je om toestemming vraagt voor de gegevens die ze gebruikt.',
+  'inbox.markAllOf': '{app} als gelezen markeren',
+  'inbox.markUnread': 'Markeren als ongelezen',
+  'inbox.muteLikeThis': 'Meldingen zoals deze dempen',
+  'inbox.mutedLikeThis':
+    'Je krijgt geen meldingen zoals deze meer. Je kunt dat hieronder wijzigen, bij ‘Wat je wilt ontvangen’.',
+  'inbox.muteFailed': 'Dempen is mislukt. Probeer het opnieuw.',
+  'inbox.actionsOf': 'Acties voor ‘{title}’',
+  'downloads.checksum': 'Download controleren',
+  'downloads.checksumHelp':
+    'De SHA-256-vingerafdruk. Bereken die van het gedownloade bestand en controleer of ze overeenkomen.',
+  'downloads.checksumLabel': 'SHA-256-vingerafdruk',
+  'downloads.copyChecksum': 'Vingerafdruk kopiëren',
+  'downloads.checksumCopied': 'Vingerafdruk gekopieerd',
 };

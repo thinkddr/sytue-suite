@@ -23,6 +23,7 @@ import type {
   BasesFieldKind,
   BasesNewField,
   BasesTable,
+  BasesValue,
 } from '@sytue/api-clients/bases';
 import type { T } from '../i18n/index.js';
 import {
@@ -33,7 +34,8 @@ import {
   referenciasDeFormula,
 } from '../lib/formulas.js';
 import { MAX_BYTES_CSV } from '../lib/limites.js';
-import { MONEDAS } from '../lib/valores.js';
+import { MODO_DE_ENTRADA, MONEDAS, TIPO_DE_INPUT } from '../lib/valores.js';
+import { borradorDeDefecto, valorDeDefecto, type BorradorDefecto } from '../lib/defectos.js';
 import { listaDeOpciones, opcionesQueSeRetiran } from '../lib/esquema.js';
 
 export interface OpcionVarias {
@@ -354,6 +356,126 @@ export function DialogoRenombrarCampo(p: {
             maxLength={120}
             onInput={(e) => setNombre(e.currentTarget.value)}
           />
+        </FieldGroup>
+        <ErrorDialogo error={p.error} />
+      </form>
+    </Modal>
+  );
+}
+
+/**
+ * El valor por defecto de un campo (solo el propietario): con el que nacen los registros
+ * nuevos que no lo traen. No toca los que ya hay: se dice en la ayuda, porque es lo
+ * primero que alguien pregunta al ver que la columna sigue vacía. En una fecha se puede
+ * elegir «el día del alta» en vez de un día fijo.
+ */
+export function DialogoDefectoCampo(p: {
+  t: T;
+  campo: BasesField;
+  error: string;
+  ocupado: boolean;
+  onGuardar: (valor: BasesValue) => void;
+  onCerrar: () => void;
+}): JSX.Element {
+  const c = p.campo;
+  const [b, setB] = useState<BorradorDefecto>(() => borradorDeDefecto(c));
+  const set = (parcial: Partial<BorradorDefecto>): void => setB((x) => ({ ...x, ...parcial }));
+  const valor = valorDeDefecto(c, b);
+  const valido = valor !== undefined;
+  const id = 'defecto-campo';
+  let control: JSX.Element;
+  if (c.kind === 'checkbox') {
+    control = (
+      <Checkbox
+        label={p.t('view.checked')}
+        checked={b.marcado}
+        onChange={(e) => set({ marcado: e.currentTarget.checked })}
+      />
+    );
+  } else if (c.kind === 'multiselect') {
+    control = (
+      <div class="flex flex-col gap-1.5">
+        {(c.choices ?? []).map((o) => (
+          <Checkbox
+            key={o}
+            label={o}
+            checked={b.varios.includes(o)}
+            onChange={(e) => {
+              const marcado = e.currentTarget.checked;
+              set({ varios: marcado ? [...b.varios, o] : b.varios.filter((x) => x !== o) });
+            }}
+          />
+        ))}
+      </div>
+    );
+  } else if (c.kind === 'select') {
+    control = (
+      <Select id={id} value={b.texto} onChange={(e) => set({ texto: e.currentTarget.value })}>
+        <option value="">{p.t('view.none')}</option>
+        {(c.choices ?? []).map((o) => (
+          <option key={o} value={o}>
+            {o}
+          </option>
+        ))}
+      </Select>
+    );
+  } else {
+    const entrada = (
+      <Input
+        id={id}
+        type={TIPO_DE_INPUT[c.kind] ?? 'text'}
+        {...(MODO_DE_ENTRADA[c.kind] ? { inputMode: MODO_DE_ENTRADA[c.kind] } : {})}
+        disabled={b.hoy}
+        value={b.texto}
+        onInput={(e) => set({ texto: e.currentTarget.value })}
+      />
+    );
+    control =
+      c.kind === 'date' ? (
+        <div class="flex flex-col gap-2">
+          <Checkbox
+            label={p.t('field.defaultToday')}
+            checked={b.hoy}
+            onChange={(e) => set({ hoy: e.currentTarget.checked })}
+          />
+          {entrada}
+        </div>
+      ) : (
+        entrada
+      );
+  }
+  return (
+    <Modal
+      open
+      size="sm"
+      onClose={p.onCerrar}
+      title={p.t('field.defaultTitle', { name: c.name })}
+      footer={
+        <>
+          <Button variant="ghost" onClick={p.onCerrar}>
+            {p.t('common.cancel')}
+          </Button>
+          <Button type="submit" form="form-defecto-campo" disabled={!valido} loading={p.ocupado}>
+            {p.t('common.save')}
+          </Button>
+        </>
+      }
+    >
+      <form
+        id="form-defecto-campo"
+        class="flex flex-col gap-4"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (valido && !p.ocupado) p.onGuardar(valor);
+        }}
+      >
+        <FieldGroup
+          label={c.name}
+          htmlFor={id}
+          help={p.t('field.defaultHelp')}
+          {...(valido ? {} : { error: p.t('grid.invalidValue') })}
+        >
+          {control}
         </FieldGroup>
         <ErrorDialogo error={p.error} />
       </form>

@@ -809,4 +809,17 @@ export const es: AppCatalog<typeof en> = {
   'search.loadMoreFailed': 'No se pudieron cargar más resultados. Vuelve a intentarlo.',
   'privacy.notice':
     'No vendemos tus datos ni los cedemos a terceros. No los usamos para perfilarte ni para publicidad, ni para entrenar o mejorar nuestros servicios o los de nadie. Van cifrados en tránsito y en reposo, y solo salen de nuestra infraestructura europea en lo imprescindible para cobrarte y en las integraciones que tú actives, en las que el tercero te pedirá aprobación sobre qué datos usará.',
+  'inbox.markAllOf': 'Marcar las de {app} como leídas',
+  'inbox.markUnread': 'Marcar como no leído',
+  'inbox.muteLikeThis': 'Silenciar avisos como este',
+  'inbox.mutedLikeThis':
+    'Ya no recibirás avisos como ese. Lo puedes cambiar abajo, en «Qué quieres recibir».',
+  'inbox.muteFailed': 'No se han podido silenciar. Vuelve a intentarlo.',
+  'inbox.actionsOf': 'Acciones de «{title}»',
+  'downloads.checksum': 'Comprobar la descarga',
+  'downloads.checksumHelp':
+    'Su huella SHA-256. Calcula la del fichero descargado y comprueba que coinciden.',
+  'downloads.checksumLabel': 'Huella SHA-256',
+  'downloads.copyChecksum': 'Copiar la huella',
+  'downloads.checksumCopied': 'Huella copiada',
 };

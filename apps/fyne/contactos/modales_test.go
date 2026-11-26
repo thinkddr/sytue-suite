@@ -195,7 +195,7 @@ func TestLaBarraDeLoteMandaLosMarcadosALaPapelera(t *testing.T) {
 	for _, x := range b.Acciones {
 		rotulos = append(rotulos, x.Texto)
 	}
-	if quiero := []string{"Enviar correo a todos", "Exportar (.vcf)", "Destacar", "Quitar destacado", "Añadir a etiqueta", "Quitar de etiqueta", "A papelera"}; !iguales(rotulos, quiero) {
+	if quiero := []string{"Enviar correo a todos", "Exportar (.vcf)", "Copiar los correos", "Destacar", "Quitar destacado", "Añadir a etiqueta", "Quitar de etiqueta", "A papelera"}; !iguales(rotulos, quiero) {
 		t.Errorf("las acciones son %v y en la web %v", rotulos, quiero)
 	}
 	b.Acciones[len(b.Acciones)-1].AlPulsar()

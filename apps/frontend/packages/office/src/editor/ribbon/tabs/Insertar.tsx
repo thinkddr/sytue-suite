@@ -24,6 +24,7 @@ import type { ComponentChildren, JSX, TargetedEvent } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { Button, useToast, Checkbox, reducirImagen, useMobileBack, Spinner } from '@sytue/ui';
 import { executeEditingCommand } from '@sytue/ui/browser/editing';
+import { formatDate, formatTime, type Locale } from '@sytue/i18n';
 import { useT } from '../../context';
 import type { DocsKey, DocsT } from '../../../i18n';
 import type { EditorContext } from '../../types';
@@ -732,6 +733,55 @@ function SimboloPanel(props: { captured: CapturedSelection; close: () => void })
           }}
         >
           {s.ch}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/* ---------- Fecha y hora: el texto de ahora, en el formato que se elija ---------- */
+
+/**
+ * «Insertar fecha y hora» de Word: el AHORA como texto fijo (no un campo que cambie al
+ * abrirlo mañana), en los formatos del idioma de quien escribe. Cada opción se enseña
+ * ya escrita, que es como se elige en Word: «25 nov 2026» se reconoce antes que «Fecha
+ * media». La app nativa ofrece los mismos cuatro con `apps/nucleo/i18n`, que es el mismo
+ * ICU de estas llamadas (`docus.FormatosFechaHora`).
+ */
+export function formatosFechaHora(locale: Locale, ahora: Date): string[] {
+  return [
+    formatDate(locale, ahora),
+    formatDate(locale, ahora, { day: 'numeric', month: 'long', year: 'numeric' }),
+    formatDate(locale, ahora, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }),
+    formatTime(locale, ahora),
+  ];
+}
+
+function FechaHoraPanel(props: {
+  locale: Locale;
+  captured: CapturedSelection;
+  close: () => void;
+}): JSX.Element {
+  // El AHORA de cuando se abre el panel, una vez: la lista no cambia mientras se elige.
+  const [opciones] = useState(() => formatosFechaHora(props.locale, new Date()));
+  return (
+    // eslint-disable-next-line jsx-a11y/no-static-element-interactions -- onMouseDown técnico (no perder el caret), no interacción
+    <div class="flex w-max flex-col gap-0.5" onMouseDown={(e) => e.preventDefault()}>
+      {opciones.map((texto) => (
+        <button
+          key={texto}
+          type="button"
+          class={
+            'text-text hover:bg-bg-subtle flex h-8 items-center rounded-sm px-2 text-left text-sm ' +
+            'pointer-coarse:h-auto pointer-coarse:min-h-[max(44px,2.75rem)] ' +
+            FOCUS_RING
+          }
+          onClick={() => {
+            insertCaptured(props.captured, 'insertText', texto);
+            props.close();
+          }}
+        >
+          {texto}
         </button>
       ))}
     </div>
@@ -1491,6 +1541,16 @@ export function InsertarTab({ ctx }: { ctx: EditorContext }): JSX.Element {
           label={t('insert.symbol')}
           render={({ captured, close }) => <SimboloPanel captured={captured} close={close} />}
         />
+        {ctx.kind === 'document' && (
+          <RibbonPopover
+            commandId="insertDateTime"
+            icon="history"
+            label={t('insert.dateTime')}
+            render={({ captured, close }) => (
+              <FechaHoraPanel locale={ctx.locale} captured={captured} close={close} />
+            )}
+          />
+        )}
       </RibbonGroup>
       {ctx.kind === 'document' && (
         <>

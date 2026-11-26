@@ -358,4 +358,8 @@ export const bg: AppCatalog<typeof en> = {
   'moderation.action.unlist': 'Премахване от публичната страница',
   'moderation.action.unpublish': 'Отмяна на публикуването',
   'moderation.action.block': 'Блокиране на човека в организацията',
+  'player.loop': 'Повтаряне',
+  'watch.chapters': 'Глави',
+  'watch.jumpTo': 'Към {time}',
+  'share.startAt': 'Начало от {time}',
 };

@@ -53,7 +53,10 @@ type Buzon interface {
 	NotificationsAntes(ctx context.Context, limite int, antes api.HubNotification) ([]api.HubNotification, error)
 	StreamNotifications(ctx context.Context, cada func(api.HubNotification)) error
 	MarkRead(ctx context.Context, id string) error
+	MarkUnread(ctx context.Context, id string) error
 	MarkAllRead(ctx context.Context) error
+	// MarkAllReadDe es «Marcar todas» de un producto (el filtro de la bandeja).
+	MarkAllReadDe(ctx context.Context, origen string) error
 	NotificationPrefs(ctx context.Context) ([]api.HubNotificationPref, error)
 	SetNotificationPref(ctx context.Context, p api.HubNotificationPref) (api.HubNotificationPref, error)
 }
@@ -240,6 +243,7 @@ func NuevaVista(t *i18n.Translator, a fyne.App, ahora time.Time) *Vista {
 	v.bajadas = NuevasDescargas(t)
 	v.bajadas.AlDescargar = v.descargarInstalador
 	v.bajadas.AlReintentar = func() { go v.cargarDescargas() }
+	v.bajadas.AlCopiarHuella = v.copiarHuella
 
 	v.bienv = NuevaBienvenida(t)
 	v.bienv.Apex = v.apex
@@ -631,6 +635,17 @@ func (v *Vista) copiar(valor, clave string) {
 		return
 	}
 	v.pilaAvisos.Notificar(ui.NuevoAviso(ui.AvisoExito, v.t.T(clave, nil), ""))
+}
+
+// copiarHuella lleva la huella SHA-256 de un instalador al portapapeles y la enseña en el
+// aviso: quien la copia va a compararla, y así la tiene delante también.
+func (v *Vista) copiarHuella(i api.Instalador) {
+	if !ui.Copiar(v.portapapeles(), i.SHA256) {
+		v.pilaAvisos.Notificar(ui.NuevoAviso(ui.AvisoPeligro,
+			v.t.T("devices.copyFailTitle", nil), v.t.T("devices.copyFailBody", nil)))
+		return
+	}
+	v.pilaAvisos.Notificar(ui.NuevoAviso(ui.AvisoExito, v.t.T("downloads.checksumCopied", nil), i.SHA256))
 }
 
 // portapapelesDeLaApp es el del sistema, o ninguno sin app en marcha.

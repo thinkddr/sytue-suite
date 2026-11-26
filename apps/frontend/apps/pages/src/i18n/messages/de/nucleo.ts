@@ -394,4 +394,36 @@ export const nucleo = {
 
   'forms.empty': 'Noch keine Antworten',
   'forms.empty_help': 'Wenn jemand ein Formular auf Ihrer Website absendet, sehen Sie es hier.',
+  'sites.search': 'Websites suchen',
+  'sites.search_empty': 'Keine Website passt zu „{q}“.',
+  'sites.sort_label': 'Websites sortieren',
+  'sites.sort_recent': 'Zuletzt bearbeitet',
+  'sites.sort_name': 'Name (A–Z)',
+  'sites.view_live': 'Website ansehen',
+  'sites.view_live_aria': '{nombre} veröffentlicht ansehen (öffnet in neuem Tab)',
+  'seo.title': 'Was Suchmaschinen sehen',
+  'seo.intro':
+    'Eine Prüfung des Entwurfs: Titel, Beschreibungen und Bilder, auf die Suchmaschinen und Screenreader angewiesen sind. Es sind Hinweise; sie verhindern das Veröffentlichen nicht.',
+  'seo.open_editor': 'Editor öffnen',
+  'seo.recheck': 'Erneut prüfen',
+  'seo.error': 'Die Prüfung konnte nicht geladen werden. Versuche es erneut.',
+  'seo.all_good':
+    'Alles in Ordnung: Jede Seite hat Titel und Beschreibung, und die Bilder haben Alternativtext.',
+  'seo.summary': 'Hinweise: {count}',
+  'seo.badge_warning': 'Verbessern',
+  'seo.badge_info': 'Hinweis',
+  'seo.on_page': 'Seite: {page}',
+  'seo.title_missing': 'Die Seite hat keinen Titel: Die Suchmaschine erfindet einen.',
+  'seo.title_long': 'Der Titel hat {count} Zeichen; etwa 60 passen, bevor die Suchmaschine kürzt.',
+  'seo.title_duplicate':
+    'Eine andere Seite hat denselben Titel: Sie konkurrieren in den Ergebnissen miteinander.',
+  'seo.description_missing':
+    'Die Seite hat keine Beschreibung: Die Suchmaschine zeigt einen beliebigen Textausschnitt.',
+  'seo.description_long': 'Die Beschreibung hat {count} Zeichen; etwa 160 werden angezeigt.',
+  'seo.image_alt_missing':
+    'Bilder ohne Alternativtext: {count}. Screenreader und Suchmaschinen wissen nicht, was sie zeigen; markiere sie als dekorativ, wenn sie nichts zeigen.',
+  'seo.page_noindex': 'Diese Seite ist vor Suchmaschinen verborgen (noindex).',
+  'seo.site_noindex': 'Die gesamte Website ist vor Suchmaschinen verborgen (noindex).',
+  'seo.share_image_missing':
+    'Die Website hat kein Teilen-Bild: Links in Nachrichten und sozialen Netzwerken erscheinen ohne Bild.',
 };

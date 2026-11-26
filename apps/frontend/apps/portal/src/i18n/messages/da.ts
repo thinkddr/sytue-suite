@@ -745,4 +745,17 @@ export const da: AppCatalog<typeof en> = {
   'search.loadMoreFailed': 'Flere resultater kunne ikke indlæses. Prøv igen.',
   'privacy.notice':
     'Vi sælger ikke dine data og videregiver dem ikke til tredjeparter. Vi bruger dem ikke til at profilere dig, til reklamer eller til at træne eller forbedre vores tjenester eller andres. De er krypteret under overførsel og i hvile og forlader kun vores europæiske infrastruktur i det omfang, det er strengt nødvendigt for at fakturere dig, og i de integrationer, du selv aktiverer, hvor tredjeparten beder om dit samtykke til de data, der bruges.',
+  'inbox.markAllOf': 'Markér {app} som læst',
+  'inbox.markUnread': 'Markér som ulæst',
+  'inbox.muteLikeThis': 'Slå notifikationer som denne fra',
+  'inbox.mutedLikeThis':
+    'Du får ikke længere notifikationer som den. Du kan ændre det nedenfor under „Hvad du vil have“.',
+  'inbox.muteFailed': 'De kunne ikke slås fra. Prøv igen.',
+  'inbox.actionsOf': 'Handlinger for „{title}“',
+  'downloads.checksum': 'Bekræft downloaden',
+  'downloads.checksumHelp':
+    'Dens SHA-256-fingeraftryk. Beregn den hentede fils, og kontrollér, at de stemmer.',
+  'downloads.checksumLabel': 'SHA-256-fingeraftryk',
+  'downloads.copyChecksum': 'Kopiér fingeraftryk',
+  'downloads.checksumCopied': 'Fingeraftryk kopieret',
 };

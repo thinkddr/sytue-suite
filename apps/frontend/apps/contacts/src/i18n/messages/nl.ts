@@ -338,4 +338,10 @@ export const nl: AppCatalog<typeof en> = {
   'relation.coworker': 'Collega',
   'relation.emergency': 'Noodgeval',
   'relation.other': 'Anders',
+  'batch.copyEmails': 'E-mailadressen kopiëren',
+  'batch.emailsCopied': 'E-mailadressen gekopieerd',
+  'birthdays.anniversary': 'Jubileum',
+  'list.sortByLastName': 'Sorteren op achternaam',
+  'list.sortByFirstName': 'Sorteren op voornaam',
+  'detail.shareByEmail': 'Delen via e-mail',
 };

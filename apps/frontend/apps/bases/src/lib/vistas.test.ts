@@ -239,3 +239,36 @@ test('una galería se guarda como la rejilla: filtro y orden, sin agrupar', () =
     sort: [{ field: 'n', dir: 'desc' }],
   });
 });
+
+const fecha: BasesField = { id: 'f', table_id: 't', name: 'Alta', kind: 'date', position: 2 };
+
+test('un formulario guarda como obligatorios solo los que enseña, en su orden', () => {
+  expect(
+    configDeBorrador({ ...base, tipo: 'form', campos: ['n', 's'], obligatorios: ['s', 'x'] }, [
+      sel,
+      num,
+    ]),
+  ).toEqual({ fields: ['n', 's'], required: ['s'] });
+  // Desmarcar un campo del formulario se lleva su «obligatorio».
+  expect(
+    configDeBorrador({ ...base, tipo: 'form', campos: ['n'], obligatorios: ['s'] }, [sel, num]),
+  ).toEqual({ fields: ['n'] });
+  const guardada = vista('form', { fields: ['s', 'n'], required: ['n'] });
+  expect(configDeBorrador(borradorDeVista(guardada, [sel, num]), [sel, num])).toEqual(
+    guardada.config,
+  );
+});
+
+test('los filtros de fecha relativos: hoy y este mes sin valor, N días entre 1 y 3650', () => {
+  const con = (filtroOp: string, filtroValor = '') =>
+    configDeBorrador({ ...base, filtroCampo: 'f', filtroOp, filtroValor }, [fecha]);
+  expect(con('today')).toEqual({ filters: [{ field: 'f', op: 'today' }] });
+  expect(con('this_month', 'basura')).toEqual({ filters: [{ field: 'f', op: 'this_month' }] });
+  expect(con('past_days', '7')).toEqual({ filters: [{ field: 'f', op: 'past_days', value: 7 }] });
+  expect(con('next_days', '30')).toEqual({
+    filters: [{ field: 'f', op: 'next_days', value: 30 }],
+  });
+  for (const malo of ['', '0', '1.5', 'siete', '3651']) expect(con('past_days', malo)).toBeNull();
+  // Un número no tiene «hoy».
+  expect(configDeBorrador({ ...base, filtroCampo: 'n', filtroOp: 'today' }, [num])).toBeNull();
+});

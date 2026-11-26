@@ -39,7 +39,7 @@ import {
   MenuItem,
   MenuSeparator,
   SegmentedControl,
-  MobileFab,
+  BotonFlotante,
   Skeleton,
   SkeletonRows,
   Spinner,
@@ -841,9 +841,8 @@ export function FileBrowser() {
   const { orden, ordenarPor, leido: prefsLeidas } = useOrdenRecordado();
   const [busy, setBusy] = useState(false);
 
-  // Estado propio de la subida: el spinner de «Subir» solo debe girar al subir,
-  // no durante otras mutaciones (que sí deshabilitan las acciones vía `busy`).
-  const [uploading, setUploading] = useState(false);
+  // Lo que va de la subida: la barra de progreso. El spinner propio de «Subir» se fue
+  // con el botón de la cabecera (crear es el «+» flotante).
   const [uploadProgress, setUploadProgress] = useState<{
     current: number;
     total: number;
@@ -1111,7 +1110,7 @@ export function FileBrowser() {
     if (!offline) fileInput.current?.click();
   };
 
-  // Subida COMPARTIDA por el botón «Subir» y el arrastrar-soltar. Reusa el endpoint
+  // Subida COMPARTIDA por «Subir archivos» del «+» flotante y el arrastrar-soltar. Reusa el endpoint
   // de subida existente (drive.upload → PUT /api/content). En PARALELO ACOTADO
   // (UPLOAD_CONCURRENCY) con progreso e informe de errores/cuota; para drops de
   // carpeta, crea antes las subcarpetas necesarias (de someras a profundas).
@@ -1119,7 +1118,6 @@ export function FileBrowser() {
     async (entries: UploadEntry[]) => {
       if (offline || entries.length === 0 || busy) return;
       setBusy(true);
-      setUploading(true);
       const total = entries.length;
       let done = 0;
       setUploadProgress({ current: 0, total, name: entries[0]!.file.name });
@@ -1194,7 +1192,6 @@ export function FileBrowser() {
         });
       }
       setBusy(false);
-      setUploading(false);
       setUploadProgress(null);
       await load(path);
     },
@@ -1907,12 +1904,12 @@ export function FileBrowser() {
     <div class="flex h-full flex-col">
       {/* Barra de vista: cabecera sólida con el acento del producto (a juego con
           la topbar de la shell). Desde 768 px es una fila que envuelve.
-          POR DEBAJO, DOS FILAS en rejilla: migas y selector de vista arriba; buscador,
-          «Nuevo» y «Subir» abajo. Fue una sola fila que se desplazaba de lado, y a
-          390 px «Subir» y el selector de vista quedaban fuera del borde derecho sin
-          nada que dijera que estaban ahí. El grupo de acciones es `contents` en móvil:
-          sus hijos se colocan en la rejilla de aquí, con el buscador en la columna que
-          crece y los dos botones a su ancho, sea cual sea el idioma. */}
+          POR DEBAJO, DOS FILAS en rejilla: migas y selector de vista arriba; el
+          buscador abajo, a todo el ancho. Fue una sola fila que se desplazaba de lado,
+          y a 390 px el selector de vista quedaba fuera del borde derecho sin nada que
+          dijera que estaba ahí. El grupo de acciones es `contents` en móvil: sus hijos
+          se colocan en la rejilla de aquí. «Nuevo» y «Subir» ya no están: crear es el
+          «+» flotante. */}
       <div
         class={cx(
           'bg-surface text-text border-border flex flex-wrap items-center gap-x-3 gap-y-2 border-b px-4 py-2.5 sm:px-6',
@@ -1944,9 +1941,9 @@ export function FileBrowser() {
               leer el placeholder. La exige el DS (design.md:639) y la lleva el buscador
               de la shell, que vive en la misma topbar unos píxeles más arriba — sin
               ella, dos buscadores contiguos se veían distintos.
-              En móvil ocupa la columna que crece de la segunda fila: lo que dejen
-              «Nuevo» y «Subir», que miden lo que su rótulo. */}
-          <span class="relative inline-flex items-center max-md:min-w-0">
+              En móvil ocupa la segunda fila entera: «Nuevo» y «Subir», que la compartían,
+              son ahora el «+» flotante. */}
+          <span class="relative inline-flex items-center max-md:col-span-full max-md:min-w-0">
             <Icon
               name="search"
               size={16}
@@ -1962,82 +1959,9 @@ export function FileBrowser() {
               class="text-text placeholder:text-text-muted hover:bg-surface-sunken focus:bg-surface-sunken border-border-strong sytue-focus-ring h-8 w-full rounded-md border bg-transparent pr-2.5 pl-8 text-sm transition-colors duration-150 md:w-56"
             />
           </span>
-          {/* Controles sobre la cabecera sólida: las variantes de Button asumen
-              superficie clara y no leen sobre el cromo grafito; aquí van en el idioma
-              del header —hundido (bg-surface-sunken) y hairline de tinta—,
-              como en calendar. */}
-          {/* «Nuevo» agrupa crear carpeta y los tres tipos de Sytue Docs. Antes solo
-              había «Nueva carpeta»: para empezar un documento había que salir a Docs,
-              aunque el servicio sabe crearlo desde el principio. */}
-          <Dropdown
-            label={t('files.new')}
-            align="end"
-            trigger={({ onClick, ...aria }) => (
-              <button
-                type="button"
-                onClick={onClick}
-                disabled={busy || offline}
-                class="text-text hover:bg-surface-sunken active:bg-surface-sunken border-border-strong sytue-focus-ring rounded-control inline-flex h-8 items-center gap-1.5 border px-3 text-sm font-semibold transition-colors duration-150 disabled:pointer-events-none disabled:opacity-50"
-                {...aria}
-              >
-                {t('files.new')}
-                <Icon name="chevronDown" size={14} />
-              </button>
-            )}
-          >
-            <MenuItem
-              icon={<Glyph name="folder" size={16} />}
-              onClick={() => setNewFolderOpen(true)}
-            >
-              {t('files.new.folder')}
-            </MenuItem>
-            {conCarpeta ? (
-              <MenuItem
-                icon={<Glyph name="upload" size={16} />}
-                onClick={() => {
-                  if (!offline) folderInput.current?.click();
-                }}
-              >
-                {t('files.upload.folder')}
-              </MenuItem>
-            ) : null}
-            <MenuSeparator />
-            <MenuItem
-              icon={<Glyph name="document" size={16} />}
-              onClick={() => void crearDoc('document')}
-            >
-              {t('files.new.document')}
-            </MenuItem>
-            <MenuItem
-              icon={<Glyph name="spreadsheet" size={16} />}
-              onClick={() => void crearDoc('spreadsheet')}
-            >
-              {t('files.new.spreadsheet')}
-            </MenuItem>
-            <MenuItem
-              icon={<Glyph name="presentation" size={16} />}
-              onClick={() => void crearDoc('presentation')}
-            >
-              {t('files.new.presentation')}
-            </MenuItem>
-            <MenuSeparator />
-            <MenuItem
-              icon={<Glyph name="spreadsheet" size={16} />}
-              onClick={() => void importarDeBases()}
-            >
-              {t('files.new.bases')}
-            </MenuItem>
-          </Dropdown>
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={onUploadClick}
-            disabled={busy || offline}
-            loading={uploading}
-            leadingIcon={<Glyph name="upload" size={16} />}
-          >
-            {t('files.upload')}
-          </Button>
+          {/* «Nuevo» y «Subir» ya no van aquí: son el «+» flotante, abajo a la derecha y
+              en todos los anchos, que abre el menú de lo que se puede crear (ver el
+              `BotonFlotante` de abajo). */}
           <input
             ref={fileInput}
             type="file"
@@ -2059,14 +1983,67 @@ export function FileBrowser() {
               tabIndex={-1}
             />
           ) : null}
-          {/* «Subir» al alcance del pulgar en el teléfono, como «Redactar» en Mail: el
-              botón de la cabecera queda arriba del todo. Es `fixed` y `md:hidden`, así
-              que da igual dónde se monte; sin red no se ofrece, que no se puede subir. */}
+          {/* CREAR es el «+» flotante, abajo a la derecha y en todos los anchos, como
+              «Redactar» en Mail: una sola puerta para subir y para crear, que antes eran
+              «Nuevo» y «Subir» en la cabecera y otro «Subir» flotante en el teléfono. Abre
+              el menú de «Nuevo» con «Subir archivos» delante, que es lo que más se hace.
+              «Nuevo» agrupa crear carpeta y los tres tipos de Sytue Docs: antes solo había
+              «Nueva carpeta» y para empezar un documento había que salir a Docs, aunque el
+              servicio sabe crearlo desde el principio. Es `fixed`, así que da igual dónde
+              se monte; sin red no se ofrece, que no se puede subir ni crear. */}
           {!offline ? (
-            <MobileFab
-              label={t('files.upload')}
-              icon={<Icon name="upload" size={24} />}
-              onClick={onUploadClick}
+            <BotonFlotante
+              label={t('files.new')}
+              disabled={busy}
+              menu={
+                <>
+                  <MenuItem icon={<Glyph name="upload" size={16} />} onClick={onUploadClick}>
+                    {t('files.upload')}
+                  </MenuItem>
+                  <MenuItem
+                    icon={<Glyph name="folder" size={16} />}
+                    onClick={() => setNewFolderOpen(true)}
+                  >
+                    {t('files.new.folder')}
+                  </MenuItem>
+                  {conCarpeta ? (
+                    <MenuItem
+                      icon={<Glyph name="upload" size={16} />}
+                      onClick={() => {
+                        if (!offline) folderInput.current?.click();
+                      }}
+                    >
+                      {t('files.upload.folder')}
+                    </MenuItem>
+                  ) : null}
+                  <MenuSeparator />
+                  <MenuItem
+                    icon={<Glyph name="document" size={16} />}
+                    onClick={() => void crearDoc('document')}
+                  >
+                    {t('files.new.document')}
+                  </MenuItem>
+                  <MenuItem
+                    icon={<Glyph name="spreadsheet" size={16} />}
+                    onClick={() => void crearDoc('spreadsheet')}
+                  >
+                    {t('files.new.spreadsheet')}
+                  </MenuItem>
+                  <MenuItem
+                    icon={<Glyph name="presentation" size={16} />}
+                    onClick={() => void crearDoc('presentation')}
+                  >
+                    {t('files.new.presentation')}
+                  </MenuItem>
+                  <MenuSeparator />
+                  <MenuItem
+                    icon={<Glyph name="spreadsheet" size={16} />}
+                    onClick={() => void importarDeBases()}
+                  >
+                    {t('files.new.bases')}
+                  </MenuItem>
+                </>
+              }
             />
           ) : null}
           {/* La cuadrícula no tiene cabeceras de columna: el orden se elige aquí. En la
@@ -2190,11 +2167,16 @@ export function FileBrowser() {
       ) : null}
 
       {/* Contenido. Zona de arrastrar-soltar: todo el lienzo (también con la carpeta
-          vacía) acepta ficheros del SO; el botón «Subir» sigue disponible (el drop no
-          es el único camino). Los handlers ignoran drags que no traen ficheros. */}
+          vacía) acepta ficheros del SO; «Subir archivos» sigue en el «+» flotante (el
+          drop no es el único camino). Los handlers ignoran drags que no traen ficheros. */}
       <div
         ref={panelMover}
-        class={cx('relative min-h-0 flex-1', listActive ? 'flex flex-col' : 'overflow-y-auto')}
+        // Sin la lista, desplaza este contenedor: le deja al final el hueco del «+»
+        // flotante (`sytue-reserva-flotante`). Con ella, lo deja la propia lista.
+        class={cx(
+          'relative min-h-0 flex-1',
+          listActive ? 'flex flex-col' : 'sytue-reserva-flotante overflow-y-auto',
+        )}
         onDragEnter={onDragEnter}
         onDragOver={onDragOver}
         onDragLeave={onDragLeave}
@@ -4843,7 +4825,8 @@ export function FileList({
         getItemKey={getKey}
         handleRef={handle}
         aria-label={t('files.list.aria')}
-        class="min-h-0 flex-1 px-3 pb-6 text-base"
+        // El hueco del «+» flotante al final: la última fila se puede bajar por encima.
+        class="sytue-reserva-flotante min-h-0 flex-1 px-3 pb-6 text-base"
         onScroll={(e) => {
           const el = e.currentTarget;
           if (hasMore && el.scrollTop + el.clientHeight >= el.scrollHeight - 600) onLoadMore();

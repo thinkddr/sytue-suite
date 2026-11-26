@@ -293,6 +293,44 @@ func (r *Repository) MarkRead(ctx context.Context, id string) error {
 	return ctx.Err()
 }
 
+// MarkUnread devuelve un aviso verificado a «sin leer»: el camino de vuelta de MarkRead,
+// con sus mismas reglas (solo uno que existe, y un conflicto se devuelve, no se pisa).
+func (r *Repository) MarkUnread(ctx context.Context, id string) error {
+	if !storage.Identifier(id) {
+		return ErrNotice
+	}
+	raw, err := r.core.Mutate(ctx, "notice-unread", id, func(ctx context.Context) (string, string, string, []byte, error) {
+		data, err := r.core.ReadRaw(ctx, noticeKind, id)
+		if err != nil {
+			return "", "", "", nil, err
+		}
+		defer clear(data)
+		n, err := decode(r.scope, noticeKind, id, data)
+		if err != nil {
+			return "", "", "", nil, err
+		}
+		if !n.Read {
+			return "", "", "", nil, errAlreadyPresent
+		}
+		n.Read = false
+		n.ReadAt = nil
+		value, err := json.Marshal(n)
+		return noticeKind, id, "live", value, err
+	})
+	clear(raw)
+	if err != nil && !errors.Is(err, errAlreadyPresent) {
+		return err
+	}
+	current, err := r.current(ctx, id)
+	if err != nil {
+		return err
+	}
+	if current.Read {
+		return records.ErrConflict
+	}
+	return ctx.Err()
+}
+
 func (r *Repository) current(ctx context.Context, id string) (Notice, error) {
 	raw, err := r.core.ReadRaw(ctx, noticeKind, id)
 	if err != nil {

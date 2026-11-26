@@ -998,4 +998,14 @@ export const hr: AppCatalog<typeof en> = {
     'Prethodni sustav pošte više nije dostupan. Dok ne premjestite poštu u trezor, nećete primati novu poštu: pošta koju vam pošalju u međuvremenu čeka na poslužitelju s kojeg je poslana, a on je nekoliko dana pokušava ponovno isporučiti. Ako poštu premjestite na vrijeme, stići će vam nakon toga; ako ne, vratit će se kao neisporučena. Ono što je već šifrirano prethodnim sustavom, kao i pošta koju već imate, neće se moći pročitati: ne briše se, ali nitko to neće moći otvoriti. Nakon premještanja pošta vam ponovno stiže i otvara se prijavom u Sytue ID kao i ostale aplikacije.',
   'privateMail.vaultMoveCheckFailed':
     'Stanje vaše pošte nije bilo moguće provjeriti. Pokušajte ponovno za trenutak.',
+  'shortcuts.goInbox': 'Idi na Pristiglu poštu',
+  'shortcuts.goSent': 'Idi na Poslano',
+  'shortcuts.goDrafts': 'Idi na Skice',
+  'shortcuts.goArchive': 'Idi na Arhivu',
+  'compose.sendAndArchive': 'Pošalji i arhiviraj',
+  'reader.copyAddress': 'Kopiraj adresu',
+  'reader.addressCopied': 'Adresa kopirana',
+  'reader.copyAddressFailed': 'Adresu nije moguće kopirati',
+  'reader.viewPlain': 'Prikaži kao običan tekst',
+  'reader.viewFormatted': 'Prikaži s oblikovanjem',
 };

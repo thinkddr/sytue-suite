@@ -24,6 +24,7 @@ import {
   HttpError,
   LinkedServicesClient,
   MAIL_PROVIDERS,
+  accountsFor,
   forgetMailConsent,
   pendingMailConsent,
   type ExternalMailAccount,
@@ -471,7 +472,13 @@ export function LinkedServices({ service, basePath, labels }: LinkedServicesProp
     (selectedCollection?.read_only === true ||
       (original?.read_only === true &&
         !(service === 'notes' && 'can_append' in original && original.can_append)));
-  const accountOptions = data.items.filter((item) => PROVIDERS.includes(item.provider));
+  // One option per provider account: the same address connected for Mail and for this
+  // service (or twice, before the gateway refused it) is one account, not two rows.
+  const accountOptions = accountsFor(
+    data.items.filter((item) => PROVIDERS.includes(item.provider)),
+    service,
+    account?.instance_id,
+  );
   return (
     <>
       <Button variant="ghost" size="sm" onClick={() => setOpen(true)}>

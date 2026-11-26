@@ -116,7 +116,7 @@ func TestAliasRevocadosConClaimsYRolesDeBase(t *testing.T) {
 							t.Fatalf("retired login marked: %v", err)
 						}
 					}
-					changed, err := st.MarkAllRead(ctx, supplied)
+					changed, err := st.MarkAllRead(ctx, supplied, "")
 					if err != nil || changed != int64(tc.want) {
 						t.Fatalf("marked=%d want=%d err=%v", changed, tc.want, err)
 					}

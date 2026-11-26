@@ -34,6 +34,7 @@ import {
   BarChart,
   BarraMovil,
   BarraUnicaContext,
+  BotonFlotante,
   BulkActionBar,
   Button,
   CARD_TONES,
@@ -68,7 +69,6 @@ import {
   MenuSeparator,
   Meter,
   Migas,
-  MobileFab,
   Modal,
   OrgMark,
   PaginaNoEncontrada,
@@ -224,9 +224,20 @@ function Botones() {
       <Fila rotulo="Salto al contenido (visible con el foco)">
         <SkipLink targetId="muestrario" />
       </Fila>
-      <Fila rotulo="Botón flotante del teléfono (dentro de su marco)">
+      <Fila rotulo="El «+» flotante de crear, solo y con menú (dentro de su marco)">
         <div class="border-border relative h-24 w-48 transform-gpu overflow-hidden rounded-lg border">
-          <MobileFab label="Nuevo" icon={<Icon name="plus" size={22} />} onClick={nada} />
+          <BotonFlotante label="Crear evento" onClick={nada} />
+        </div>
+        <div class="border-border relative h-24 w-48 transform-gpu overflow-hidden rounded-lg border">
+          <BotonFlotante
+            label="Nuevo"
+            menu={
+              <>
+                <MenuItem icon={<Icon name="upload" size={16} />}>Subir archivos</MenuItem>
+                <MenuItem icon={<Icon name="image" size={16} />}>Fotos</MenuItem>
+              </>
+            }
+          />
         </div>
       </Fila>
     </>

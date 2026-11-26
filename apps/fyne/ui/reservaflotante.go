@@ -13,17 +13,18 @@ import (
 //
 // El «+» flotante (BotonFlotante) va encima de la pantalla, abajo a la derecha, y las listas
 // no dejaban sitio debajo de su última fila: al bajar del todo, el botón la tapaba (Mail,
-// Contacts, Drive y Cast en la auditoría del 2026-11-24). En la web las listas con
-// `MobileFab` acaban con un relleno de abajo; aquí lo dan estas dos piezas, solo por
-// debajo de `Estrecho`, que es donde el botón se ve.
+// Contacts, Drive y Cast en la auditoría del 2026-11-24). En la web lo que desplaza bajo el
+// botón lleva `sytue-reserva-flotante` y acaba con un relleno de abajo; aquí lo dan estas
+// dos piezas. En TODOS los anchos desde el 2026-11-25, que es desde cuando el botón se ve
+// también en escritorio: antes, solo por debajo de `Estrecho`.
 
 // ReservaFlotante es lo que una lista deja libre al final para el botón flotante: el botón
 // y su margen por arriba y por abajo (`h-14` y dos `bottom-4`), 88 con el rem de 16.
 var ReservaFlotante = LadoBotonFlotante + 2*MargenBotonFlotante
 
 // ConReservaFlotante envuelve el contenido de un desplazamiento vertical y le añade la
-// reserva al final cuando la ventana es estrecha. Lo de dentro se coloca arriba con su
-// alto; lo que sobra queda vacío, del fondo de la lista.
+// reserva al final. Lo de dentro se coloca arriba con su alto; lo que sobra queda vacío,
+// del fondo de la lista.
 func ConReservaFlotante(contenido fyne.CanvasObject) *fyne.Container {
 	return container.New(reservaFlotante{}, contenido)
 }
@@ -35,9 +36,10 @@ var (
 	_ conAlto     = reservaFlotante{}
 )
 
-// reservaPara es la reserva que toca a lo que vive en el lienzo de `o`.
+// reservaPara es la reserva que toca a lo que vive en el lienzo de `o`: la entera en
+// cuanto está en una ventana, sea del ancho que sea.
 func reservaPara(o fyne.CanvasObject) float32 {
-	if c := lienzoDe(o); c != nil && c.Size().Width > 0 && c.Size().Width < Estrecho {
+	if c := lienzoDe(o); c != nil && c.Size().Width > 0 {
 		return ReservaFlotante
 	}
 	return 0
@@ -104,8 +106,8 @@ func ReservarEnLista(l *widget.List) *ReservaEnLista {
 	return r
 }
 
-// Ajustar enciende o apaga la reserva según el ancho de la ventana (0: el del lienzo de la
-// lista) y le pone su alto al índice que toca. Se llama donde la app ya fija los altos de
+// Ajustar enciende la reserva en cuanto la lista está en una ventana con ancho (0: el del
+// lienzo de la lista) y le pone su alto al índice que toca. Se llama donde la app ya fija los altos de
 // sus filas —tras cambiar la lista o el ancho— y ANTES de fijarlos: devuelve al alto de
 // la plantilla la fila que deja de ser reserva, y la app le pone después el suyo si es
 // otro. Nunca desde Length ni UpdateItem, que corren dentro del pintado de la lista.
@@ -115,7 +117,18 @@ func (r *ReservaEnLista) Ajustar(ventana float32) {
 			ventana = c.Size().Width
 		}
 	}
-	activa := ventana > 0 && ventana < Estrecho
+	r.encender(ventana > 0)
+}
+
+// Quitar apaga la reserva aunque la lista esté en una ventana: es para quien la deja al
+// final de OTRO desplazamiento (la franja compacta de Drive, que lleva la lista dentro).
+func (r *ReservaEnLista) Quitar() { r.encender(false) }
+
+// Largo es el número de filas de verdad, sin la de la reserva: el último índice al que
+// pueden ir Fin y ↓ (la reserva no es de nadie y abrirla no hace nada).
+func (r *ReservaEnLista) Largo() int { return r.largo() }
+
+func (r *ReservaEnLista) encender(activa bool) {
 	n := r.largo()
 	if r.fila >= 0 && (!activa || r.fila != n) {
 		r.l.SetItemHeight(r.fila, r.altoPlantilla())

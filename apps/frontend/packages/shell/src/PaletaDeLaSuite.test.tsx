@@ -97,7 +97,10 @@ const opciones = () =>
   [...document.querySelectorAll<HTMLElement>('[role="option"]')].map((o) => o.textContent ?? '');
 
 function escribir(texto: string): void {
-  const campo = document.querySelector<HTMLInputElement>('[role="combobox"][aria-autocomplete]')!;
+  // El de la paleta, dentro de su diálogo: el buscador de la barra también es un combobox.
+  const campo = document.querySelector<HTMLInputElement>(
+    '[role="dialog"] [role="combobox"][aria-autocomplete]',
+  )!;
   act(() => {
     campo.value = texto;
     campo.dispatchEvent(new Event('input', { bubbles: true }));

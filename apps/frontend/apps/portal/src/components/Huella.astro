@@ -1,0 +1,30 @@
+---
+/**
+ * La huella SHA-256 de un instalador, para comprobar la descarga.
+ *
+ * Plegada en un `<details>`: casi nadie la mira, y quien la busca (porque baja desde
+ * un espejo, por un proxy de empresa o porque su equipo se lo exige) la encuentra
+ * debajo del botón. Sin JS, como el resto de la página: `select-all` deja seleccionar
+ * los 64 caracteres de un clic para copiarlos, que es lo que se hace con ella.
+ */
+import type { useT } from '../i18n/index.js';
+
+interface Props {
+  sha256: string;
+  t: ReturnType<typeof useT>;
+}
+
+const { sha256, t } = Astro.props;
+---
+
+<details class="mt-2 text-xs">
+  <summary class="text-text-muted hover:text-text sytue-focus-ring cursor-pointer rounded">
+    {t('downloads.checksum')}
+  </summary>
+  <p class="text-text-muted mt-1">{t('downloads.checksumHelp')}</p>
+  <code
+    class="bg-bg-subtle text-text mt-1 block rounded px-2 py-1 font-mono break-all select-all"
+    aria-label={t('downloads.checksumLabel')}
+    set:text={sha256}
+  />
+</details>

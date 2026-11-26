@@ -380,4 +380,34 @@ export const nucleo = {
 
   'forms.empty': 'Vastuseid veel pole',
   'forms.empty_help': 'Kui keegi saadab teie veebisaidil vormi, näete seda siin.',
+  'sites.search': 'Otsi saite',
+  'sites.search_empty': 'Ükski sait ei vasta päringule „{q}“.',
+  'sites.sort_label': 'Sordi saidid',
+  'sites.sort_recent': 'Hiljuti muudetud',
+  'sites.sort_name': 'Nimi (A–Ü)',
+  'sites.view_live': 'Vaata saiti',
+  'sites.view_live_aria': 'Vaata avaldatud saiti {nombre} (avaneb uuel vahekaardil)',
+  'seo.title': 'Mida otsingumootorid näevad',
+  'seo.intro':
+    'Mustandi ülevaatus: pealkirjad, kirjeldused ja pildid, millest otsingumootorid ja ekraanilugejad sõltuvad. Need on hoiatused; avaldamist need ei takista.',
+  'seo.open_editor': 'Ava redaktor',
+  'seo.recheck': 'Kontrolli uuesti',
+  'seo.error': 'Ülevaatust ei õnnestunud laadida. Proovi uuesti.',
+  'seo.all_good':
+    'Kõik korras: igal lehel on pealkiri ja kirjeldus ning piltidel alternatiivtekst.',
+  'seo.summary': 'Hoiatused: {count}',
+  'seo.badge_warning': 'Paranda',
+  'seo.badge_info': 'Märkus',
+  'seo.on_page': 'Leht: {page}',
+  'seo.title_missing': 'Lehel pole pealkirja: otsingumootor mõtleb selle ise välja.',
+  'seo.title_long': 'Pealkirjas on {count} märki; otsingumootor lõikab umbes 60 järel.',
+  'seo.title_duplicate': 'Teisel lehel on sama pealkiri: tulemustes konkureerivad nad omavahel.',
+  'seo.description_missing': 'Lehel pole kirjeldust: otsingumootor näitab juhuslikku tekstilõiku.',
+  'seo.description_long': 'Kirjelduses on {count} märki; näidatakse umbes 160.',
+  'seo.image_alt_missing':
+    'Alternatiivtekstita pildid: {count}. Ekraanilugejad ja otsingumootorid ei tea, mida need näitavad; märgi need dekoratiivseks, kui need midagi ei näita.',
+  'seo.page_noindex': 'See leht on otsingumootorite eest peidetud (noindex).',
+  'seo.site_noindex': 'Kogu sait on otsingumootorite eest peidetud (noindex).',
+  'seo.share_image_missing':
+    'Saidil pole jagamispilti: lingid sõnumites ja sotsiaalvõrgustikes kuvatakse ilma pildita.',
 };

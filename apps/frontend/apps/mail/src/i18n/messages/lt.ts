@@ -1029,4 +1029,14 @@ export const lt: AppCatalog<typeof en> = {
     'Ankstesnė pašto sistema nebepasiekiama. Kol neperkelsite pašto į saugyklą, naujo pašto negausite: tuo metu jums siunčiami laiškai laukia serveryje, iš kurio buvo išsiųsti, o jis kelias dienas bando juos pristatyti iš naujo. Jei perkelsite laiku, jie jus pasieks vėliau; jei ne, jie bus grąžinti kaip nepristatyti. To, kas jau užšifruota ankstesne sistema, kaip ir jau turėto pašto, nebus galima perskaityti: tai neištrinama, bet niekas negalės to atidaryti. Perkėlus paštas vėl pradės ateiti ir atsidarys prisijungus prie Sytue ID, kaip ir kitos programos.',
   'privateMail.vaultMoveCheckFailed':
     'Nepavyko patikrinti jūsų pašto būsenos. Bandykite dar kartą po akimirkos.',
+  'shortcuts.goInbox': 'Eiti į Gautus',
+  'shortcuts.goSent': 'Eiti į Išsiųstus',
+  'shortcuts.goDrafts': 'Eiti į Juodraščius',
+  'shortcuts.goArchive': 'Eiti į Archyvą',
+  'compose.sendAndArchive': 'Siųsti ir archyvuoti',
+  'reader.copyAddress': 'Kopijuoti adresą',
+  'reader.addressCopied': 'Adresas nukopijuotas',
+  'reader.copyAddressFailed': 'Adreso nukopijuoti nepavyko',
+  'reader.viewPlain': 'Rodyti kaip paprastą tekstą',
+  'reader.viewFormatted': 'Rodyti su formatavimu',
 };

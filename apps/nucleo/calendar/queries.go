@@ -195,6 +195,27 @@ func (r *Repository) GetEvent(ctx context.Context, id string) (api.Event, error)
 	return result, nil
 }
 
+// EventICS es el recurso iCalendar del evento tal cual se guardó: «Descargar .ics».
+func (r *Repository) EventICS(ctx context.Context, id string) ([]byte, error) {
+	s, err := r.Snapshot(ctx)
+	if err != nil {
+		return nil, err
+	}
+	ev, err := findEvent(s, id)
+	if err != nil {
+		return nil, err
+	}
+	row, ok := s.Row("object", ev.ObjectID.String())
+	if !ok {
+		return nil, model.ErrSnapshot
+	}
+	data, err := objectData(row)
+	if err != nil {
+		return nil, err
+	}
+	return []byte(data), nil
+}
+
 func validWindow(from, to time.Time) bool {
 	return !from.IsZero() && to.After(from) && to.Sub(from) <= 366*24*time.Hour
 }

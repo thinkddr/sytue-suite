@@ -248,6 +248,19 @@ func elementoGlifo(texto, d string, peligro bool, alPulsar func()) *ui.ElementoM
 
 // elementoBloquear es «Bloquear a …» con el nombre del remitente, si se ofrece: con
 // acción puesta, fuera de una cuenta externa y no a uno mismo.
+// elementoCopiarDireccion es «Copiar la dirección» del remitente: la de verdad, para
+// pegarla en otro sitio, que el nombre visible no siempre la deja ver.
+func (x *Lector) elementoCopiarDireccion() (*ui.ElementoMenu, bool) {
+	remitente := remitenteDe(x.Conversacion)
+	if remitente == "" || x.AlCopiarDireccion == nil {
+		return nil, false
+	}
+	e := ui.NuevoElementoMenu(x.T.T("reader.copyAddress", nil), iconos.Copias,
+		func() { x.AlCopiarDireccion(remitente) })
+	e.TamIcono = TallaGlifoLector
+	return e, true
+}
+
 func (x *Lector) elementoBloquear() (*ui.ElementoMenu, bool) {
 	a := x.Acciones
 	remitente := remitenteDe(x.Conversacion)
@@ -283,6 +296,9 @@ func (x *Lector) menuMas() *ui.Menu {
 	if a.CrearRegla != nil && !esExterno(x.Conversacion.Ultimo.ID) {
 		els = append(els, elementoGlifo(t.T("reader.createRule", nil), CarpetaD, false,
 			func() { a.CrearRegla(x.Conversacion) }))
+	}
+	if e, hay := x.elementoCopiarDireccion(); hay {
+		els = append(els, e)
 	}
 	// La búsqueda es la del servicio de Sytue: lo de una cuenta externa no está en ella,
 	// y ofrecerlo daría «sin resultados» por respuesta.

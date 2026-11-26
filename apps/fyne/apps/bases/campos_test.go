@@ -92,7 +92,7 @@ func TestElPropietarioGestionaUnCampoDesdeSuCabecera(t *testing.T) {
 	}
 	test.Tap(b)
 	opciones, menu := opcionesAbiertas(w)
-	if !slices.Equal(opciones, []string{"Renombrar…", "Mover a la izquierda", "Mover a la derecha", "Eliminar campo"}) || menu == nil || menu.AccessibilityLabel() != "Opciones del campo Edad" {
+	if !slices.Equal(opciones, []string{"Renombrar…", "Valor por defecto…", "Mover a la izquierda", "Mover a la derecha", "Eliminar campo"}) || menu == nil || menu.AccessibilityLabel() != "Opciones del campo Edad" {
 		t.Errorf("el menú de un número ofrece %v (%v)", opciones, menu)
 	}
 	menu.Cerrar()

@@ -55,7 +55,8 @@ type notifStore interface {
 	ListNotifications(ctx context.Context, subjects []string, onlyUnread bool, before *domain.Antes, limit int) ([]domain.Notification, error)
 	UnreadCount(ctx context.Context, subjects []string) (int, error)
 	MarkRead(ctx context.Context, id uuid.UUID, subjects []string) error
-	MarkAllRead(ctx context.Context, subjects []string) (int64, error)
+	MarkUnread(ctx context.Context, id uuid.UUID, subjects []string) error
+	MarkAllRead(ctx context.Context, subjects []string, origen string) (int64, error)
 	ListNotificationPrefs(ctx context.Context, subject string) ([]domain.NotificationPref, error)
 	SetNotificationPref(ctx context.Context, subject string, p domain.NotificationPref) error
 	OlvidarBuzon(ctx context.Context, subject string) (int64, error)
@@ -530,9 +531,32 @@ func (h *Handlers) MarkRead(w http.ResponseWriter, r *http.Request) {
 	httpx.NoContent(w)
 }
 
-// MarkAllRead: POST /api/v1/notifications/read_all.
+// MarkUnread: POST /api/v1/notifications/{id}/unread — lo devuelve a «sin leer».
+func (h *Handlers) MarkUnread(w http.ResponseWriter, r *http.Request) {
+	id, err := parseID(r, "id")
+	if err != nil {
+		httpx.Fail(w, r, err)
+		return
+	}
+	if err := h.store.MarkUnread(personales(r.Context()), id, buzones(r)); err != nil {
+		httpx.Fail(w, r, toAPIError(err))
+		return
+	}
+	httpx.NoContent(w)
+}
+
+// MarkAllRead: POST /api/v1/notifications/read_all[?source=drive].
+//
+// Con `source`, solo las de ese producto: la bandeja lo manda cuando hay un filtro de
+// producto puesto. Un origen que no existe es un 400, no «todas»: leer de más un
+// parámetro mal escrito marcaría como leído lo que la persona no ha visto.
 func (h *Handlers) MarkAllRead(w http.ResponseWriter, r *http.Request) {
-	n, err := h.store.MarkAllRead(personales(r.Context()), buzones(r))
+	origen := strings.TrimSpace(r.URL.Query().Get("source"))
+	if origen != "" && !domain.ValidNotificationSource(domain.Source(origen)) {
+		httpx.Fail(w, r, httpx.ErrBadRequest.WithMessage("Unknown source: "+origen))
+		return
+	}
+	n, err := h.store.MarkAllRead(personales(r.Context()), buzones(r), origen)
 	if err != nil {
 		httpx.Fail(w, r, toAPIError(err))
 		return

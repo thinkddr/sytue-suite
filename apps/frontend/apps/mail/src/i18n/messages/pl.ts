@@ -1025,4 +1025,14 @@ export const pl: AppCatalog<typeof en> = {
     'Poprzedni system poczty nie jest już dostępny. Dopóki nie przeniesiesz poczty do sejfu, nie będziesz otrzymywać nowej poczty: wiadomości wysłane do Ciebie w międzyczasie czekają na serwerze, z którego zostały wysłane, a ten przez kilka dni ponawia próby doręczenia. Jeśli przeniesiesz pocztę na czas, dotrą do Ciebie później; jeśli nie, wrócą jako niedoręczone. Tego, co jest już zaszyfrowane poprzednim systemem, tak jak poczty, którą już masz, nie da się odczytać: nie zostanie usunięte, ale nikt nie będzie mógł tego otworzyć. Po przeniesieniu poczta znów zacznie przychodzić i będzie się otwierać po zalogowaniu do Sytue ID, jak pozostałe aplikacje.',
   'privateMail.vaultMoveCheckFailed':
     'Nie udało się sprawdzić stanu Twojej poczty. Spróbuj ponownie za chwilę.',
+  'shortcuts.goInbox': 'Przejdź do Odebranych',
+  'shortcuts.goSent': 'Przejdź do Wysłanych',
+  'shortcuts.goDrafts': 'Przejdź do Wersji roboczych',
+  'shortcuts.goArchive': 'Przejdź do Archiwum',
+  'compose.sendAndArchive': 'Wyślij i zarchiwizuj',
+  'reader.copyAddress': 'Kopiuj adres',
+  'reader.addressCopied': 'Skopiowano adres',
+  'reader.copyAddressFailed': 'Nie udało się skopiować adresu',
+  'reader.viewPlain': 'Pokaż jako zwykły tekst',
+  'reader.viewFormatted': 'Pokaż z formatowaniem',
 };

@@ -24,6 +24,7 @@ export type AccionDeAtajo =
   | 'editar'
   | 'destacar'
   | 'marcar'
+  | 'papelera'
   | 'ayuda';
 
 interface FilaDeAtajo {
@@ -58,6 +59,7 @@ const ATAJOS: { grupo: 'move' | 'actions'; filas: FilaDeAtajo[] }[] = [
       { teclas: ['e'], accion: 'editar', ambito: 'app' },
       { teclas: ['s'], accion: 'destacar', ambito: 'app' },
       { teclas: ['x'], accion: 'marcar', ambito: 'app' },
+      { teclas: ['#'], accion: 'papelera', ambito: 'app' },
       { teclas: ['?'], accion: 'ayuda', ambito: 'app' },
     ],
   },
@@ -146,6 +148,7 @@ const DESCRIPCION: Record<AccionDeAtajo, ContactsMessageKey> = {
   editar: 'shortcuts.edit',
   destacar: 'shortcuts.star',
   marcar: 'shortcuts.select',
+  papelera: 'batch.toTrash',
   ayuda: 'shortcuts.help',
 };
 

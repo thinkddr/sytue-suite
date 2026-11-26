@@ -391,4 +391,33 @@ export const nucleo = {
 
   'forms.empty': 'Još nema odgovora',
   'forms.empty_help': 'Kad netko pošalje obrazac s vašeg web-mjesta, vidjet ćete ga ovdje.',
+  'sites.search': 'Traži web-mjesta',
+  'sites.search_empty': 'Nijedno web-mjesto ne odgovara „{q}”.',
+  'sites.sort_label': 'Poredaj web-mjesta',
+  'sites.sort_recent': 'Nedavno uređeno',
+  'sites.sort_name': 'Naziv (A–Ž)',
+  'sites.view_live': 'Prikaži web-mjesto',
+  'sites.view_live_aria': 'Prikaži objavljeno {nombre} (otvara se u novoj kartici)',
+  'seo.title': 'Što će vidjeti tražilice',
+  'seo.intro':
+    'Pregled nacrta: naslovi, opisi i slike o kojima ovise tražilice i čitači zaslona. To su upozorenja; ne sprječavaju objavu.',
+  'seo.open_editor': 'Otvori uređivač',
+  'seo.recheck': 'Provjeri ponovno',
+  'seo.error': 'Pregled nije moguće učitati. Pokušajte ponovno.',
+  'seo.all_good': 'Sve je u redu: svaka stranica ima naslov i opis, a slike imaju zamjenski tekst.',
+  'seo.summary': 'Upozorenja: {count}',
+  'seo.badge_warning': 'Poboljšaj',
+  'seo.badge_info': 'Napomena',
+  'seo.on_page': 'Stranica: {page}',
+  'seo.title_missing': 'Stranica nema naslov: tražilica će ga izmisliti.',
+  'seo.title_long': 'Naslov ima {count} znakova; stane oko 60 prije nego što ga tražilica skrati.',
+  'seo.title_duplicate': 'Druga stranica ima isti naslov: međusobno će se natjecati u rezultatima.',
+  'seo.description_missing': 'Stranica nema opis: tražilica će prikazati nasumičan dio teksta.',
+  'seo.description_long': 'Opis ima {count} znakova; prikazuje se oko 160.',
+  'seo.image_alt_missing':
+    'Slike bez zamjenskog teksta: {count}. Čitači zaslona i tražilice ne znaju što prikazuju; označite ih kao ukrasne ako ništa ne prikazuju.',
+  'seo.page_noindex': 'Ova je stranica skrivena od tražilica (noindex).',
+  'seo.site_noindex': 'Cijelo web-mjesto skriveno je od tražilica (noindex).',
+  'seo.share_image_missing':
+    'Web-mjesto nema sliku za dijeljenje: poveznice u porukama i društvenim mrežama prikazat će se bez slike.',
 };

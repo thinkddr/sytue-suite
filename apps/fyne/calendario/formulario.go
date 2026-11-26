@@ -58,6 +58,9 @@ type Edicion struct {
 	Recordatorios *[]int
 	// Recursos son las salas y los equipos que se reservan al guardar, por su id.
 	Recursos []string
+	// Libre es «Mostrar como: disponible» (TRANSP:TRANSPARENT): no ocupa la hora en el
+	// free/busy ni en «buscar hueco».
+	Libre bool
 	// desde es el evento del que se leen los recordatorios al duplicar.
 	desde string
 }
@@ -126,6 +129,9 @@ type AccionesFormulario struct {
 	// Recursos lista las salas y los recursos con su disponibilidad en [desde, hasta).
 	// Nil: el formulario no ofrece reservar.
 	Recursos func(desde, hasta time.Time, listo func([]api.Resource, error))
+	// Choques son los eventos ya cargados que se pisan con [inicio, fin), sin contar el
+	// de `uid` («Coincide con…»). Nil: no se avisa.
+	Choques func(inicio, fin time.Time, uid string) []Solape
 }
 
 // formulario es el estado vivo del modal.
@@ -143,7 +149,9 @@ type formulario struct {
 
 	titulo, inicio, fin, lugar, correo, cuenta, hasta *ui.Entrada
 	descripcion                                       *ui.AreaTexto
-	calendario, zona, repetir, finSerie               *ui.Selector
+	calendario, zona, repetir, finSerie, mostrar      *ui.Selector
+	// aviso es «Coincide con…» del último cálculo; vacío, ningún choque.
+	aviso string
 	// dias son los días elegidos de una semanal (`repeatDays`); nil, el del inicio.
 	dias []string
 	// reglaCruda es la RRULE personalizada con la que se abrió el formulario, para
@@ -232,24 +240,20 @@ func (f *formulario) construir() {
 		f.leerFechas()
 		f.e.TodoElDia = si
 		f.escribirFechas()
+		f.aviso = f.textoChoques()
 		f.rehacer()
 	})
 	f.todoElDia.Encendido = e.TodoElDia
 
 	f.inicio, f.fin = campoFechaHora(), campoFechaHora()
 	f.inicio.AlCambiar(func(s string) { f.cambiarInicio(s) })
-	f.fin.AlCambiar(func(s string) {
-		f.limpiar(&f.errFin, f.fin)
-		if t, ok := f.leerFechaHora(s, f.e.Fin); ok && f.rec != nil {
-			f.e.Fin = t
-			f.pedirRecursos()
-		}
-	})
+	f.fin.AlCambiar(f.cambiarFin)
 	f.escribirFechas()
 	f.inicioCaja = f.conSelectorFecha(f.inicio, p.t("event.start", nil), func() time.Time { return f.e.Inicio })
 	f.finCaja = f.conSelectorFecha(f.fin, p.t("event.end", nil), func() time.Time { return f.e.Fin })
 
 	f.construirZona()
+	f.construirMostrar()
 	// En consulta no hay nada que rellenar: el asistente apagado arriba de una ficha
 	// que no se puede editar solo estorba (como «buscar un hueco»).
 	if f.a.Asistente != nil && !e.SoloLectura {
@@ -592,6 +596,75 @@ func (f *formulario) cambiarInicio(s string) {
 		f.rehacer()
 	}
 	f.pedirRecursos()
+	f.revisarChoques()
+}
+
+// cambiarFin es el campo «Fin» al teclear: quita su error, pide las salas libres y
+// revisa los choques con la hora nueva.
+func (f *formulario) cambiarFin(s string) {
+	f.limpiar(&f.errFin, f.fin)
+	t, ok := f.leerFechaHora(s, f.e.Fin)
+	if !ok {
+		return
+	}
+	f.e.Fin = t
+	if f.rec != nil {
+		f.pedirRecursos()
+	}
+	f.revisarChoques()
+}
+
+// construirMostrar es «Mostrar como»: ocupado (lo de siempre) o disponible, y el primer
+// cálculo de «Coincide con…».
+func (f *formulario) construirMostrar() {
+	p := f.p
+	f.mostrar = ui.NuevoSelector([]string{p.t("event.showAsBusy", nil), p.t("event.showAsFree", nil)}, func(i int) {
+		f.e.Libre = i == 1
+		f.revisarChoques()
+	})
+	if f.e.Libre {
+		f.mostrar.Elegida = 1
+	}
+	f.mostrar.Rotulo = p.t("event.showAs", nil)
+	f.aviso = f.textoChoques()
+}
+
+// textoChoques es «Coincide con…» para las horas puestas: vacío en un día completo, en
+// un evento «disponible», en consulta o sin nada que se pise (`choques` en EventModal).
+func (f *formulario) textoChoques() string {
+	e := f.e
+	if f.a.Choques == nil || e.TodoElDia || e.Libre || e.SoloLectura {
+		return ""
+	}
+	l := f.a.Choques(e.Inicio, e.Fin, e.UID)
+	if len(l) == 0 {
+		return ""
+	}
+	loc := f.p.zona()
+	vars := i18n.Vars{
+		"title": resumenDe(l[0].O, f.p.t("event.untitled", nil)),
+		"time": i18n.FormatTimeDigits(f.p.locale(), l[0].Inicio.In(loc)) + "–" +
+			i18n.FormatTimeDigits(f.p.locale(), l[0].Fin.In(loc)),
+	}
+	if len(l) == 1 {
+		return f.p.t("event.overlaps", vars)
+	}
+	return f.p.t("event.overlapsMore", vars)
+}
+
+// revisarChoques recalcula el aviso y solo rehace el formulario si ha cambiado: se llama
+// con cada hora tecleada.
+func (f *formulario) revisarChoques() {
+	nuevo := f.textoChoques()
+	if nuevo == f.aviso {
+		return
+	}
+	f.aviso = nuevo
+	// Mientras se arma (escribir las fechas dispara los campos) aún no hay filas que
+	// rehacer: las primeras ya salen con el aviso.
+	if f.cuerpo != nil {
+		f.rehacer()
+	}
 }
 
 // ancho es el de la ventana, que es lo que miran los cortes `sm:` de la hoja.
@@ -648,6 +721,12 @@ func (f *formulario) rehacerFilas() {
 	gInicio := ui.GrupoCampo(p.t("event.start", nil), false, f.inicioCaja, "", "")
 	gFin := ui.GrupoCampo(p.t("event.end", nil), false, f.finCaja, "", f.errFin)
 	filas = append(filas, container.New(&dosColumnas{Hueco: tema.Espacio(4), Corte: CorteSM, ventana: f.ventana}, gInicio, gFin))
+	if f.aviso != "" {
+		// «Coincide con…» bajo las horas, que es lo que se toca para arreglarlo: un aviso
+		// en `warning-text`, no un error (no bloquea Guardar).
+		filas = append(filas, ui.NuevoParrafo(f.aviso, tema.TextoSM, ui.Normal, "warning-text", v).A(f.util()))
+	}
+	filas = append(filas, ui.GrupoCampo(p.t("event.showAs", nil), false, f.mostrar, p.t("event.showAsHint", nil), ""))
 	if !e.TodoElDia {
 		filas = append(filas, ui.GrupoCampo(p.t("event.timeZone", nil), false, f.zona, "", ""))
 		if f.bh != nil {
@@ -944,6 +1023,10 @@ func (e Edicion) EntradaDe(p *Pantalla) api.EventInput {
 	in.Summary, in.Description, in.Location = e.Titulo, e.Descripcion, e.Lugar
 	in.Color, in.ConferenceURL = e.Color, e.Videollamada
 	in.AllDay = e.TodoElDia
+	in.Transparency = "OPAQUE"
+	if e.Libre {
+		in.Transparency = "TRANSPARENT"
+	}
 	if e.TodoElDia {
 		// Día completo: FLOTANTE, a las 00:00 UTC de su fecha y sin zona. El «Fin» del
 		// formulario es el ÚLTIMO día y el DTEND es exclusivo (RFC 5545 §3.6.1): «8 → 10
@@ -1036,6 +1119,7 @@ func (p *Pantalla) EdicionDe(o Ocurrencia) Edicion {
 		Inicio: ini, Fin: fin, TodoElDia: o.Event.AllDay, Zona: o.Event.TZID,
 		Lugar: o.Event.Location, Descripcion: o.Event.Description, Color: o.Event.Color,
 		Videollamada: o.Event.ConferenceURL, SoloLectura: o.SoloLectura, UID: o.Event.UID,
+		Libre: Disponible(o),
 	}
 	if r, ok := LeerRRule(o.Event.RRule); ok {
 		e.Regla = &r

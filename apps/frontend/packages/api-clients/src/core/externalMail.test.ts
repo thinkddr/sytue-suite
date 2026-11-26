@@ -3,6 +3,7 @@ import { expect, test } from 'bun:test';
 import { HttpClient } from './http.js';
 import {
   ExternalMailClient,
+  accountsFor,
   isICloudMail,
   mailProviderName,
   forgetMailConsent,
@@ -182,4 +183,32 @@ test('the sidebar summary is one personal GET with no instance in it', async () 
   const summary = await api.summary();
   expect(calls).toEqual(['GET https://mail.test/api/external-mail/summary']);
   expect(summary.items[0]?.state).toBe('reconnect');
+});
+
+test('a picker lists each provider account once, keeping the one that opens the service', () => {
+  const base = {
+    provider: 'gmail' as const,
+    name: 'Gmail',
+    connected: true,
+    capabilities: {
+      read: true,
+      send: true,
+      actions: true,
+      attachments: true,
+      continuous_sync: true,
+    },
+  };
+  const items = [
+    { ...base, instance_id: 'mail', address: 'Ana@Gmail.com', services: ['mail' as const] },
+    { ...base, instance_id: 'cal', address: 'ana@gmail.com', services: ['calendar' as const] },
+    { ...base, instance_id: 'otra', address: 'luis@gmail.com', services: ['mail' as const] },
+    { ...base, provider: 'microsoft' as const, instance_id: 'ms', address: 'ana@gmail.com' },
+  ];
+  expect(accountsFor(items, 'calendar').map((a) => a.instance_id)).toEqual(['cal', 'otra', 'ms']);
+  // What is already open stays, even if another connection of the address serves better.
+  expect(accountsFor(items, 'calendar', 'mail').map((a) => a.instance_id)).toEqual([
+    'mail',
+    'otra',
+    'ms',
+  ]);
 });

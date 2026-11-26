@@ -44,7 +44,51 @@ func montarTienda(g grupos, h *Handlers) {
 		r.Get("/gateways/{provider}/webhook-url", h.webhookURLPasarelaTienda)
 		r.Get("/orders", h.listarPedidosTienda)
 		r.Get("/orders.csv", h.exportarPedidosCSV)
+		// Marcar un pedido pagado como servido (o deshacerlo). Quién ha comprado
+		// y qué se le ha enviado es de quien administra, como la lista (WEB-02).
+		r.Post("/orders/{orderId}/fulfillment", h.marcarPedidoServido)
 	})
+}
+
+// marcarPedidoServido — POST /sites/{id}/store/orders/{orderId}/fulfillment
+// {fulfilled: bool}. Devuelve el pedido actualizado; 409 `order_state` si no está en
+// el estado de partida (pagado para servir, servido para deshacer).
+func (h *Handlers) marcarPedidoServido(w http.ResponseWriter, r *http.Request) {
+	siteID, err := idSitio(r)
+	if err != nil {
+		httpx.Fail(w, r, err)
+		return
+	}
+	if !esAdmin(r) {
+		httpx.Fail(w, r, httpx.ErrForbidden)
+		return
+	}
+	orderID, err := uuid.Parse(chi.URLParam(r, "orderId"))
+	if err != nil {
+		httpx.Fail(w, r, httpx.ErrBadRequest.WithCode("invalid_id"))
+		return
+	}
+	var in struct {
+		Fulfilled *bool `json:"fulfilled"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil || in.Fulfilled == nil {
+		httpx.Fail(w, r, httpx.ErrBadRequest.WithCode("invalid_json"))
+		return
+	}
+	t, _ := tenancy.From(r.Context())
+	o, err := h.Store.MarcarPedidoServido(r.Context(), t.Slug, siteID, orderID, *in.Fulfilled)
+	switch {
+	case errors.Is(err, domain.ErrPedidoNoExiste):
+		httpx.Fail(w, r, httpx.ErrNotFound.WithCode("order_not_found"))
+		return
+	case errors.Is(err, domain.ErrEstadoPedido):
+		httpx.Fail(w, r, httpx.NewError(http.StatusConflict, "order_state", "pages: el pedido no está en el estado de partida"))
+		return
+	case err != nil:
+		httpx.Fail(w, r, errorAPI(err))
+		return
+	}
+	httpx.JSON(w, r, http.StatusOK, o)
 }
 
 func (h *Handlers) listarPedidosTienda(w http.ResponseWriter, r *http.Request) {

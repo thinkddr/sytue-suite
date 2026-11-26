@@ -454,9 +454,11 @@ export function MessageList({
           desplazar, y alargaba el documento bajo el armazón: 1113 px con el buzón de
           verdad (v3.11.1). El `main` del AppShell no lo cubre: esto va en su panel
           secundario. */}
+      {/* `sytue-reserva-flotante`: la última conversación se puede bajar por encima del
+          «+» de Redactar, que flota encima en el teléfono. */}
       <div
         ref={scrollRef}
-        class="relative min-h-0 flex-1 overflow-x-hidden overflow-y-auto"
+        class="sytue-reserva-flotante relative min-h-0 flex-1 overflow-x-hidden overflow-y-auto"
         aria-busy={loading}
       >
         {loading ? (

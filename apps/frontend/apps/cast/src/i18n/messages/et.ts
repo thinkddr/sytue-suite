@@ -355,4 +355,8 @@ export const et: AppCatalog<typeof en> = {
   'moderation.action.unlist': 'Eemalda avalikult lehelt',
   'moderation.action.unpublish': 'Tühista avaldamine',
   'moderation.action.block': 'Blokeeri inimene organisatsioonis',
+  'player.loop': 'Korda',
+  'watch.chapters': 'Peatükid',
+  'watch.jumpTo': 'Mine kohale {time}',
+  'share.startAt': 'Alusta kohast {time}',
 };

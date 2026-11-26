@@ -322,6 +322,22 @@ func (c *Calendars) DismissReminder(ctx context.Context, id string) error {
 	return resp.Body.Close()
 }
 
+// SnoozeReminder pospone un recordatorio `minutos` (de 1 a 1440): sale de la campana y
+// vuelve a avisar a su nueva hora, que es lo que devuelve.
+func (c *Calendars) SnoozeReminder(ctx context.Context, id string, minutos int) (time.Time, error) {
+	if c.data != nil {
+		return c.data.SnoozeReminder(ctx, id, minutos)
+	}
+	r, err := JSON[struct {
+		TriggerAt time.Time `json:"trigger_at"`
+	}](ctx, c.c, Request{
+		Method: http.MethodPost, Path: "/reminders/" + url.PathEscape(id) + "/snooze",
+		Header: http.Header{"Content-Type": {"application/json"}},
+		Body:   []byte(`{"minutes":` + strconv.Itoa(minutos) + `}`),
+	})
+	return r.TriggerAt, err
+}
+
 // List lista los calendarios de la persona.
 func (c *Calendars) List(ctx context.Context) ([]Calendar, error) {
 	if c.data != nil {
@@ -654,6 +670,20 @@ func (c *Calendars) ExportICS(ctx context.Context, calendario string) ([]byte, e
 		return c.data.ExportICS(ctx, calendario)
 	}
 	resp, err := c.c.Do(ctx, Request{Path: "/calendars/" + url.PathEscape(calendario) + "/export.ics"})
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	return io.ReadAll(resp.Body)
+}
+
+// EventICS descarga UN evento como .ics: el recurso guardado entero, con su serie y sus
+// excepciones. «Descargar .ics» de la vista rápida.
+func (c *Calendars) EventICS(ctx context.Context, id string) ([]byte, error) {
+	if c.data != nil {
+		return c.data.EventICS(ctx, id)
+	}
+	resp, err := c.c.Do(ctx, Request{Path: "/events/" + url.PathEscape(id) + "/ics"})
 	if err != nil {
 		return nil, err
 	}

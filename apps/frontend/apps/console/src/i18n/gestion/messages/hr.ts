@@ -1,0 +1,87 @@
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: (c) 2026 Daniel Delgado Ramos
+ *
+ * Las herramientas de gestión de personas de Sytue Admin (acceso efectivo,
+ * sesiones, bajas recuperables, lotes, export del directorio, dispositivos,
+ * auditoría y roles): traducción del inglés (`en.ts`), que es la fuente de verdad.
+ */
+import type { AppCatalog } from '@sytue/i18n';
+import type { en } from './en.js';
+
+export const hr: AppCatalog<typeof en> = {
+  'gestion.acceso.titulo': 'Što smije raditi i zašto',
+  'gestion.acceso.ver': 'Prikaži',
+  'gestion.acceso.error': 'Stvarni pristup nije moguće učitati.',
+  'gestion.acceso.ayuda':
+    'Izračunava ga Sytue ID istim pravilom kojim autorizira. Svako dopuštenje pokazuje odakle dolazi; ako uklonite taj izvor, provjerite ostale navedene ovdje.',
+  'gestion.acceso.sinPermisos': 'Nema administratorskih dopuštenja.',
+  'gestion.acceso.fuente.integrado': 'Ugrađena uloga: {role}',
+  'gestion.acceso.fuente.rol': 'Uloga: {name}',
+  'gestion.acceso.fuente.elevacion': 'Povišeno na {name} do {when}',
+  'gestion.acceso.pendientes': 'Povišenja koja čekaju odobrenje',
+  'gestion.acceso.pendiente': '{role}, zatraženo {when}',
+  'gestion.acceso.grupos': 'Grupe',
+  'gestion.acceso.sinGrupos': 'Nije ni u jednoj grupi.',
+  'gestion.acceso.calculado': 'Izračunato {when}',
+  'gestion.sesiones.titulo': 'Otvorene sesije',
+  'gestion.sesiones.ver': 'Prikaži',
+  'gestion.sesiones.error': 'Sesije nije moguće učitati.',
+  'gestion.sesiones.vacia': 'Nema otvorenih sesija.',
+  'gestion.sesiones.inicio': 'prijava {when}',
+  'gestion.sesiones.caduca': 'istječe {when}',
+  'gestion.sesiones.mfa': 'Drugi faktor',
+  'gestion.sesiones.sinMfa': 'Samo lozinka',
+  'gestion.sesiones.total': 'Otvorene sesije: {count}',
+  'gestion.bajas.titulo': 'Zatvoreni računi koje još možete vratiti',
+  'gestion.bajas.ayuda':
+    'Zatvoreni račun čuva podatke {days} dana. Vraćanjem se vraća suspendiran: ponovno ga aktivirajte u imeniku kako biste vratili pristup.',
+  'gestion.bajas.cerrada': 'zatvoren {when}',
+  'gestion.bajas.motivo': 'razlog: {reason}',
+  'gestion.bajas.quedan': 'Preostalo dana: {count}',
+  'gestion.bajas.restaurar': 'Vrati',
+  'gestion.bajas.confirmarTitulo': 'Vratiti {name}?',
+  'gestion.bajas.confirmar':
+    'Račun se vraća suspendiran, s podacima. Nitko se ne može njime prijaviti dok ga ponovno ne aktivirate.',
+  'gestion.bajas.restaurada': '{name} vraćen',
+  'gestion.bajas.reactivar': 'Suspendiran je: aktivirajte ga u imeniku kako biste vratili pristup.',
+  'gestion.bajas.fallo': 'Račun nije moguće vratiti',
+  'gestion.directorio.exportar': 'Izvezi CSV',
+  'gestion.dispositivos.buscar': 'Traži osobu, uređaj ili IP',
+  'gestion.dispositivos.confianza': 'Filtriraj po povjerenju',
+  'gestion.dispositivos.todos': 'Svi uređaji',
+  'gestion.dispositivos.recuento': 'Prikazano {count} od {total}',
+  'gestion.dispositivos.sinResultados': 'Nijedan uređaj ne odgovara.',
+  'gestion.auditoria.rango': 'Brzi raspon',
+  'gestion.auditoria.hoy': 'Danas',
+  'gestion.auditoria.7d': '7 dana',
+  'gestion.auditoria.30d': '30 dana',
+  'gestion.roles.duplicar': 'Dupliciraj',
+  'gestion.roles.copia': '{name} (kopija)',
+  'gestion.lotes.titulo': 'Nedavne skupne radnje',
+  'gestion.lotes.ayuda':
+    'Što je primijenjeno na više osoba odjednom i na koga se nije moglo primijeniti.',
+  'gestion.lotes.ver': 'Prikaži',
+  'gestion.lotes.error': 'Skupne radnje nije moguće učitati.',
+  'gestion.lotes.vacio': 'Još nema skupnih radnji.',
+  'gestion.lotes.progreso': '{done} od {total}',
+  'gestion.lotes.accion.setRole': 'Promijeni ulogu',
+  'gestion.lotes.estado.ejecutando': 'U tijeku',
+  'gestion.lotes.estado.terminado': 'Završeno',
+  'gestion.lotes.estado.cancelado': 'Otkazano',
+  'gestion.lotes.estado.interrumpido': 'Prekinuto',
+  'gestion.lotes.detalle': 'Pojedinosti',
+  'gestion.lotes.todosBien': 'Primijenjeno na sve.',
+  'gestion.lote.fallos': 'Nije primijenjeno na',
+  'gestion.lote.cerrar': 'Zatvori',
+  'gestion.lote.codigo.not_found': 'nije u ovoj organizaciji',
+  'gestion.lote.codigo.self': 'to ste vi',
+  'gestion.lote.codigo.forbidden': 'vlasnički račun moguće je mijenjati samo s vlasničkim pravima',
+  'gestion.lote.codigo.deleted': 'račun je zatvoren',
+  'gestion.lote.codigo.last_owner': 'posljednji vlasnik organizacije',
+  'gestion.lote.codigo.last_admin': 'posljednji administrator organizacije',
+  'gestion.lote.codigo.error': 'neočekivana pogreška; pokušajte ponovno',
+  'gestion.lote.seleccionarVisibles': 'Odaberi sve vidljive ({count})',
+  'gestion.lote.recortado':
+    'Skupna radnja obuhvaća najviše {max} osoba: odabrano je prvih {max} vidljivih.',
+};

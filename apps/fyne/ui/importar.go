@@ -4,7 +4,10 @@
 package ui
 
 import (
+	"cmp"
 	"context"
+	"errors"
+	"slices"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -24,7 +27,12 @@ import (
 // migre los archivos: necesita el botón donde está mirando.
 //
 // Una sola pieza para las apps que traen contenido personal (Drive, Contacts, Mail,
-// Calendar): lo que cambia es QUÉ trae, y eso es `dominios`. No aparece si la
+// Calendar): lo que cambia es QUÉ trae, y eso es `dominios`. Un botón por CUENTA, no por
+// conexión —la misma cuenta conectada varias veces salía como varios «Traerlo de Google»
+// idénticos—, con la cuenta en el rótulo cuando hay más de una del mismo proveedor, una
+// línea por contenido con lo traído y cuándo terminó, y el motivo de un fallo con su
+// «Reintentar». Las decisiones sin pintar llevan los nombres de la web
+// (`packages/shell/src/importacion.ts`). No aparece si la
 // organización no ha conectado ningún origen —un botón que siempre falla es peor que
 // ninguno— ni mientras se averigua, porque un bloque que aparece y desaparece al cargar
 // da la sensación de que algo se rompió.
@@ -48,11 +56,13 @@ type ImportarDatos struct {
 	// los botones se comen media barra lateral. Se recuerda (`PreferenciaPlegado`).
 	plegado bool
 
-	origenes    []api.OrigenImportacion
-	trabajos    []api.TrabajoImportacion
-	cargada     bool
-	enviando    bool
-	fallo       bool
+	origenes []api.OrigenImportacion
+	trabajos []api.TrabajoImportacion
+	cargada  bool
+	enviando bool
+	// fallo es el último lanzamiento rechazado, con el código de la pasarela; nil si no
+	// hubo. Una conexión caducada no se arregla «intentándolo dentro de un momento».
+	fallo       *falloAlLanzar
 	ctx         context.Context
 	cancelar    context.CancelFunc
 	ciclo       uint64
@@ -105,6 +115,9 @@ func (d *ImportarDatos) cambiar() {
 	}
 }
 
+// falloAlLanzar es un lanzamiento que la pasarela rechazó.
+type falloAlLanzar struct{ code, source string }
+
 // enCurso dice si algo sigue trabajando.
 func enCurso(ts []api.TrabajoImportacion) bool {
 	for _, t := range ts {
@@ -145,7 +158,7 @@ func (d *ImportarDatos) Parar() {
 	}
 	d.pararReloj()
 	d.origenes, d.trabajos = nil, nil
-	d.cargada, d.enviando, d.fallo, d.cargando = false, false, false, false
+	d.cargada, d.enviando, d.fallo, d.cargando = false, false, nil, false
 	d.cambiar()
 }
 
@@ -220,15 +233,29 @@ func (d *ImportarDatos) pararReloj() {
 	}
 }
 
+// lanzamiento es lo que se pide a la pasarela de una vez: un origen y sus contenidos.
+type lanzamiento struct {
+	origen   api.OrigenImportacion
+	dominios []string
+}
+
 // traer lanza la importación desde un origen.
+func (d *ImportarDatos) traer(o api.OrigenImportacion) {
+	d.lanzarImportaciones([]lanzamiento{{origen: o, dominios: d.dominios}})
+}
+
+// lanzarImportaciones pide a la pasarela cada lanzamiento, uno tras otro, en una sola
+// vuelta. La pasarela es idempotente: si esa cuenta y contenido ya tenían un trabajo,
+// devuelve ese —en marcha, o reanudado donde se quedó— y aquí SUSTITUYE al que había en
+// vez de sumarse a él.
 //
 //nolint:contextcheck // el importador usa la vida que guardó al cargarse; lo lanza un clic, no el flujo que lo pinta.
-func (d *ImportarDatos) traer(o api.OrigenImportacion) {
+func (d *ImportarDatos) lanzarImportaciones(ls []lanzamiento) {
 	parent, ciclo := d.ctx, d.ciclo
-	if d.enviando || d.svc == nil || parent == nil || !d.vigente(parent, ciclo) {
+	if len(ls) == 0 || d.enviando || d.svc == nil || parent == nil || !d.vigente(parent, ciclo) {
 		return
 	}
-	d.enviando, d.fallo = true, false
+	d.enviando, d.fallo = true, nil
 	d.cambiar()
 	d.lanzar(func() {
 		if parent.Err() != nil {
@@ -236,16 +263,28 @@ func (d *ImportarDatos) traer(o api.OrigenImportacion) {
 		}
 		ctx, cancelar := context.WithTimeout(parent, 30*time.Second)
 		defer cancelar()
-		nuevos, err := d.svc.Importar(ctx, o, d.dominios)
+		var nuevos []api.TrabajoImportacion
+		var fallo *falloAlLanzar
+		for _, l := range ls {
+			ts, err := d.svc.Importar(ctx, l.origen, l.dominios)
+			if err != nil {
+				code := ""
+				var apiErr *api.Error
+				if errors.As(err, &apiErr) {
+					code = apiErr.Code()
+				}
+				fallo = &falloAlLanzar{code: code, source: l.origen.Source}
+				break
+			}
+			nuevos = append(nuevos, ts...)
+		}
 		fyne.Do(func() {
 			if !d.vigente(parent, ciclo) {
 				return
 			}
-			d.enviando = false
-			if err != nil {
-				d.fallo = true
-			} else {
-				d.trabajos = append(nuevos, d.trabajos...)
+			d.enviando, d.fallo = false, fallo
+			if len(nuevos) > 0 {
+				d.trabajos = api.UltimasImportaciones(append(nuevos, sinLosDe(d.trabajos, nuevos)...))
 				// La web no vuelve a preguntar tras lanzarla y se queda en «trayendo»
 				// hasta que se recarga la página; aquí se sigue el progreso.
 				d.seguir(parent, ciclo)
@@ -253,6 +292,44 @@ func (d *ImportarDatos) traer(o api.OrigenImportacion) {
 			d.cambiar()
 		})
 	})
+}
+
+// sinLosDe quita de `ts` los trabajos que vuelven en `nuevos`: un relanzamiento devuelve
+// el MISMO trabajo, y no debe contarse dos veces.
+func sinLosDe(ts, nuevos []api.TrabajoImportacion) []api.TrabajoImportacion {
+	var out []api.TrabajoImportacion
+	for _, t := range ts {
+		if !slices.ContainsFunc(nuevos, func(n api.TrabajoImportacion) bool { return n.ID == t.ID }) {
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
+// reintentar vuelve a lanzar lo que falló, con sus contenidos: cada trabajo sigue donde
+// se quedó y vuelve a intentar SOLO lo que no entró. Un lanzamiento por cuenta.
+func (d *ImportarDatos) reintentar(fallidos []api.TrabajoImportacion) {
+	var ls []lanzamiento
+	for _, j := range fallidos {
+		o := api.OrigenImportacion{InstanceID: j.InstanceID, InstanceIDs: []string{j.InstanceID}, Source: j.Source}
+		for _, x := range d.origenes {
+			if esDeOrigen(j, x) {
+				o = x
+				break
+			}
+		}
+		i := slices.IndexFunc(ls, func(l lanzamiento) bool {
+			return l.origen.Source == o.Source && l.origen.InstanceID == o.InstanceID
+		})
+		if i < 0 {
+			ls = append(ls, lanzamiento{origen: o})
+			i = len(ls) - 1
+		}
+		if !slices.Contains(ls[i].dominios, j.Domain) {
+			ls[i].dominios = append(ls[i].dominios, j.Domain)
+		}
+	}
+	d.lanzarImportaciones(ls)
 }
 
 // Objeto es la sección a `ancho`, o nil si no hay nada que ofrecer.
@@ -287,17 +364,17 @@ func (d *ImportarDatos) Objeto(ancho float32, v tema.Variante) fyne.CanvasObject
 		x := NuevoParrafo(texto, e, p, tinta, v)
 		poner(x, AltoParrafo(x, col), antes)
 	}
-	trabajando, hechos, fallidos := repartirTrabajos(d.trabajos)
+	r := repartirImportaciones(d.origenes, d.trabajos, d.dominios)
 
-	fila, altoFila := d.filaTitulo(col, len(trabajando) > 0, v)
+	fila, altoFila := d.filaTitulo(col, len(r.trabajando) > 0, v)
 	poner(fila, altoFila, 0)
 
 	if d.plegado {
 		return d.caja(ancho, y+relleno, objs, v)
 	}
-	if len(trabajando) > 0 {
+	if len(r.trabajando) > 0 {
 		rueda := NuevaRueda(16, "text", v)
-		x := NuevoParrafo(t("import.running", i18n.Vars{"count": contarTraidos(trabajando)}), tema.TextoXS, Normal, "text-muted", v)
+		x := NuevoParrafo(t("import.running", i18n.Vars{"count": contarTraidos(r.trabajando)}), tema.TextoXS, Normal, "text-muted", v)
 		hueco := tema.Espacio(2)
 		alto := max(16, AltoParrafo(x, col-16-hueco))
 		fila := container.NewWithoutLayout(rueda, x)
@@ -314,37 +391,81 @@ func (d *ImportarDatos) Objeto(ancho float32, v tema.Variante) fyne.CanvasObject
 		}
 		flujo := FlujoDatos(d.tr, "", entra, nil, true, d.AlPolitica, col)
 		poner(flujo, flujo.MinSize().Height, tema.Espacio(2))
-		var piezas []PiezaFlujo
-		for _, o := range d.origenes {
-			clave := "import.fromMicrosoft"
-			if o.Source == "google" {
-				clave = "import.fromGoogle"
-			}
-			origen := o
-			b := NuevoBoton(t(clave), func() { d.traer(origen) }).Con(Secundario, TallaSM)
-			b.Inerte = d.enviando
-			m := b.MinSize()
-			piezas = append(piezas, PiezaFlujo{O: b, Ancho: m.Width, Alto: m.Height, Sep: tema.Espacio(2)})
-		}
-		if len(piezas) > 0 {
-			botones, alto := Fluir(piezas, col, piezas[0].Alto, tema.Espacio(2))
-			poner(botones, alto, tema.Espacio(2))
-		}
 	}
-	if len(hechos) > 0 {
-		omitidos := 0
-		for _, j := range hechos {
-			omitidos += j.Counts.Skipped
+	piezas, apagados := d.botonesDeOrigenes(r.libres)
+	if len(piezas) > 0 {
+		botones, alto := Fluir(piezas, col, piezas[0].Alto, tema.Espacio(2))
+		poner(botones, alto, tema.Espacio(2))
+	}
+	for _, m := range apagados {
+		parrafo(m, tema.TextoXS, Normal, "text-muted", tema.Espacio(2))
+	}
+	// Una línea por contenido (y cuenta) con lo acumulado y cuándo terminó: «traído» a
+	// secas no dice si llegó todo, y lo que se quedó fuera es la mitad honesta.
+	for _, j := range r.hechos {
+		parrafo(d.lineaHecha(j, r.variasCuentas), tema.TextoXS, Normal, "text-subtle", tema.Espacio(2))
+	}
+	if len(r.fallidos) > 0 {
+		for _, m := range d.motivosDeFallo(r.fallidos, apagados) {
+			parrafo(m, tema.TextoXS, Normal, "danger-text", tema.Espacio(2))
 		}
-		parrafo(t("import.done", i18n.Vars{"count": contarTraidos(hechos), "skipped": omitidos}), tema.TextoXS, Normal, "text-subtle", tema.Espacio(2))
+		fallidos := r.fallidos
+		b := NuevoBoton(t("action.retry"), func() { d.reintentar(fallidos) }).Con(Fantasma, TallaXS)
+		b.Inerte = d.enviando || len(r.trabajando) > 0
+		poner(b, b.MinSize().Height, tema.Espacio(2))
 	}
-	if fallidos {
-		parrafo(t("import.someFailed"), tema.TextoXS, Normal, "danger-text", tema.Espacio(2))
-	}
-	if d.fallo {
-		parrafo(t("import.failed"), tema.TextoXS, Normal, "danger-text", tema.Espacio(2))
+	if d.fallo != nil {
+		texto := t("import.failed")
+		if claveDeFallo(d.fallo.code) == "import.unavailable" {
+			texto = t("import.unavailable", i18n.Vars{"source": marcas[d.fallo.source]})
+		}
+		parrafo(texto, tema.TextoXS, Normal, "danger-text", tema.Espacio(2))
 	}
 	return d.caja(ancho, y+relleno, objs, v)
+}
+
+// botonesDeOrigenes es un botón por origen libre y, de los que no pueden leer, el aviso
+// con el motivo. Las cuentas con una importación en marcha ya vienen fuera (`libres`):
+// la pasarela devolvería la misma, y un botón que no hace nada confunde.
+func (d *ImportarDatos) botonesDeOrigenes(libres []api.OrigenImportacion) (piezas []PiezaFlujo, apagados []string) {
+	repetidos := proveedoresRepetidos(d.origenes)
+	for _, o := range libres {
+		origen := o
+		b := NuevoBoton(rotuloOrigen(d.tr, o, repetidos), func() { d.traer(origen) }).Con(Secundario, TallaSM)
+		b.Inerte = d.enviando || !o.Disponible()
+		m := b.MinSize()
+		piezas = append(piezas, PiezaFlujo{O: b, Ancho: m.Width, Alto: m.Height, Sep: tema.Espacio(2)})
+		if !o.Disponible() {
+			apagados = append(apagados, d.tr.T("import.unavailable", i18n.Vars{"source": marcaDeOrigen(o, repetidos)}))
+		}
+	}
+	return piezas, apagados
+}
+
+// lineaHecha es la línea del resumen de una importación terminada: qué trajo, cuánto
+// —acumulado de todas sus pasadas, también lo que se quedó fuera— y cuándo terminó.
+func (d *ImportarDatos) lineaHecha(j api.TrabajoImportacion, variasCuentas bool) string {
+	cuando := j.CreatedAt
+	if j.FinishedAt != nil {
+		cuando = *j.FinishedAt
+	}
+	return d.tr.T("import.done", i18n.Vars{
+		"what": d.queTrajo(j, variasCuentas), "count": j.Counts.Migrated, "skipped": j.Counts.Skipped,
+		"date": i18n.FormatDate(d.tr.Locale(), cuando.Local()),
+	})
+}
+
+// motivosDeFallo es un aviso por motivo distinto: el correo y los contactos de la misma
+// cuenta caducada son UN problema, y si ya lo dice el origen apagado, sobra.
+func (d *ImportarDatos) motivosDeFallo(fallidos []api.TrabajoImportacion, apagados []string) []string {
+	var motivos []string
+	for _, j := range fallidos {
+		m := d.tr.T(claveDeFallo(j.ErrorCode), i18n.Vars{"source": marcas[j.Source]})
+		if !slices.Contains(motivos, m) && !slices.Contains(apagados, m) {
+			motivos = append(motivos, m)
+		}
+	}
+	return motivos
 }
 
 // filaTitulo es la línea de título: el rótulo y, a la derecha, el galón que pliega
@@ -383,19 +504,122 @@ func (d *ImportarDatos) filaTitulo(col float32, trabajando bool, v tema.Variante
 	return container.NewWithoutLayout(objsFila...), alto
 }
 
-// repartirTrabajos separa los trabajos en curso, los terminados y si alguno falló.
-func repartirTrabajos(ts []api.TrabajoImportacion) (trabajando, hechos []api.TrabajoImportacion, fallidos bool) {
+// marcas son los nombres de los proveedores. Marcas comerciales: no se traducen.
+var marcas = map[string]string{"google": "Google", "m365": "Microsoft 365"}
+
+// esDeOrigen dice si un trabajo es de un origen: por la cuenta si se sabe de las dos
+// partes; si no, por la conexión, mirando TODAS las de la cuenta.
+func esDeOrigen(j api.TrabajoImportacion, o api.OrigenImportacion) bool {
+	if j.Source != o.Source {
+		return false
+	}
+	if j.AccountKey != "" && o.AccountKey != "" {
+		return j.AccountKey == o.AccountKey
+	}
+	return slices.Contains(o.InstanceIDs, j.InstanceID)
+}
+
+// proveedoresRepetidos son los proveedores con más de un origen: solo ahí el botón lleva
+// la cuenta («Traerlo de Google · acme.com»).
+func proveedoresRepetidos(os []api.OrigenImportacion) map[string]bool {
+	vistos, repetidos := map[string]bool{}, map[string]bool{}
+	for _, o := range os {
+		if vistos[o.Source] {
+			repetidos[o.Source] = true
+		}
+		vistos[o.Source] = true
+	}
+	return repetidos
+}
+
+// cuentaDeOrigen es cómo se nombra la cuenta: su dominio o, sin él, el nombre de la conexión.
+func cuentaDeOrigen(o api.OrigenImportacion) string {
+	if o.AccountLabel != "" {
+		return o.AccountLabel
+	}
+	return o.Name
+}
+
+// rotuloOrigen es el texto del botón: «Traerlo de Google», con la cuenta detrás si hay
+// más de una del mismo proveedor.
+func rotuloOrigen(tr *i18n.Translator, o api.OrigenImportacion, repetidos map[string]bool) string {
+	clave := "import.fromMicrosoft"
+	if o.Source == "google" {
+		clave = "import.fromGoogle"
+	}
+	if repetidos[o.Source] {
+		return tr.T(clave, nil) + " · " + cuentaDeOrigen(o)
+	}
+	return tr.T(clave, nil)
+}
+
+// marcaDeOrigen es el proveedor tal y como se nombra en un aviso, con la cuenta si hace falta.
+func marcaDeOrigen(o api.OrigenImportacion, repetidos map[string]bool) string {
+	if repetidos[o.Source] {
+		return marcas[o.Source] + " · " + cuentaDeOrigen(o)
+	}
+	return marcas[o.Source]
+}
+
+// queTrajo es el contenido de una línea del resumen: «Correo», y la cuenta detrás si el
+// resumen mezcla cuentas.
+func (d *ImportarDatos) queTrajo(j api.TrabajoImportacion, variasCuentas bool) string {
+	tipo := d.tr.T("dataflow.item."+categoriaImportacion[j.Domain], nil)
+	if variasCuentas && j.AccountLabel != "" {
+		return tipo + " · " + j.AccountLabel
+	}
+	return tipo
+}
+
+// repartoImportaciones es lo que hay que pintar, ya decidido.
+type repartoImportaciones struct {
+	trabajando, hechos, fallidos []api.TrabajoImportacion
+	// libres son los orígenes que se pueden ofrecer: los que no tienen ya una
+	// importación en marcha de este contenido.
+	libres        []api.OrigenImportacion
+	variasCuentas bool
+}
+
+// repartirImportaciones es el `repartir` de la web: separa los trabajos de este
+// contenido en curso, terminados y fallidos, y deja fuera de los botones las cuentas que
+// ya están trayendo. Los trabajos llegan reducidos al vigente de cada cuenta y contenido
+// (`api.UltimasImportaciones`): no se suma nada dos veces.
+func repartirImportaciones(os []api.OrigenImportacion, ts []api.TrabajoImportacion, dominios []string) repartoImportaciones {
+	var r repartoImportaciones
+	cuentas := map[string]bool{}
 	for _, j := range ts {
+		if !slices.Contains(dominios, j.Domain) {
+			continue
+		}
+		cuentas[cmp.Or(j.AccountKey, "instance:"+j.InstanceID)] = true
 		switch {
 		case j.EnCurso():
-			trabajando = append(trabajando, j)
+			r.trabajando = append(r.trabajando, j)
 		case j.Status == "done":
-			hechos = append(hechos, j)
+			r.hechos = append(r.hechos, j)
 		case j.Status == "error":
-			fallidos = true
+			r.fallidos = append(r.fallidos, j)
 		}
 	}
-	return trabajando, hechos, fallidos
+	for _, o := range os {
+		if !slices.ContainsFunc(r.trabajando, func(j api.TrabajoImportacion) bool { return esDeOrigen(j, o) }) {
+			r.libres = append(r.libres, o)
+		}
+	}
+	r.variasCuentas = len(cuentas) > 1
+	return r
+}
+
+// claveDeFallo es qué decir de un fallo: el motivo con arreglo, si lo tiene.
+func claveDeFallo(code string) string {
+	switch code {
+	case "connection_expired", "import_connection_unavailable":
+		return "import.unavailable"
+	case "needs_admin":
+		return "import.needsAdmin"
+	default:
+		return "import.someFailed"
+	}
 }
 
 // caja envuelve lo pintado en el `border-border bg-surface rounded-md`.

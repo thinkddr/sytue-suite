@@ -12,6 +12,8 @@
 import { preguntarEnEditor } from '@sytue/ui';
 import { editorT } from '../../i18n';
 import { comandoDelAtajo, type IdComando, type Pulsacion } from '../comandos';
+import { siguienteModoMayusculas } from '../mayusculas';
+import { textoDeLaSeleccion } from '../recuento';
 import type { EditorCommand } from '../types';
 
 /**
@@ -40,6 +42,15 @@ export function atenderAtajoDeTexto(
   destino: DestinoDeAtajo,
   admite?: ReadonlySet<IdComando>,
 ): boolean {
+  // Mayús+F3 alterna las mayúsculas de lo elegido (minúsculas, MAYÚSCULAS, Cada Palabra),
+  // como en Word. No es del registro: no lleva Ctrl. En la celda de Calcus no (`admite`).
+  if (!admite && e.key === 'F3' && e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    const texto = textoDeLaSeleccion();
+    if (texto === null) return false;
+    e.preventDefault();
+    destino.exec('changeCase', siguienteModoMayusculas(texto));
+    return true;
+  }
   const atajo = comandoDelAtajo(e, 'document');
   if (!atajo || (admite && !admite.has(atajo.id))) return false;
   e.preventDefault();

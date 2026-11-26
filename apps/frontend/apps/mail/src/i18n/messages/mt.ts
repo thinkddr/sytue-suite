@@ -1027,4 +1027,14 @@ export const mt: AppCatalog<typeof en> = {
     "Is-sistema tal-posta ta' qabel m'għadhiex disponibbli. Sakemm tittrasferixxi l-posta tiegħek fil-kaxxaforti ma tirċievix posta ġdida: dak li jintbagħtlek sadanittant jistenna fuq is-server ta' min bagħtu, li jerġa' jipprova għal ftit jiem. Jekk tittrasferixxi fil-ħin, jaslek wara; jekk le, min bagħtu jiġi infurmat li ma setax jitwassal. Dak li diġà huwa kriptat bis-sistema ta' qabel, bħall-posta li diġà kellek, ma jistax jinqara: ma jitħassarx, iżda ħadd ma jkun jista' jiftħu. Wara t-trasferiment, il-posta terġa' tasal għandek u tinfetaħ bil-login ta' Sytue ID tiegħek, bħall-bqija tal-apps.",
   'privateMail.vaultMoveCheckFailed':
     "Ma setax jiġi ċċekkjat l-istat tal-posta tiegħek. Erġa' pprova fi ftit mumenti.",
+  'shortcuts.goInbox': 'Mur fl-Inbox',
+  'shortcuts.goSent': 'Mur fil-Mibgħuta',
+  'shortcuts.goDrafts': 'Mur fl-Abbozzi',
+  'shortcuts.goArchive': 'Mur fl-Arkivju',
+  'compose.sendAndArchive': 'Ibgħat u arkivja',
+  'reader.copyAddress': 'Ikkopja l-indirizz',
+  'reader.addressCopied': 'L-indirizz ġie kkupjat',
+  'reader.copyAddressFailed': 'L-indirizz ma setax jiġi kkupjat',
+  'reader.viewPlain': 'Uri bħala test sempliċi',
+  'reader.viewFormatted': 'Uri bil-formattjar',
 };

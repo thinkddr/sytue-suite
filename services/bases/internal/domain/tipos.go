@@ -123,7 +123,10 @@ type Campo struct {
 	Result  Tipo   `json:"result,omitempty"`
 	// Currency solo en los campos de moneda: su código ISO 4217 (EUR, USD…).
 	Currency string `json:"currency,omitempty"`
-	Position int    `json:"position"`
+	// Default es el valor con el que nace un registro que no trae este campo
+	// (defectos.go): una opción, una casilla marcada, un importe, o "today" en una fecha.
+	Default  json.RawMessage `json:"default,omitempty"`
+	Position int             `json:"position"`
 }
 
 // Registro de una tabla. Data lleva los campos que no son enlaces; Links, los

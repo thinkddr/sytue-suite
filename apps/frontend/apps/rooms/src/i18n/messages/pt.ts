@@ -1051,4 +1051,11 @@ export const pt: AppCatalog<typeof en> = {
   'nativeResource.description':
     'Liga esta app à tua conta em {tenant}. As tuas permissões de acesso atuais mantêm-se.',
   'nativeResource.approve': 'Ligar',
+  'channel.markRead': 'Marcar como lido',
+  'channel.copyLink': 'Copiar ligação',
+  'channel.linkCopied': 'Ligação copiada',
+  'channel.download': 'Transferir a conversa',
+  'channel.downloaded': 'Conversa guardada em',
+  'channel.downloadFailed': 'Não foi possível guardar a conversa',
+  'status.nothingUnread': 'Já estava tudo lido',
 };

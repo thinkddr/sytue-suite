@@ -83,6 +83,8 @@ export interface BorradorVista {
   agrupar: string;
   /** Formulario: ids de los campos incluidos, en orden. */
   campos: string[];
+  /** Formulario: los incluidos que hay que rellenar para enviarlo. */
+  obligatorios?: string[];
   filtroCampo: string;
   filtroOp: string;
   filtroValor: string;
@@ -112,6 +114,7 @@ export function borradorDeVista(v: BasesView, campos: readonly BasesField[]): Bo
       v.kind === 'form' && (v.config.fields ?? []).length === 0
         ? camposDeFormulario(campos).map((c) => c.id)
         : [...(v.config.fields ?? [])],
+    obligatorios: [...(v.config.required ?? [])],
     filtroCampo: filtro?.field ?? '',
     filtroOp: filtro?.op ?? 'eq',
     filtroValor:
@@ -127,7 +130,31 @@ export function borradorDeVista(v: BasesView, campos: readonly BasesField[]): Bo
 
 /** Operadores por tipo de campo, espejo de `domain.operadores` del servicio. */
 export type Operador =
-  'eq' | 'neq' | 'contains' | 'gt' | 'gte' | 'lt' | 'lte' | 'empty' | 'notempty';
+  | 'eq'
+  | 'neq'
+  | 'contains'
+  | 'gt'
+  | 'gte'
+  | 'lt'
+  | 'lte'
+  | 'empty'
+  | 'notempty'
+  | 'today'
+  | 'this_month'
+  | 'past_days'
+  | 'next_days';
+
+/**
+ * Los operadores que no llevan valor: vacío o no, y los relativos a un día que pone la
+ * lectura («hoy», «este mes»).
+ */
+export const OPS_SIN_VALOR: readonly string[] = ['empty', 'notempty', 'today', 'this_month'];
+
+/** Los relativos que llevan un número de días (hoy incluido), de 1 a `MAX_DIAS`. */
+export const OPS_CON_DIAS: readonly string[] = ['past_days', 'next_days'];
+
+/** El tope de días de un filtro relativo, `domain.MaxDiasRelativos` del servicio. */
+export const MAX_DIAS = 3650;
 
 export const OPERADORES: Record<
   Exclude<
@@ -138,7 +165,20 @@ export const OPERADORES: Record<
 > = {
   text: ['contains', 'eq', 'neq', 'empty', 'notempty'],
   number: ['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'empty', 'notempty'],
-  date: ['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'empty', 'notempty'],
+  date: [
+    'eq',
+    'neq',
+    'gt',
+    'gte',
+    'lt',
+    'lte',
+    'empty',
+    'notempty',
+    'today',
+    'past_days',
+    'next_days',
+    'this_month',
+  ],
   checkbox: ['eq'],
   select: ['eq', 'neq', 'empty', 'notempty'],
   multiselect: ['contains', 'empty', 'notempty'],
@@ -164,15 +204,23 @@ export function configDeBorrador(
   if (b.tipo === 'form') {
     if (b.campos.length === 0) return null;
     cfg.fields = b.campos;
+    // Obligatorio solo lo que el formulario enseña, en su orden: el servicio rechaza
+    // la vista entera por un obligatorio que no sale.
+    const obligatorios = b.campos.filter((id) => (b.obligatorios ?? []).includes(id));
+    if (obligatorios.length > 0) cfg.required = obligatorios;
     return cfg;
   }
   const elegido = campos.find((c) => c.id === b.filtroCampo);
   const f = elegido && efectivo(elegido);
   if (f) {
     if (!(operadoresDe(f) as readonly string[]).includes(b.filtroOp)) return null;
-    const sinValor = b.filtroOp === 'empty' || b.filtroOp === 'notempty';
+    const sinValor = OPS_SIN_VALOR.includes(b.filtroOp);
     let valor: string | number | boolean | undefined;
-    if (!sinValor) {
+    if (OPS_CON_DIAS.includes(b.filtroOp)) {
+      const n = Number(b.filtroValor.trim());
+      if (b.filtroValor.trim() === '' || !Number.isInteger(n) || n < 1 || n > MAX_DIAS) return null;
+      valor = n;
+    } else if (!sinValor) {
       if (f.kind === 'number') {
         const n = Number(b.filtroValor.replace(',', '.'));
         if (b.filtroValor.trim() === '' || !Number.isFinite(n)) return null;

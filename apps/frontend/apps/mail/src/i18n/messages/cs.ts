@@ -1019,4 +1019,14 @@ export const cs: AppCatalog<typeof en> = {
     'Předchozí poštovní systém už není k dispozici. Dokud poštu nepřesunete do trezoru, nebude vám chodit nová pošta: zprávy, které vám mezitím někdo pošle, počkají na serveru, ze kterého byly odeslány, a ten bude doručení několik dní opakovat. Pokud poštu přesunete včas, dorazí vám potom; pokud ne, vrátí se jako nedoručitelné. Co už je zašifrované předchozím systémem, například pošta, kterou už máte, nepůjde přečíst: nesmaže se, ale nikdo to nebude moci otevřít. Po přesunu vám pošta zase začne chodit a bude se otevírat přihlášením do Sytue ID jako ostatní aplikace.',
   'privateMail.vaultMoveCheckFailed':
     'Stav vaší pošty se nepodařilo ověřit. Zkuste to za chvíli znovu.',
+  'shortcuts.goInbox': 'Přejít do Doručené pošty',
+  'shortcuts.goSent': 'Přejít do Odeslané pošty',
+  'shortcuts.goDrafts': 'Přejít do Konceptů',
+  'shortcuts.goArchive': 'Přejít do Archivu',
+  'compose.sendAndArchive': 'Odeslat a archivovat',
+  'reader.copyAddress': 'Kopírovat adresu',
+  'reader.addressCopied': 'Adresa zkopírována',
+  'reader.copyAddressFailed': 'Adresu se nepodařilo zkopírovat',
+  'reader.viewPlain': 'Zobrazit jako prostý text',
+  'reader.viewFormatted': 'Zobrazit s formátováním',
 };

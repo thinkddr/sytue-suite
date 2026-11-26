@@ -27,6 +27,8 @@ import {
   nombreCorto,
   Glifo,
   Icon,
+  Tooltip,
+  TopBarButton,
   useFitInViewport,
 } from '@sytue/ui';
 import { permsFromAccessToken } from '@sytue/auth/client';
@@ -50,6 +52,10 @@ export function AppSwitcher({ compacto = false }: { compacto?: boolean } = {}): 
   // pantalla decía en qué aplicación estabas. Sin «Sytue» delante, que ya lo
   // dice la marca de al lado.
   const producto = nombreCorto(currentApp);
+  // El nombre accesible CONTIENE el texto visible (WCAG 2.5.3): «Mail · Aplicaciones».
+  const nombreSelector = producto
+    ? `${producto} · ${t('shell.appSwitcher')}`
+    : t('shell.appSwitcher');
   const [open, setOpen] = useState(false);
   const [falloLogo, setFalloLogo] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
@@ -143,10 +149,10 @@ export function AppSwitcher({ compacto = false }: { compacto?: boolean } = {}): 
   return (
     <div ref={boxRef} class="relative inline-flex">
       {compacto ? (
-        <button
-          type="button"
-          aria-label={t('shell.appSwitcher')}
-          title={t('shell.appSwitcher')}
+        // `TopBarButton` y no una copia de sus clases con `title`: el `title` no sale con
+        // el teclado ni con el dedo, y era el único botón de la barra que lo usaba.
+        <TopBarButton
+          label={t('shell.appSwitcher')}
           aria-expanded={open}
           aria-haspopup="menu"
           onClick={() => {
@@ -154,37 +160,38 @@ export function AppSwitcher({ compacto = false }: { compacto?: boolean } = {}): 
             cargarDesplegadas();
             setOpen((v) => !v);
           }}
-          class={`text-topbar-fg rounded-control hover:bg-chrome-hover active:bg-chrome-active sytue-focus-ring-chrome inline-flex h-9 w-9 items-center justify-center transition-colors duration-150 focus-visible:outline-none pointer-coarse:min-h-[max(44px,2.75rem)] pointer-coarse:min-w-[max(44px,2.75rem)] ${
-            open ? 'bg-chrome-hover' : ''
-          }`}
+          class={open ? 'bg-chrome-hover' : undefined}
         >
           <Icon name="grid" size={20} />
-        </button>
+        </TopBarButton>
       ) : (
-        <button
-          type="button"
-          // El nombre accesible CONTIENE el texto visible (WCAG 2.5.3): «Mail · Aplicaciones».
-          aria-label={producto ? `${producto} · ${t('shell.appSwitcher')}` : t('shell.appSwitcher')}
-          aria-expanded={open}
-          aria-haspopup="menu"
-          onClick={() => {
-            load();
-            cargarDesplegadas();
-            setOpen((v) => !v);
-          }}
-          // ALTURA FIJA `h-9`, la misma que el buscador, las notificaciones y la
-          // cuenta. Sin ella la caja la marcaba el texto del producto y salía a 35px
-          // mientras sus vecinos median 31,5: cuatro controles en una fila y el de
-          // la izquierda más alto que los otros tres. El relleno lateral se queda
-          // —es lo que separa el logo del velo del hover— y ahora cuadra con el aire
-          // que deja el avatar del otro extremo. `-ml-1` se come ese `pl-1`: la marca
-          // VISIBLE queda a un canalón del cristal, como el avatar (medido en drive, one
-          // y mail: 24,5 a la izquierda contra 21 a la derecha); el velo se sale.
-          class={`hover:bg-chrome-hover active:bg-chrome-active sytue-focus-ring-chrome rounded-control -ml-1 inline-flex h-9 items-center gap-1.5 pr-1.5 pl-1 transition-colors duration-150 focus-visible:outline-none pointer-coarse:min-h-[max(44px,2.75rem)] ${
-            open ? 'bg-chrome-hover' : ''
-          }`}
-        >
-          {/* El logo de la organización si lo ha subido, y si no la marca de la casa
+        // La marca es un botón que no lo parece del todo (solo el galón lo delata): su
+        // pista, como la de los demás controles de la barra, dice qué abre. Repite el
+        // nombre accesible, así que no se enlaza como descripción (ver Tooltip.tsx).
+        <Tooltip label={nombreSelector} placement="bottom">
+          <button
+            type="button"
+            aria-label={nombreSelector}
+            aria-expanded={open}
+            aria-haspopup="menu"
+            onClick={() => {
+              load();
+              cargarDesplegadas();
+              setOpen((v) => !v);
+            }}
+            // ALTURA FIJA `h-9`, la misma que el buscador, las notificaciones y la
+            // cuenta. Sin ella la caja la marcaba el texto del producto y salía a 35px
+            // mientras sus vecinos median 31,5: cuatro controles en una fila y el de
+            // la izquierda más alto que los otros tres. El relleno lateral se queda
+            // —es lo que separa el logo del velo del hover— y ahora cuadra con el aire
+            // que deja el avatar del otro extremo. `-ml-1` se come ese `pl-1`: la marca
+            // VISIBLE queda a un canalón del cristal, como el avatar (medido en drive, one
+            // y mail: 24,5 a la izquierda contra 21 a la derecha); el velo se sale.
+            class={`hover:bg-chrome-hover active:bg-chrome-active sytue-focus-ring-chrome rounded-control -ml-1 inline-flex h-9 items-center gap-1.5 pr-1.5 pl-1 transition-colors duration-150 focus-visible:outline-none pointer-coarse:min-h-[max(44px,2.75rem)] ${
+              open ? 'bg-chrome-hover' : ''
+            }`}
+          >
+            {/* El logo de la organización si lo ha subido, y si no la marca de la casa
             teñida por su slug. Excluyentes: NUNCA se enmarca ni se tiñe el logo de
             un cliente con nuestro acento.
 
@@ -193,33 +200,34 @@ export function AppSwitcher({ compacto = false }: { compacto?: boolean } = {}): 
             tope un wordmark apaisado empujaría el resto de la barra. Si la imagen
             no carga (logo recién borrado con el token todavía vivo), se cae a la
             marca de la casa en vez de dejar el hueco roto. */}
-          {user.orgLogo && user.tenant && !falloLogo ? (
-            <img
-              src={`${appDomains.id}/branding/${encodeURIComponent(user.tenant)}/logo.png?v=${user.orgLogo}`}
-              alt=""
-              height={28}
-              // Placa blanca redondeada, SIEMPRE, como la marca de la casa: el logo de un
-              // cliente está pensado para papel blanco y aquí va sobre el carril de color.
-              class="h-7 w-auto max-w-[160px] rounded-md bg-white object-contain p-0.5"
-              onError={() => setFalloLogo(true)}
+            {user.orgLogo && user.tenant && !falloLogo ? (
+              <img
+                src={`${appDomains.id}/branding/${encodeURIComponent(user.tenant)}/logo.png?v=${user.orgLogo}`}
+                alt=""
+                height={28}
+                // Placa blanca redondeada, SIEMPRE, como la marca de la casa: el logo de un
+                // cliente está pensado para papel blanco y aquí va sobre el carril de color.
+                class="h-7 w-auto max-w-[160px] rounded-md bg-white object-contain p-0.5"
+                onError={() => setFalloLogo(true)}
+              />
+            ) : (
+              <OrgMark slug={user.tenant} size={28} />
+            )}
+            {producto ? (
+              // Oculto en <640px: ahí la barra no tiene sitio y la app se lee en su
+              // propia barra móvil.
+              <span class="text-topbar-fg text-sm font-semibold max-sm:hidden">{producto}</span>
+            ) : null}
+            {/* Chevron discreto: sin él, nada delata que la marca es pulsable. */}
+            <Glifo
+              d="m6 9 6 6 6-6"
+              size={14}
+              class={`text-topbar-fg shrink-0 opacity-70 transition-transform duration-150 ${
+                open ? 'rotate-180' : ''
+              }`}
             />
-          ) : (
-            <OrgMark slug={user.tenant} size={28} />
-          )}
-          {producto ? (
-            // Oculto en <640px: ahí la barra no tiene sitio y la app se lee en su
-            // propia barra móvil.
-            <span class="text-topbar-fg text-sm font-semibold max-sm:hidden">{producto}</span>
-          ) : null}
-          {/* Chevron discreto: sin él, nada delata que la marca es pulsable. */}
-          <Glifo
-            d="m6 9 6 6 6-6"
-            size={14}
-            class={`text-topbar-fg shrink-0 opacity-70 transition-transform duration-150 ${
-              open ? 'rotate-180' : ''
-            }`}
-          />
-        </button>
+          </button>
+        </Tooltip>
       )}
       {open ? (
         <div

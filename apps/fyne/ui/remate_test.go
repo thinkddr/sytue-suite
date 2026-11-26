@@ -349,7 +349,7 @@ func TestNingunWidgetNaceInvisible(t *testing.T) {
 			b.Titulo, b.EnDetalle = "Contactos", true
 			return b
 		}},
-		{"BotonFlotante", func() fyne.CanvasObject { return NuevoBotonFlotante("Nuevo contacto", iconos.Mas, nil) }},
+		{"BotonFlotante", func() fyne.CanvasObject { return NuevoBotonFlotante("Nuevo contacto", nil) }},
 		{"SelectorAvatar", func() fyne.CanvasObject { return NuevoSelectorAvatar(NuevoAvatar("Ana Ruiz").Con(AvatarLG)) }},
 		{"FilaSelector", func() fyne.CanvasObject {
 			return filaDePrueba(api.Elegible{ID: "c1", Nombre: "General", Meta: "Anuncios", URL: "u"})

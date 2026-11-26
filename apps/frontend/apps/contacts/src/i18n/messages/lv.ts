@@ -361,4 +361,10 @@ export const lv: AppCatalog<typeof en> = {
   'relation.coworker': 'Kolēģis',
   'relation.emergency': 'Ārkārtas kontakts',
   'relation.other': 'Cita',
+  'batch.copyEmails': 'Kopēt e-pasta adreses',
+  'batch.emailsCopied': 'E-pasta adreses nokopētas',
+  'birthdays.anniversary': 'Gadadiena',
+  'list.sortByLastName': 'Kārtot pēc uzvārda',
+  'list.sortByFirstName': 'Kārtot pēc vārda',
+  'detail.shareByEmail': 'Kopīgot pa e-pastu',
 };

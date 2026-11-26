@@ -243,6 +243,12 @@ const MARCADOR = /^\s*(?:\/\/|#)\s*paridad-web:\s*(\S+)/;
  *   videollamada.go`), que es lo que la web busca con «Sacar a otra ventana». Diferencia
  *   deliberada, dicha junto al marcador: sin modo mini de 420x320, porque en escritorio
  *   cambiar de canal o de app no cuelga.
+ * 2026-11-25: ±0 — `MobileFab` pasa a `BotonFlotante` (el «+» de crear, redondo y en todos
+ *   los anchos, por decisión de producto). La pareja de Fyne ya existía sin marcador; la
+ *   porta el commit siguiente, que baja esta línea.
+ * 2026-11-25: −1 — `BotonFlotante`, en `apps/fyne/ui/botonflotante.go`: el `ui.BotonFlotante`
+ *   de Fyne sale de `barramovil.go` a su propio fichero con el marcador, redondo, con el
+ *   «+» y en todos los anchos, como la web.
  */
 const DEUDA_SIN_NATIVO = `
 apps/frontend/apps/calcus/src/pages/edit.astro
@@ -262,7 +268,6 @@ apps/frontend/packages/ui/src/components/Illustration.tsx
 apps/frontend/packages/ui/src/components/LanguageSelect.tsx
 apps/frontend/packages/ui/src/components/List.tsx
 apps/frontend/packages/ui/src/components/Meter.tsx
-apps/frontend/packages/ui/src/components/MobileFab.tsx
 apps/frontend/packages/ui/src/components/Modal.tsx
 apps/frontend/packages/ui/src/components/OrgMark.tsx
 apps/frontend/packages/ui/src/components/ReviewSummary.tsx

@@ -102,6 +102,9 @@ func (a *App) abrirVistaRapida(o Ocurrencia, ancla fyne.CanvasObject) {
 	if a.AbrirEnlace != nil {
 		acciones.Unirse = func() { a.AbrirEnlace(o.Event.ConferenceURL) }
 	}
+	if a.Cal != nil && o.Event.ID != "" {
+		acciones.DescargarICS = func() { e.Cerrar(); a.descargarEventoICS(o) }
+	}
 	if a.Notas != nil && o.Event.UID != "" {
 		uid := o.Event.UID
 		acciones.Notas = func(listo func([]api.Note, error)) {
@@ -151,17 +154,7 @@ func (a *App) cerrarVistaRapida() {
 // «tentative», «declined» o «pending»), o "" si no me han invitado. Es la regla de la
 // web: SOLO si mi dirección está entre los asistentes; al organizador no se le pregunta
 // «¿vas a ir?» a su propia reunión.
-func (a *App) miRespuesta(o Ocurrencia) string {
-	if a.Correo == "" {
-		return ""
-	}
-	for _, at := range o.Event.Attendees {
-		if strings.EqualFold(strings.TrimPrefix(strings.ToLower(at.Email), "mailto:"), a.Correo) {
-			return estadoInvitado(at.PartStat)
-		}
-	}
-	return ""
-}
+func (a *App) miRespuesta(o Ocurrencia) string { return respuestaDe(o, a.Correo) }
 
 // responder es `responderInvitacion`: el PARTSTAT desde el propio evento.
 func (a *App) responder(o Ocurrencia, estado string) {
@@ -245,6 +238,10 @@ func (a *App) accionesFormulario(e Edicion) AccionesFormulario {
 		Guardar:  a.guardar,
 		Eliminar: func(e Edicion, listo func(bool)) { a.borrarDesdeFormulario(e, listo) },
 		Aviso:    func(clave string) { a.avisar(ui.AvisoPeligro, clave) },
+		// «Coincide con…»: contra lo que la vista ya tiene, sin pedir nada al servicio.
+		Choques: func(inicio, fin time.Time, uid string) []Solape {
+			return Solapes(a.P.Eventos, inicio, fin, uid, a.Correo, a.P.zona())
+		},
 	}
 	if a.Salas != nil {
 		acc.Videollamada = func(uid, titulo string, listo func(string, bool)) {

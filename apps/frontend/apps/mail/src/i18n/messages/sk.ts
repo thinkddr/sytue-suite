@@ -1022,4 +1022,14 @@ export const sk: AppCatalog<typeof en> = {
     'Predchádzajúci poštový systém už nie je k dispozícii. Kým poštu nepresuniete do trezoru, nebude vám chodiť nová pošta: správy, ktoré vám medzitým niekto pošle, počkajú na serveri, z ktorého boli odoslané, a ten bude doručenie niekoľko dní opakovať. Ak poštu presuniete včas, dorazia vám potom; ak nie, vrátia sa ako nedoručiteľné. Čo už je zašifrované predchádzajúcim systémom, napríklad pošta, ktorú už máte, sa nebude dať prečítať: nezmaže sa, ale nikto to nebude môcť otvoriť. Po presune vám pošta znova začne chodiť a bude sa otvárať prihlásením do Sytue ID ako ostatné aplikácie.',
   'privateMail.vaultMoveCheckFailed':
     'Stav vašej pošty sa nepodarilo overiť. Skúste to o chvíľu znova.',
+  'shortcuts.goInbox': 'Prejsť do Doručenej pošty',
+  'shortcuts.goSent': 'Prejsť do Odoslanej pošty',
+  'shortcuts.goDrafts': 'Prejsť do Konceptov',
+  'shortcuts.goArchive': 'Prejsť do Archívu',
+  'compose.sendAndArchive': 'Odoslať a archivovať',
+  'reader.copyAddress': 'Kopírovať adresu',
+  'reader.addressCopied': 'Adresa skopírovaná',
+  'reader.copyAddressFailed': 'Adresu sa nepodarilo skopírovať',
+  'reader.viewPlain': 'Zobraziť ako obyčajný text',
+  'reader.viewFormatted': 'Zobraziť s formátovaním',
 };

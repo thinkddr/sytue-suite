@@ -13,6 +13,7 @@ import (
 
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
+	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 )
 
 // # La tabla del ERP (el `<table>` de `Lista` en ErpApp.tsx)
@@ -98,6 +99,11 @@ func (l *Lista) celdaDe(r Registro, clave string) celdaERP {
 	case "estado":
 		if r.Estado == "" {
 			return celdaERP{}
+		}
+		// Una factura abierta y vencida dice cuánto lleva así en lugar de su estado, que
+		// siempre es «emitida» (cartera.go; la web pone las dos insignias).
+		if dias := diasVencida(r, ahora()); dias > 0 && l.tr != nil {
+			return celdaERP{texto: l.tr.T("due.overdue", i18n.Vars{"n": dias}), insignia: true, tono: ui.InsigniaPeligro}
 		}
 		return celdaERP{texto: RotuloEstado(l.Modelo, r.Estado), insignia: true, tono: tonosEstado[Tono(r.Estado)]}
 	}

@@ -2,6 +2,7 @@
   "aiBatch.excludeOrg": "Undanþiggja stofnunina sjálfvirkri Sytue AI-keyrslu",
   "aiBatch.excludedHint": "Stofnunin er undanþegin sjálfvirkri Sytue AI-keyrslu. Nýjar myndir eru ekki unnar í bakgrunni fyrir tillögur eða líkindi.",
   "album.coverSet": "Forsíða albúmsins uppfærð",
+  "album.download": "Sækja albúm",
   "album.isCover": "Þetta er forsíða albúmsins",
   "album.linkCopied": "Tengill afritaður",
   "album.newLink": "Nýr tengill",
@@ -257,6 +258,7 @@
   "public.count": "{count} myndir",
   "public.notFound": "Þessi tengill er ekki lengur gildur.",
   "public.title": "Deilt albúm",
+  "shortcuts.favorite": "Merkja eða afmerkja sem uppáhald",
   "shortcuts.first": "Fyrsta mynd",
   "shortcuts.group.gallery": "Myndasafn",
   "shortcuts.group.viewer": "Skoðari",
@@ -291,6 +293,8 @@
   },
   "trash.purgesToday": "Eytt í dag",
   "trash.restore": "Endurheimta",
+  "trash.restoreAll": "Endurheimta allt",
+  "trash.restoredAll": "Aftur í myndunum þínum: {count}",
   "trash.retention": {
     "one": "Myndir sem þú fjarlægir úr safninu verða hér í {count} dag og hægt er að endurheimta þær þangað til.",
     "other": "Myndir sem þú fjarlægir úr safninu verða hér í {count} daga og hægt er að endurheimta þær þangað til."
@@ -337,6 +341,7 @@
   "viewer.infoTechnical": "Tæknilegar upplýsingar",
   "viewer.infoUploaded": "Hlaðið upp (engin EXIF-dagsetning)",
   "viewer.next": "Næsta mynd",
+  "viewer.openInDrive": "Skoða frumritið í Sytue Drive",
   "viewer.prev": "Fyrri mynd",
   "viewer.rotate": "Snúa 90°",
   "viewer.rotateFailed": "Ekki tókst að snúa myndinni.",

@@ -331,4 +331,10 @@ export const el: AppCatalog<typeof en> = {
   'relation.coworker': 'Συνάδελφος',
   'relation.emergency': 'Έκτακτη ανάγκη',
   'relation.other': 'Άλλη',
+  'batch.copyEmails': 'Αντιγραφή διευθύνσεων email',
+  'batch.emailsCopied': 'Οι διευθύνσεις email αντιγράφηκαν',
+  'birthdays.anniversary': 'Επέτειος',
+  'list.sortByLastName': 'Ταξινόμηση κατά επώνυμο',
+  'list.sortByFirstName': 'Ταξινόμηση κατά όνομα',
+  'detail.shareByEmail': 'Κοινοποίηση με email',
 };

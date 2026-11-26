@@ -8,6 +8,7 @@ import type { ComponentChildren, JSX, Ref } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { useT } from '@sytue/i18n/preact';
 import { cx } from '../lib/cx.js';
+import { useMobileBack } from '../lib/useMobileBack.js';
 import type { DestinosBarra } from './BarraMovil.js';
 import { Icon } from './Icon.js';
 import { Tooltip } from './Tooltip.js';
@@ -121,8 +122,29 @@ export function TopBar({
   }, [suite]);
   const plegada = hayMovil && !suite;
   const desplegada = hayMovil && suite;
+  // «ATRÁS» PLIEGA LA SUITE, como recoge un cajón o un menú (`useMobileBack`). La cara de
+  // la suite era la única capa del teléfono que no lo hacía: con ella desplegada, el
+  // «atrás» del navegador abandonaba la página en vez de volver a la app. Nivel de cajón:
+  // la cuenta o la campana que se abran desde ella (nivel 2) se recogen antes.
+  useMobileBack(desplegada, () => setSuite(false), { estrecho: true, nivel: 1 });
   // Lo de la suite que se esconde en la cara de la app del teléfono.
   const deLaSuite = plegada ? 'max-md:hidden' : undefined;
+  // EL BUSCADOR DEL TELÉFONO OCUPA LA FILA MIENTRAS SE ESCRIBE EN ÉL. Desplegada, la cara
+  // de la suite reparte 320 px entre el ✕, la marca, el candado, la campana y la cuenta,
+  // y al buscador le quedaban 50 (93 a 390): una lupa sin sitio para leer lo escrito
+  // —medido en el banco de la barra, con «Pesquisar no Sytue One…» pidiendo 195—. Con
+  // el foco dentro, la marca y las acciones se apartan y el campo va del ✕ al canalón.
+  //
+  // Es un ATRIBUTO del `<header>` puesto a mano y no un estado: el Tab tiene que verlas ya
+  // de vuelta cuando el navegador busca a quién dar el foco, y eso es antes de que Preact
+  // vuelva a pintar. Sin él, Tab desde el campo se saltaba la campana y la cuenta.
+  const marcarBusqueda = (si: boolean): void => {
+    const h = headerRef.current;
+    if (!h) return;
+    if (si) h.setAttribute('data-buscando', '');
+    else h.removeAttribute('data-buscando');
+  };
+  const apartable = desplegada ? 'max-md:in-data-[buscando]:hidden' : undefined;
   const nombreEntrada = movil
     ? movil.aviso
       ? `${t('ui.suiteOpen')} · ${movil.aviso.texto}`
@@ -199,6 +221,7 @@ export function TopBar({
           class={cx(
             '-ms-4 flex shrink-0 self-stretch md:w-[var(--spacing-sidebar)] lg:-ms-6',
             deLaSuite,
+            apartable,
             // Tras el ✕ no hay cristal que alcanzar: ni margen negativo ni el relleno del
             // menú lateral, o la marca quedaba a 26 px del ✕ en vez de al hueco de la barra.
             desplegada && 'max-md:ms-0 max-md:[&>div]:ps-0',
@@ -209,7 +232,7 @@ export function TopBar({
           </div>
         </div>
       ) : brand ? (
-        <div ref={suiteRef} class={cx('flex shrink-0 items-center gap-2', deLaSuite)}>
+        <div ref={suiteRef} class={cx('flex shrink-0 items-center gap-2', deLaSuite, apartable)}>
           {brand}
         </div>
       ) : null}
@@ -217,14 +240,30 @@ export function TopBar({
         // La zona central (buscador global) se acota al ancho canónico ~480px
         // (design-system §3.3) y se centra; el envoltorio interno mantiene ese
         // tope sin estirar contenidos más estrechos (p. ej. nav de marca).
-        <div class={cx('flex min-w-0 flex-1 justify-center', deLaSuite)}>
+        <div
+          class={cx('flex min-w-0 flex-1 justify-center', deLaSuite)}
+          {...(hayMovil
+            ? {
+                onFocusIn: () => marcarBusqueda(true),
+                onFocusOut: (e: FocusEvent) => {
+                  const dentro = e.currentTarget as HTMLElement;
+                  if (!dentro.contains(e.relatedTarget as Node | null)) marcarBusqueda(false);
+                },
+                // Antes de que el navegador mueva el foco: la campana y la cuenta tienen
+                // que estar a la vista para ser la siguiente parada (ver `marcarBusqueda`).
+                onKeyDown: (e: KeyboardEvent) => {
+                  if (e.key === 'Tab') marcarBusqueda(false);
+                },
+              }
+            : {})}
+        >
           <div class="flex w-full max-w-[30rem] justify-center">{center}</div>
         </div>
       ) : (
         <div class={cx('flex-1', deLaSuite)} />
       )}
       {actions ? (
-        <div class={cx('flex shrink-0 items-center gap-1', deLaSuite)}>{actions}</div>
+        <div class={cx('flex shrink-0 items-center gap-1', deLaSuite, apartable)}>{actions}</div>
       ) : null}
       {movil ? (
         <>

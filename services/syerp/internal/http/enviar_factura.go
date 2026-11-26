@@ -120,10 +120,15 @@ func (h *Handlers) correoDelCliente(ctx context.Context, reg store.Registro) str
 // EnviarFactura — POST /api/v1/{modelo}/{id}/enviar — manda la factura en PDF a
 // UNA dirección y lo apunta en el historial del documento.
 func (h *Handlers) EnviarFactura(w http.ResponseWriter, r *http.Request) {
+	// Recordatorio: es un recordatorio de pago de una factura ya enviada y sin cobrar. El
+	// correo es el mismo —la factura en PDF a una dirección—, pero solo vale para una
+	// factura abierta y en el historial queda como lo que es: «un recordatorio», no otro
+	// envío, que es lo que se mira al decidir si hace falta el segundo.
 	var cuerpo struct {
-		Para    string `json:"para"`
-		Asunto  string `json:"asunto"`
-		Mensaje string `json:"mensaje"`
+		Para         string `json:"para"`
+		Asunto       string `json:"asunto"`
+		Mensaje      string `json:"mensaje"`
+		Recordatorio bool   `json:"recordatorio"`
 	}
 	if err := httpx.DecodeJSON(w, r, &cuerpo); err != nil {
 		httpx.Fail(w, r, err)
@@ -155,6 +160,10 @@ func (h *Handlers) EnviarFactura(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, r, errFacturaNoEnviable)
 		return
 	}
+	if cuerpo.Recordatorio && !facturaAbierta(reg) {
+		httpx.Fail(w, r, errFacturaNoAbierta)
+		return
+	}
 	pdf, err := facturaPDF(f)
 	if err != nil {
 		httpx.Fail(w, r, err)
@@ -180,7 +189,11 @@ func (h *Handlers) EnviarFactura(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// En el historial, en el idioma de quien la manda: es quien lo va a leer.
-	nota := strings.ReplaceAll(h.cat.Rotulo("historial.enviada_por_correo", httpx.LanguageFromRequest(r)), "{para}", para)
+	clave := "historial.enviada_por_correo"
+	if cuerpo.Recordatorio {
+		clave = "historial.recordatorio_por_correo"
+	}
+	nota := strings.ReplaceAll(h.cat.Rotulo(clave, httpx.LanguageFromRequest(r)), "{para}", para)
 	e, err := h.store.Anotar(ctx, "factura_venta", reg.ID, sub(r), nota)
 	if err != nil {
 		// El correo YA salió: decir que falló invitaría a mandarlo otra vez.

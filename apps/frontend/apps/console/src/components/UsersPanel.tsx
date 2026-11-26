@@ -26,10 +26,21 @@ import {
   ToastProvider,
   useToast,
   VirtualList,
+  withBase,
 } from '@sytue/ui';
 import { formatDate, formatDateTime, type Locale } from '@sytue/i18n';
 import { useT, type ConsoleMessageKey, type T } from '../i18n/index.js';
 import UserMailboxes from './UserMailboxes.js';
+import FichaAcceso from './FichaAcceso.js';
+import HistorialLotes, { FallosLote } from './HistorialLotes.js';
+import BajasRecuperables from './BajasRecuperables.js';
+import { useTGestion } from '../i18n/gestion/index.js';
+import {
+  fallosDelLote,
+  MAX_LOTE,
+  seleccionarVisibles,
+  type ResultadoLote,
+} from '../lib/gestion.js';
 import InviteUserWizard from './InviteUserWizard.js';
 import type { DirectoryUser, SytueRole, SytueService, Tenant } from '../lib/types.js';
 import type { PendingInvitation, UserImpact } from '../lib/admin.js';
@@ -235,6 +246,11 @@ function Inner({
   // acabaría aplicando la acción sobre datos que ya no son los de la pantalla.
   const [marcados, setMarcados] = useState<Set<string>>(new Set());
   const [enLote, setEnLote] = useState(false);
+  // A quién NO se aplicó el último lote, con el motivo. El aviso decía «28 de 30»
+  // y no cuáles eran los dos: justo lo que hay que saber para arreglarlo.
+  const [fallosLote, setFallosLote] = useState<ResultadoLote[]>([]);
+  const [recortado, setRecortado] = useState(false);
+  const tg = useTGestion(locale);
   // Reset de contraseña por admin (panel inline dentro de la ficha).
   const [resetting, setResetting] = useState(false);
   const [newPw, setNewPw] = useState('');
@@ -571,9 +587,11 @@ function Inner({
         body: JSON.stringify({ action, user_ids: [...marcados], ...(role ? { role } : {}) }),
       });
       if (!res.ok) throw new Error(String(res.status));
-      const data = (await res.json()) as { applied?: number; results?: { ok?: boolean }[] };
+      const data = (await res.json()) as { applied?: number; results?: ResultadoLote[] };
       const total = data.results?.length ?? marcados.size;
       const hechos = data.applied ?? 0;
+      setFallosLote(fallosDelLote(data.results));
+      setRecortado(false);
       toast.notify({
         tone: hechos === total ? 'success' : 'warning',
         title: t('users.bulk.done', { count: hechos }),
@@ -617,6 +635,13 @@ function Inner({
     () => (tenant === 'all' ? items : items.filter((u) => u.tenant === tenant)),
     [items, tenant],
   );
+
+  // Nombre visible de un id para los informes de lote. Si la persona no está en
+  // la página cargada, su id corto: mejor eso que una fila sin sujeto.
+  const nombreDe = useMemo(() => {
+    const mapa = new Map(items.map((u) => [u.id, u.fullName || u.email]));
+    return (id: string) => mapa.get(id) ?? id.slice(0, 8);
+  }, [items]);
 
   // Clave estable por fila: la caché de medición del virtualizador sobrevive a
   // los cambios de filtro sin saltos de scroll.
@@ -942,9 +967,28 @@ function Inner({
             </option>
           ))}
         </Select>
+        {/* El directorio entero con la búsqueda y el filtro que se están viendo:
+            lo que se pide en una auditoría de accesos. Lo arma el BFF recorriendo
+            las páginas en el servidor; aquí es un enlace de descarga normal. */}
+        <Button
+          variant="secondary"
+          class="ml-auto"
+          disabled={!live}
+          href={withBase(
+            import.meta.env.BASE_URL,
+            `/api/admin/users/export.csv${(() => {
+              const p = new URLSearchParams();
+              if (query.trim()) p.set('q', query.trim());
+              if (filtro) p.set('filter', filtro);
+              const qs = p.toString();
+              return qs ? `?${qs}` : '';
+            })()}`,
+          )}
+        >
+          {tg('gestion.directorio.exportar')}
+        </Button>
         <Button
           variant="primary"
-          class="ml-auto"
           leadingIcon={<Icon name="plus" size={16} />}
           onClick={() => setInviteOpen(true)}
         >
@@ -967,6 +1011,24 @@ function Inner({
           <strong class="text-text text-sm">
             {t('users.bulk.selected', { count: marcados.size })}
           </strong>
+          {/* Marcar de una en una a treinta personas filtradas por «sin segundo
+              factor» era la parte lenta del lote. Hasta el tope del servicio. */}
+          {filtered.length > marcados.size ? (
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={enLote}
+              onClick={() => {
+                const sel = seleccionarVisibles(filtered.map((u) => u.id));
+                setMarcados(sel.ids);
+                setRecortado(sel.recortado);
+              }}
+            >
+              {tg('gestion.lote.seleccionarVisibles', {
+                count: Math.min(filtered.length, MAX_LOTE),
+              })}
+            </Button>
+          ) : null}
           <Button
             size="sm"
             variant="secondary"
@@ -1021,6 +1083,28 @@ function Inner({
         </div>
       )}
 
+      {recortado && marcados.size > 0 ? (
+        <InlineHelp tone="warning" class="mx-4 mt-3 shrink-0">
+          {tg('gestion.lote.recortado', { max: MAX_LOTE })}
+        </InlineHelp>
+      ) : null}
+      {fallosLote.length > 0 ? (
+        <InlineHelp
+          tone="warning"
+          title={tg('gestion.lote.fallos')}
+          titleAs="h2"
+          live="off"
+          class="mx-4 mt-3 shrink-0"
+          action={
+            <Button size="sm" variant="ghost" onClick={() => setFallosLote([])}>
+              {tg('gestion.lote.cerrar')}
+            </Button>
+          }
+        >
+          <FallosLote fallos={fallosLote} nombre={nombreDe} tg={tg} />
+        </InlineHelp>
+      ) : null}
+
       {/* Invitaciones emitidas y sin aceptar. Solo se pinta si hay alguna: en una
           organización asentada lo normal es que no haya ninguna, y una caja vacía
           permanente es ruido que se aprende a no mirar. */}
@@ -1062,6 +1146,9 @@ function Inner({
           </ul>
         </section>
       )}
+
+      {live ? <HistorialLotes locale={locale} nombre={nombreDe} /> : null}
+      {live ? <BajasRecuperables locale={locale} /> : null}
 
       {/* Caja de tabla: abraza el contenido con pocas filas y, cuando crece,
           se acota al alto disponible (flex-shrink + min-h-0) y desplaza dentro. */}
@@ -1289,6 +1376,8 @@ function Inner({
                 ))}
               </div>
             </div>
+
+            <FichaAcceso key={selected.id} userId={selected.id} locale={locale} t={t} />
 
             <div>
               <p class="text-text mb-1 text-sm font-semibold">{t('users.detail.provisioning')}</p>

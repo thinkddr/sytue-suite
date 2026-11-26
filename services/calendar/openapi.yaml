@@ -217,6 +217,47 @@ paths:
         "204": { description: Borrado. }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /api/v1/events/{id}/ics:
+    parameters:
+      - $ref: "#/components/parameters/PathID"
+    get:
+      tags: [Eventos]
+      summary: Descarga el evento como .ics (el recurso iCalendar guardado, con su serie)
+      responses:
+        "200":
+          description: El objeto iCalendar del evento, como adjunto.
+          content:
+            text/calendar:
+              schema: { type: string }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/reminders/{id}/snooze:
+    parameters:
+      - $ref: "#/components/parameters/PathID"
+    post:
+      tags: [Eventos]
+      summary: Pospone un recordatorio vencido (vuelve a avisar dentro de `minutes`)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [minutes]
+              properties:
+                minutes: { type: integer, minimum: 1, maximum: 1440 }
+      responses:
+        "200":
+          description: Cuándo vuelve a avisar.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  trigger_at: { type: string, format: date-time }
+        "400": { description: Minutos fuera de 1 a 1440. }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /api/v1/events/{id}/attendees/partstat:
     parameters:
       - $ref: "#/components/parameters/PathID"

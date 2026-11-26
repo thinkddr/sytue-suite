@@ -385,4 +385,37 @@ export const nucleo = {
 
   'forms.empty': 'Nog geen reacties',
   'forms.empty_help': 'Als iemand een formulier op je website verstuurt, zie je dat hier.',
+  'sites.search': 'Sites zoeken',
+  'sites.search_empty': 'Geen site komt overeen met ‘{q}’.',
+  'sites.sort_label': 'Sites sorteren',
+  'sites.sort_recent': 'Recent bewerkt',
+  'sites.sort_name': 'Naam (A–Z)',
+  'sites.view_live': 'Site bekijken',
+  'sites.view_live_aria': 'Gepubliceerde {nombre} bekijken (opent in een nieuw tabblad)',
+  'seo.title': 'Wat zoekmachines zullen zien',
+  'seo.intro':
+    'Een controle van het concept: titels, beschrijvingen en afbeeldingen waar zoekmachines en schermlezers op rekenen. Dit zijn waarschuwingen; ze houden publiceren niet tegen.',
+  'seo.open_editor': 'Editor openen',
+  'seo.recheck': 'Opnieuw controleren',
+  'seo.error': 'De controle kon niet worden geladen. Probeer het opnieuw.',
+  'seo.all_good':
+    'Alles in orde: elke pagina heeft een titel en beschrijving, en de afbeeldingen hebben alternatieve tekst.',
+  'seo.summary': 'Waarschuwingen: {count}',
+  'seo.badge_warning': 'Verbeteren',
+  'seo.badge_info': 'Let op',
+  'seo.on_page': 'Pagina: {page}',
+  'seo.title_missing': 'De pagina heeft geen titel: de zoekmachine verzint er een.',
+  'seo.title_long':
+    "De titel heeft {count} tekens; er passen er zo'n 60 voordat de zoekmachine hem afkapt.",
+  'seo.title_duplicate':
+    'Een andere pagina heeft dezelfde titel: ze concurreren met elkaar in de resultaten.',
+  'seo.description_missing':
+    'De pagina heeft geen beschrijving: de zoekmachine toont een willekeurig stuk tekst.',
+  'seo.description_long': "De beschrijving heeft {count} tekens; er worden er zo'n 160 getoond.",
+  'seo.image_alt_missing':
+    'Afbeeldingen zonder alternatieve tekst: {count}. Schermlezers en zoekmachines weten niet wat ze tonen; markeer ze als decoratief als ze niets tonen.',
+  'seo.page_noindex': 'Deze pagina is verborgen voor zoekmachines (noindex).',
+  'seo.site_noindex': 'De hele site is verborgen voor zoekmachines (noindex).',
+  'seo.share_image_missing':
+    'De site heeft geen deelafbeelding: links in berichten en sociale netwerken verschijnen zonder afbeelding.',
 };

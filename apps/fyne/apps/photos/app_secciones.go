@@ -260,6 +260,7 @@ func (a *App) datosAlbum() AlbumAbierto {
 		AlDejarDeCompartir: a.dejarDeCompartir,
 		AlBorrar:           a.borrarAlbum,
 		AlRenombrar:        a.renombrarAlbum,
+		AlDescargar:        a.descargarAlbum,
 		AlAbrir: func(f api.Photo) {
 			if i := posicion(a.uno.fotos, f.ID); i >= 0 {
 				a.abrirVisor(desdeAlbum, i)
@@ -425,7 +426,8 @@ func (a *App) pedirPapelera() {
 func (a *App) datosPapelera() Papelera {
 	return Papelera{
 		Fotos: a.pap.fotos, Retencion: a.pap.retencion, Aviso: a.pap.aviso, Error: a.pap.error, AlIr: a.irSeccion,
-		AlRestaurar: a.restaurar,
+		AlRestaurar:     a.restaurar,
+		AlRestaurarTodo: a.restaurarTodo,
 		AlPurgar: func(f api.Photo) {
 			a.confirmar(a.v.Traduce("trash.purge"), a.v.Traduce("trash.purgeConfirm"), a.v.Traduce("trash.purge"),
 				func() { a.purgar(f.ID) })
@@ -444,6 +446,19 @@ func (a *App) restaurar(f api.Photo) {
 			return
 		}
 		a.pap.fotos = quitarFoto(a.pap.fotos, f.ID)
+	})
+}
+
+// restaurarTodo es «Restaurar todo»: una petición, y la papelera se queda vacía con el
+// recuento dicho en el aviso, como la web.
+func (a *App) restaurarTodo() {
+	pedir(a, func(x context.Context, c *api.Photos) (int, error) { return c.RestaurarTodo(x) }, func(n int, err error) {
+		if err != nil {
+			a.pap.error = a.textoDeFallo(err)
+			return
+		}
+		a.pap.fotos, a.pap.error = []api.Photo{}, ""
+		a.pap.aviso = a.v.T.T("trash.restoredAll", i18n.Vars{"count": n})
 	})
 }
 

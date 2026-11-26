@@ -89,7 +89,7 @@ async function borrarContacto(request: APIRequestContext, href: string): Promise
 /** Enfoca el buscador global de la topbar y teclea la consulta. Escritura real
  * carácter a carácter: el input controlado de Preact no reacciona a fill(). */
 async function buscar(page: Page, q: string): Promise<void> {
-  const input = page.getByRole('searchbox', { name: 'Búsqueda global' });
+  const input = page.getByRole('combobox', { name: 'Búsqueda global' });
   await expect(input, 'la topbar debe montar el buscador global').toBeVisible({ timeout: 30_000 });
   await input.click();
   await input.pressSequentially(q, { delay: 25 });
@@ -156,7 +156,7 @@ test.describe('Búsqueda global federada (Sytue Shell)', () => {
         );
 
         // Teclado: flecha abajo enfoca el primer resultado, Enter navega a su deep-link.
-        await page.getByRole('searchbox', { name: 'Búsqueda global' }).focus();
+        await page.getByRole('combobox', { name: 'Búsqueda global' }).focus();
         await page.keyboard.press('ArrowDown');
         await page.keyboard.press('Enter');
         await page.waitForURL(/drive\.sytue\.localhost\/files\//, { timeout: 20_000 });

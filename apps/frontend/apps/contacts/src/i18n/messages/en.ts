@@ -371,4 +371,10 @@ export const en = {
   'relation.coworker': 'Co-worker',
   'relation.emergency': 'Emergency',
   'relation.other': 'Other',
+  'batch.copyEmails': 'Copy email addresses',
+  'batch.emailsCopied': 'Email addresses copied',
+  'birthdays.anniversary': 'Anniversary',
+  'list.sortByLastName': 'Sort by last name',
+  'list.sortByFirstName': 'Sort by first name',
+  'detail.shareByEmail': 'Share by email',
 } satisfies Record<string, MessageEntry>;

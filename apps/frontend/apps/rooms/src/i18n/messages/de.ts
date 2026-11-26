@@ -1101,4 +1101,11 @@ export const de: AppCatalog<typeof en> = {
   'nativeResource.description':
     'Verbinde diese App mit deinem Konto in {tenant}. Deine bisherigen Zugriffsrechte bleiben erhalten.',
   'nativeResource.approve': 'Verbinden',
+  'channel.markRead': 'Als gelesen markieren',
+  'channel.copyLink': 'Link kopieren',
+  'channel.linkCopied': 'Link kopiert',
+  'channel.download': 'Unterhaltung herunterladen',
+  'channel.downloaded': 'Unterhaltung gespeichert unter',
+  'channel.downloadFailed': 'Die Unterhaltung konnte nicht gespeichert werden',
+  'status.nothingUnread': 'Es war schon alles gelesen',
 };

@@ -22,6 +22,7 @@ import { enHilos } from '../lib/comentarios.js';
 import { FalloDelServicio } from '../lib/fallo.js';
 import type { Comentario } from '../lib/tipos.js';
 import type { Moderacion } from './Moderacion.js';
+import { ConMarcas } from './ConMarcas.js';
 
 const MAX_CUERPO = 2000;
 
@@ -34,6 +35,8 @@ export interface CommentsProps {
   entrar: () => void;
   miSub: string | null;
   moderacion: Moderacion;
+  /** Lleva el vídeo a una marca de tiempo de un comentario («en el 3:15…»). */
+  saltar?: ((segundos: number) => void) | undefined;
 }
 
 export function Comments({
@@ -45,6 +48,7 @@ export function Comments({
   entrar,
   miSub,
   moderacion,
+  saltar,
 }: CommentsProps): JSX.Element {
   const [filas, setFilas] = useState<Comentario[] | null>(null);
   const [cursor, setCursor] = useState<string | undefined>(undefined);
@@ -122,6 +126,7 @@ export function Comments({
   );
   const acciones = (c: Comentario): AccionesDeFila => ({
     retirar,
+    saltar,
     denunciar:
       c.author.sub === miSub
         ? undefined
@@ -216,6 +221,7 @@ export function Comments({
 
 interface AccionesDeFila {
   retirar: (c: Comentario) => Promise<void>;
+  saltar: ((segundos: number) => void) | undefined;
   denunciar: (() => void) | undefined;
   bloquear: (() => void) | undefined;
 }
@@ -226,6 +232,7 @@ function Fila({
   c,
   responder,
   retirar,
+  saltar,
   denunciar,
   bloquear,
 }: AccionesDeFila & {
@@ -249,7 +256,9 @@ function Fila({
             {formatTimeAgo(locale, c.created_at)}
           </time>
         </p>
-        <p class="text-text mt-0.5 text-sm break-words whitespace-pre-wrap">{c.body}</p>
+        <p class="text-text mt-0.5 text-sm break-words whitespace-pre-wrap">
+          <ConMarcas t={t} texto={c.body} saltar={saltar} />
+        </p>
         <div class="mt-1 flex gap-1">
           {responder ? (
             <Button size="xs" variant="ghost" onClick={responder}>
@@ -319,7 +328,12 @@ function Redactor({
         value={texto}
         maxLength={MAX_CUERPO}
         placeholder={placeholder}
+        aria-keyshortcuts="Control+Enter Meta+Enter"
         onInput={(e) => setTexto(e.currentTarget.value)}
+        // ⌘/Ctrl+Intro publica sin ir al botón; Intro solo sigue siendo salto de línea.
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !e.isComposing) void alEnviar(e);
+        }}
       />
       <div class="flex justify-end gap-2">
         {cancelar ? (

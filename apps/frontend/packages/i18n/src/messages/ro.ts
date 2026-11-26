@@ -396,10 +396,14 @@ export const ro: Catalog = {
   'import.fromGoogle': 'Adu din Google',
   'import.fromMicrosoft': 'Adu din Microsoft 365',
   'import.running': 'Se copiază datele… {count} elemente până acum.',
-  'import.done': '{count} elemente aduse, {skipped} omise.',
+  'import.done': '{what}: {count} elemente aduse, {skipped} omise. Finalizat la {date}.',
   'import.someFailed':
     'O parte din datele dvs. nu a putut fi copiată. Administrarea organizației poate vedea de ce.',
   'import.failed': 'Importul nu a putut fi pornit. Încercați din nou peste puțin timp.',
+  'import.unavailable':
+    'Conexiunea cu {source} nu poate fi citită acum: a expirat, a fost revocată sau nu a fost autorizată niciodată. Cereți administrării organizației să o reconecteze.',
+  'import.needsAdmin':
+    'Conexiunea cu {source} nu poate copia încă datele fiecărei persoane. Cereți administrării organizației să finalizeze configurarea.',
   'dataflow.label': 'Ce se întâmplă cu datele',
   'dataflow.in.title': 'Intră doar în Sytue One',
   'dataflow.in.body':

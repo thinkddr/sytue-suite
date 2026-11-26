@@ -184,6 +184,11 @@ func NewRouter(d Deps) http.Handler {
 		// "libro" y "balance" se tomarían por nombres de modelo y darían 404.
 		api.With(h.exigir("contabilidad", permisos.Lectura)).Get("/libro", h.Libro)
 		api.With(h.exigir("contabilidad", permisos.Lectura)).Get("/balance", h.Balance)
+		api.With(h.exigir("contabilidad", permisos.Lectura)).Get("/mayor", h.Mayor)
+
+		// La cartera: antigüedad de cobros y pagos y lo que falta en el almacén (cartera.go).
+		api.With(h.exigir("facturacion", permisos.Lectura)).Get("/cobros/antiguedad", h.Antiguedad)
+		api.Get("/inventario/bajo-minimo", h.BajoMinimo)
 		api.With(h.exigir("contabilidad", permisos.Administrador),
 			h.exigirVerboContable(permisos.Asentar)).
 			Post("/libro/{id}/anular", h.AnularAsiento)
@@ -276,6 +281,8 @@ func NewRouter(d Deps) http.Handler {
 			// va a asentar, así que basta con el verbo de crear.
 			mod.Post("/{id}/aprobacion", h.PedirAprobacion)
 			mod.Get("/{id}/asientos", h.AsientosDe)
+			// El estado de cuenta de un contacto: solo tiene sentido en /contacto.
+			mod.Get("/{id}/estado-cuenta", h.EstadoDeCuenta)
 			// El historial del registro, como el de Odoo: cambios y notas.
 			mod.Get("/{id}/historial", h.Historial)
 			mod.Post("/{id}/historial", h.Anotar)

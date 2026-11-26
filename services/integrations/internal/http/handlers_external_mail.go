@@ -134,12 +134,13 @@ func (h *Handlers) reuseMailDraft(ctx context.Context, actor, template string) (
 	return reuse, nil
 }
 
-// errMailAccountExists says the provider account is already connected by the
-// same person, for the same service. A second instance would show the mailbox
-// twice and refresh two token sets for one account.
-type errMailAccountExists struct{ instance string }
+// errAccountExists says the provider account is already connected: by the same
+// person for the same service (mail), or by the organisation for the same import
+// source (import_account.go). A second instance would show the account twice and
+// refresh two token sets for one account.
+type errAccountExists struct{ instance string }
 
-func (e *errMailAccountExists) Error() string { return "mail account already connected" }
+func (e *errAccountExists) Error() string { return "account already connected" }
 
 // duplicateMailAccount finds, among the caller's instances, another connection
 // of the same provider and address that already serves `service`. A
@@ -589,7 +590,7 @@ func (h *Handlers) rejectDuplicateMail(ctx context.Context, inst *domain.AppInst
 			log.From(ctx).Warn("integrations: borrador de cuenta repetida sin borrar", "instance", inst.ID, "error", err)
 		}
 	}
-	return &errMailAccountExists{instance: existing}
+	return &errAccountExists{instance: existing}
 }
 
 func (h *Handlers) ExternalMailFolders(w http.ResponseWriter, r *http.Request) {

@@ -127,6 +127,14 @@ func TestInvitaciones(t *testing.T) {
 			_, _ = io.WriteString(w, `{"reminders":[{"id":"r1","event_id":"e1","uid":"u1","summary":"Comité de obra","dtstart":"2026-09-25T08:00:00Z","trigger_at":"2026-09-25T07:50:00Z","action":"DISPLAY"}],"next_cursor":""}`)
 		case "POST /api/v1/reminders/r1/dismiss":
 			w.WriteHeader(http.StatusNoContent)
+		case "POST /api/v1/reminders/r1/snooze":
+			datos, _ := io.ReadAll(r.Body)
+			if string(datos) != `{"minutes":10}` || r.Header.Get("Content-Type") != "application/json" {
+				t.Errorf("posponer manda %q (%s)", datos, r.Header.Get("Content-Type"))
+			}
+			_, _ = io.WriteString(w, `{"trigger_at":"2026-09-25T08:00:00Z"}`)
+		case "GET /api/v1/events/e1/ics":
+			_, _ = io.WriteString(w, "BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n")
 		case "POST /api/v1/invitations/i1/respond":
 			datos, _ := io.ReadAll(r.Body)
 			_ = json.Unmarshal(datos, &respuesta)
@@ -163,6 +171,12 @@ func TestInvitaciones(t *testing.T) {
 	}
 	if err := c.DismissReminder(ctx, "r1"); err != nil {
 		t.Fatalf("descartar: %v", err)
+	}
+	if hasta, err := c.SnoozeReminder(ctx, "r1", 10); err != nil || !hasta.Equal(time.Date(2026, 9, 25, 8, 0, 0, 0, time.UTC)) {
+		t.Fatalf("posponer: %v, %v", hasta, err)
+	}
+	if ics, err := c.EventICS(ctx, "e1"); err != nil || !strings.HasPrefix(string(ics), "BEGIN:VCALENDAR") {
+		t.Fatalf(".ics del evento: %q, %v", ics, err)
 	}
 
 	inv, err := c.RespondInvitation(ctx, "i1", InvitacionAceptada)

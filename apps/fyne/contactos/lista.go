@@ -133,6 +133,10 @@ func (p *Pantalla) barraLote() *ui.BarraDeLote {
 		exportar := ui.NuevoBoton(p.t("batch.exportVcf", nil), func() { p.AlExportarSeleccion(sel) }).Con(ui.Secundario, ui.TallaSM)
 		acciones = append(acciones, exportar)
 	}
+	if p.AlCopiarCorreos != nil {
+		copiar := ui.NuevoBoton(p.t("batch.copyEmails", nil), func() { p.AlCopiarCorreos(sel) }).Con(ui.Secundario, ui.TallaSM)
+		acciones = append(acciones, copiar)
+	}
 	destacar, quitar := boton("batch.star", ui.Secundario), boton("batch.unstar", ui.Secundario)
 	destacar.AlPulsar = func() { p.AlLote(LoteDestacar, sel, nil) }
 	quitar.AlPulsar = func() { p.AlLote(LoteQuitarDestacado, sel, nil) }
@@ -393,7 +397,7 @@ func (p *Pantalla) montarFilas() {
 		}
 		return
 	}
-	for _, g := range GruposPorInicial(nombresDe(p.Contactos), p.locale()) {
+	for _, g := range GruposPorInicial(clavesDeOrden(p.Contactos, p.PorApellido), p.locale()) {
 		p.filasLista = append(p.filasLista, filaLista{cabecera: g.Inicial})
 		for _, i := range g.Indices {
 			p.filaDe[i] = len(p.filasLista)
@@ -405,22 +409,14 @@ func (p *Pantalla) montarFilas() {
 // porInicial devuelve la libreta en el orden de sus cabeceras: el de la colación, con
 // lo que no empieza por letra al final. Es una copia: `filtrar` devuelve la libreta
 // entera sin filtro, y reordenarla en su sitio cambiaría el estado de la app.
-func porInicial(lista []api.Contact, l i18n.Locale) []api.Contact {
+func porInicial(lista []api.Contact, l i18n.Locale, porApellido bool) []api.Contact {
 	fuera := make([]api.Contact, 0, len(lista))
-	for _, g := range GruposPorInicial(nombresDe(lista), l) {
+	for _, g := range GruposPorInicial(clavesDeOrden(lista, porApellido), l) {
 		for _, i := range g.Indices {
 			fuera = append(fuera, lista[i])
 		}
 	}
 	return fuera
-}
-
-func nombresDe(lista []api.Contact) []string {
-	nombres := make([]string, len(lista))
-	for i, c := range lista {
-		nombres[i] = c.DisplayName()
-	}
-	return nombres
 }
 
 // ponerCabecera convierte una fila reciclada en la cabecera de una inicial. Sale del

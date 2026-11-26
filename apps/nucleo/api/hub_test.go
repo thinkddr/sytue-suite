@@ -89,6 +89,7 @@ func TestLosCamposDelHubSonLosDelServicio(t *testing.T) {
 	montadas := []string{
 		`"/notifications"`, `"/notifications/unread_count"`, `"/notifications/{id}/read"`, `"/export"`,
 		`"/notifications/read_all"`, `"/notifications/prefs"`, `"/apps"`, `"/recent"`,
+		`"/notifications/{id}/unread"`,
 		`"/instaladores"`, `"/instaladores/{fichero}"`,
 	}
 	for _, ruta := range montadas {

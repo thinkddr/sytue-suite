@@ -27,6 +27,7 @@ import {
   ponerPortada,
   quitarDelAlbum,
   renombrarAlbum,
+  urlDeZip,
   type Album,
   type Foto,
 } from '../client/photosApi.js';
@@ -38,7 +39,8 @@ import { conAvisos, FalloDeCarga, useAvisoDeFallo } from './Fallo.js';
 import { textoDeFallo } from '../lib/fallo.js';
 import { Marco } from './Marco.js';
 import type { SytueUser } from '@sytue/auth';
-import { Filete, alTeclearEnGaleria, Miniatura, Visor } from './PhotosApp.js';
+import { Filete, alTeclearEnGaleria, descargar, Miniatura, Visor } from './PhotosApp.js';
+import { nombreDeZip, planDeZip, prefijoDeAlbum } from '../lib/descargaZip.js';
 import { Nav } from './Nav.js';
 import { EsqueletoFilas } from './Esqueletos.js';
 
@@ -222,6 +224,31 @@ function VistaDeAlbum({
     setFotos((l) => (l ?? []).map((x) => (x.id === f.id ? { ...x, description, tags } : x)));
   };
 
+  const descargarAlbum = () => {
+    if (!al || !fotos || fotos.length === 0) return;
+    const zip = planDeZip(
+      fotos.map((f) => f.id),
+      fotos,
+    );
+    if (zip.ficheros.length === 0) return;
+    try {
+      descargar(
+        urlDeZip(
+          zip.ficheros,
+          nombreDeZip(prefijoDeAlbum(al.title, t('gallery.zipName')), new Date()),
+        ),
+      );
+    } catch (e) {
+      avisarFallo(e);
+      return;
+    }
+    setAviso(
+      zip.fuera > 0
+        ? `${t('gallery.downloadingZip', { count: zip.ficheros.length })} · ${t('gallery.downloadCapped', { count: zip.fuera })}`
+        : t('gallery.downloadingZip', { count: zip.ficheros.length }),
+    );
+  };
+
   return (
     <Marco user={user} hubBaseUrl={hubBaseUrl} locale={locale} title={al?.title ?? t('nav.albums')}>
       <div class="mx-auto w-full max-w-7xl px-4 py-6">
@@ -286,6 +313,17 @@ function VistaDeAlbum({
               onClick={() => void renombrar()}
             >
               {t('album.rename')}
+            </Button>
+            {/* El álbum entero en UN ZIP con los originales, como «Descargar» de la
+                selección: antes había que ir a la galería y marcarlas una a una. */}
+            <Button
+              variant="ghost"
+              size="sm"
+              leadingIcon={<Icon name="download" />}
+              disabled={!al || !fotos || fotos.length === 0}
+              onClick={descargarAlbum}
+            >
+              {t('album.download')}
             </Button>
             <Filete />
             <IconButton

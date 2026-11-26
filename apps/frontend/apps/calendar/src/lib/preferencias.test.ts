@@ -18,6 +18,7 @@ import {
   leerOcultos,
   leerVista,
   normalizarAjustes,
+  ocultoPorRechazo,
   visiblesTrasCarga,
 } from './preferencias.js';
 
@@ -133,6 +134,7 @@ describe('ajustes de Calendar', () => {
       finLaboral: 15,
       finesDeSemana: false,
       numeroSemana: true,
+      rechazados: false,
     };
     guardarAjustes('ana', propios);
     expect(leerAjustes('ana')).toEqual(propios);
@@ -150,5 +152,26 @@ describe('ajustes de Calendar', () => {
     expect([alReves.inicioLaboral, alReves.finLaboral]).toEqual([9, 18]);
     localStorage.setItem('sytue.calendar.ana.ajustes', '{no es json');
     expect(leerAjustes('ana')).toEqual({ ...AJUSTES_POR_DEFECTO });
+  });
+
+  test('los rechazados se ven salvo que se diga lo contrario (también en lo de antes)', () => {
+    // Un JSON guardado antes de que existiera el ajuste no esconde nada.
+    expect(normalizarAjustes({ duracion: 30 }).rechazados).toBe(true);
+    expect(normalizarAjustes({ rechazados: 'no' }).rechazados).toBe(true);
+    expect(normalizarAjustes({ rechazados: false }).rechazados).toBe(false);
+  });
+
+  test('solo se esconde lo que YO he rechazado, y solo con el ajuste apagado', () => {
+    const ical = [
+      'BEGIN:VEVENT',
+      'ORGANIZER:mailto:luis@sytue.eu',
+      'ATTENDEE;PARTSTAT=DECLINED:mailto:ana@sytue.eu',
+      'ATTENDEE;PARTSTAT=DECLINED:mailto:eva@sytue.eu',
+      'END:VEVENT',
+    ].join('\r\n');
+    expect(ocultoPorRechazo({ rechazados: false }, ical, 'Ana@sytue.eu')).toBe(true);
+    expect(ocultoPorRechazo({ rechazados: true }, ical, 'ana@sytue.eu')).toBe(false);
+    expect(ocultoPorRechazo({ rechazados: false }, ical, 'luis@sytue.eu')).toBe(false);
+    expect(ocultoPorRechazo({ rechazados: false }, undefined, 'ana@sytue.eu')).toBe(false);
   });
 });

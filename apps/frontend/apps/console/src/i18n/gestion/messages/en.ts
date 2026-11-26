@@ -1,0 +1,87 @@
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: (c) 2026 Daniel Delgado Ramos
+ *
+ * Las herramientas de gestión de personas de Sytue Admin (acceso efectivo,
+ * sesiones, bajas recuperables, lotes, export del directorio, dispositivos,
+ * auditoría y roles), en INGLÉS: la fuente de verdad. Los otros 25 derivan su
+ * tipo de aquí, así que una clave nueva rompe su compilación hasta que se traduzca.
+ */
+import type { MessageEntry } from '@sytue/i18n';
+
+export const en = {
+  'gestion.acceso.titulo': 'What they can do, and why',
+  'gestion.acceso.ver': 'Show',
+  'gestion.acceso.error': 'The effective access could not be loaded.',
+  'gestion.acceso.ayuda':
+    'Calculated by Sytue ID with the same rule it applies when authorising. Each permission shows where it comes from; if you remove that source, check the others listed here.',
+  'gestion.acceso.sinPermisos': 'No administration permissions.',
+  'gestion.acceso.fuente.integrado': 'Built-in role: {role}',
+  'gestion.acceso.fuente.rol': 'Role: {name}',
+  'gestion.acceso.fuente.elevacion': 'Elevated to {name} until {when}',
+  'gestion.acceso.pendientes': 'Elevations waiting for approval',
+  'gestion.acceso.pendiente': '{role}, requested {when}',
+  'gestion.acceso.grupos': 'Groups',
+  'gestion.acceso.sinGrupos': 'Not in any group.',
+  'gestion.acceso.calculado': 'Calculated {when}',
+  'gestion.sesiones.titulo': 'Open sessions',
+  'gestion.sesiones.ver': 'Show',
+  'gestion.sesiones.error': 'The sessions could not be loaded.',
+  'gestion.sesiones.vacia': 'No open sessions.',
+  'gestion.sesiones.inicio': 'signed in {when}',
+  'gestion.sesiones.caduca': 'expires {when}',
+  'gestion.sesiones.mfa': 'Second factor',
+  'gestion.sesiones.sinMfa': 'Password only',
+  'gestion.sesiones.total': 'Open sessions: {count}',
+  'gestion.bajas.titulo': 'Closed accounts you can restore',
+  'gestion.bajas.ayuda':
+    'A closed account keeps its data for {days} days. Restoring brings it back suspended: reactivate it in the directory to give access back.',
+  'gestion.bajas.cerrada': 'closed {when}',
+  'gestion.bajas.motivo': 'reason: {reason}',
+  'gestion.bajas.quedan': 'Days left: {count}',
+  'gestion.bajas.restaurar': 'Restore',
+  'gestion.bajas.confirmarTitulo': 'Restore {name}?',
+  'gestion.bajas.confirmar':
+    'The account comes back suspended, with its data. Nobody can sign in with it until you reactivate it.',
+  'gestion.bajas.restaurada': '{name} restored',
+  'gestion.bajas.reactivar': 'It is suspended: reactivate it in the directory to give access back.',
+  'gestion.bajas.fallo': 'The account could not be restored',
+  'gestion.directorio.exportar': 'Export CSV',
+  'gestion.dispositivos.buscar': 'Search person, device or IP',
+  'gestion.dispositivos.confianza': 'Filter by trust',
+  'gestion.dispositivos.todos': 'All devices',
+  'gestion.dispositivos.recuento': 'Showing {count} of {total}',
+  'gestion.dispositivos.sinResultados': 'No device matches.',
+  'gestion.auditoria.rango': 'Quick range',
+  'gestion.auditoria.hoy': 'Today',
+  'gestion.auditoria.7d': '7 days',
+  'gestion.auditoria.30d': '30 days',
+  'gestion.roles.duplicar': 'Duplicate',
+  'gestion.roles.copia': '{name} (copy)',
+  'gestion.lotes.titulo': 'Recent bulk actions',
+  'gestion.lotes.ayuda':
+    'What was applied to several people at once, and to whom it could not be applied.',
+  'gestion.lotes.ver': 'Show',
+  'gestion.lotes.error': 'The bulk actions could not be loaded.',
+  'gestion.lotes.vacio': 'No bulk actions yet.',
+  'gestion.lotes.progreso': '{done} of {total}',
+  'gestion.lotes.accion.setRole': 'Change role',
+  'gestion.lotes.estado.ejecutando': 'Running',
+  'gestion.lotes.estado.terminado': 'Finished',
+  'gestion.lotes.estado.cancelado': 'Canceled',
+  'gestion.lotes.estado.interrumpido': 'Interrupted',
+  'gestion.lotes.detalle': 'Details',
+  'gestion.lotes.todosBien': 'Applied to everyone.',
+  'gestion.lote.fallos': 'Not applied to',
+  'gestion.lote.cerrar': 'Dismiss',
+  'gestion.lote.codigo.not_found': 'not in this organisation',
+  'gestion.lote.codigo.self': 'it is you',
+  'gestion.lote.codigo.forbidden': 'only an owner can change an owner',
+  'gestion.lote.codigo.deleted': 'the account is closed',
+  'gestion.lote.codigo.last_owner': "they are the organisation's last owner",
+  'gestion.lote.codigo.last_admin': "they are the organisation's last administrator",
+  'gestion.lote.codigo.error': 'unexpected error; try again',
+  'gestion.lote.seleccionarVisibles': 'Select all visible ({count})',
+  'gestion.lote.recortado':
+    'A bulk action covers at most {max} people: the first {max} visible are selected.',
+} satisfies Record<string, MessageEntry>;

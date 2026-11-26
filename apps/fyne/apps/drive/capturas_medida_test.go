@@ -115,8 +115,8 @@ func TestCapturaDelLateralConLoNuevo(t *testing.T) {
 	t.Cleanup(func() { tema.Elegir("") })
 	pasarela := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case "/api/v1/instances":
-			_, _ = io.WriteString(w, `{"instances":[{"id":"g","name":"Google","template_key":"google","status":"active"}]}`)
+		case "/api/v1/migrations/self/origins":
+			_, _ = io.WriteString(w, `{"origins":[{"instance_id":"g","name":"Google","source":"google","state":"ready"}]}`)
 		default:
 			_, _ = io.WriteString(w, `{"migrations":[]}`)
 		}

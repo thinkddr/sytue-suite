@@ -66,6 +66,9 @@ func (a *App) abrirVistaRapidaHoja(c fyne.Canvas, o Ocurrencia) {
 		detalle = append(detalle, container.NewBorder(nil, nil, container.NewCenter(punto), nil,
 			ui.NuevoParrafo(cuando, tema.TextoSM, ui.Normal, "text-muted", v).A(ancho-ladoPuntoRapida-espacio2)))
 	}
+	if Disponible(o) {
+		detalle = append(detalle, parrafo(p.t("popover.showsAsFree", nil), "text-muted"))
+	}
 	if o.Event.Location != "" {
 		detalle = append(detalle, parrafo(o.Event.Location, "text-muted"))
 	}
@@ -116,8 +119,18 @@ func (a *App) abrirVistaRapidaHoja(c fyne.Canvas, o Ocurrencia) {
 	if solo {
 		hijos = append(hijos, ui.NuevoParrafo(p.t("popover.readOnly", nil), tema.TextoXS, ui.Normal, "text-subtle", v).A(ancho))
 	}
+	// «Descargar .ics» y «Eliminar», al final del cuerpo y a su ancho: se encuentran sin
+	// ser lo primero que se ve.
+	var finales []fyne.CanvasObject
+	if a.Cal != nil && o.Event.ID != "" {
+		finales = append(finales, ui.NuevoBoton(p.t("popover.downloadIcs", nil), cerrar(func() { a.descargarEventoICS(o) })).
+			Con(ui.Fantasma, ui.TallaMD).ConIcono(iconos.Descargar, 16))
+	}
 	if eliminar != nil {
-		hijos = append(hijos, container.NewHBox(eliminar))
+		finales = append(finales, eliminar)
+	}
+	if len(finales) > 0 {
+		hijos = append(hijos, container.NewHBox(finales...))
 	}
 	d.CambiarCuerpo(container.New(ui.Columna{Hueco: tema.Espacio(3)}, hijos...))
 	a.mostrarDialogo(d, c)

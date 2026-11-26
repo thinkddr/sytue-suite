@@ -105,6 +105,29 @@ test('Escape la cierra: es ayuda, no un diálogo que atrape al usuario', async (
   render(null, host);
 });
 
+test('el foco que trae una PULSACIÓN no la abre: no tapa el menú que se acaba de abrir', async () => {
+  const host = montar(
+    <Tooltip label="Notificaciones">
+      <button type="button">N</button>
+    </Tooltip>,
+  );
+  const btn = host.querySelector('button')!;
+  // El orden de Chromium al pulsar un botón: `pointerdown` (cierra), el foco del
+  // `mousedown` y el `click`. Antes, el foco la volvía a abrir al instante, encima del
+  // panel que el clic despliega. VISTO EN ROJO quitando `pulsar()` del `onPointerDown`.
+  btn.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+  btn.focus();
+  btn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 30));
+  expect(ayuda()).toBeNull();
+  // La pulsación se gasta: el teclado, después, la sigue abriendo al instante.
+  btn.blur();
+  btn.focus();
+  await hasta(() => ayuda()?.textContent === 'Notificaciones', 'el teclado la abre');
+  btn.blur();
+  render(null, host);
+});
+
 test('sin puntero ni foco no hay nada que anunciar', () => {
   const host = montar(
     <Tooltip label="Guardar">

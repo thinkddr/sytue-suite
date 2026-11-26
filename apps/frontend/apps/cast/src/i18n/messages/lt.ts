@@ -377,4 +377,8 @@ export const lt: AppCatalog<typeof en> = {
   'moderation.action.unlist': 'Pašalinti iš viešo puslapio',
   'moderation.action.unpublish': 'Atšaukti paskelbimą',
   'moderation.action.block': 'Blokuoti asmenį organizacijoje',
+  'player.loop': 'Kartoti',
+  'watch.chapters': 'Skyriai',
+  'watch.jumpTo': 'Pereiti į {time}',
+  'share.startAt': 'Pradėti nuo {time}',
 };

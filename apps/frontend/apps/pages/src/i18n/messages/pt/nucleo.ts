@@ -388,4 +388,36 @@ export const nucleo = {
 
   'forms.empty': 'Ainda não há respostas',
   'forms.empty_help': 'Quando alguém enviar um formulário do seu site, vai vê-lo aqui.',
+  'sites.search': 'Procurar sites',
+  'sites.search_empty': 'Nenhum site corresponde a «{q}».',
+  'sites.sort_label': 'Ordenar sites',
+  'sites.sort_recent': 'Editados recentemente',
+  'sites.sort_name': 'Nome (A–Z)',
+  'sites.view_live': 'Ver site',
+  'sites.view_live_aria': 'Ver {nombre} publicado (abre num novo separador)',
+  'seo.title': 'O que os motores de pesquisa vão ver',
+  'seo.intro':
+    'Uma revisão do rascunho: títulos, descrições e imagens de que dependem os motores de pesquisa e os leitores de ecrã. São avisos; não impedem a publicação.',
+  'seo.open_editor': 'Abrir o editor',
+  'seo.recheck': 'Verificar novamente',
+  'seo.error': 'Não foi possível carregar a revisão. Tente novamente.',
+  'seo.all_good':
+    'Tudo bem: cada página tem título e descrição, e as imagens têm texto alternativo.',
+  'seo.summary': 'Avisos: {count}',
+  'seo.badge_warning': 'Melhorar',
+  'seo.badge_info': 'Nota',
+  'seo.on_page': 'Página: {page}',
+  'seo.title_missing': 'A página não tem título: o motor de pesquisa vai inventar um.',
+  'seo.title_long':
+    'O título tem {count} caracteres; cabem cerca de 60 antes de o motor de pesquisa o cortar.',
+  'seo.title_duplicate': 'Outra página tem o mesmo título: vão competir entre si nos resultados.',
+  'seo.description_missing':
+    'A página não tem descrição: o motor de pesquisa vai mostrar um excerto qualquer.',
+  'seo.description_long': 'A descrição tem {count} caracteres; mostram-se cerca de 160.',
+  'seo.image_alt_missing':
+    'Imagens sem texto alternativo: {count}. Os leitores de ecrã e os motores de pesquisa não sabem o que mostram; marque-as como decorativas se não mostrarem nada.',
+  'seo.page_noindex': 'Esta página está oculta dos motores de pesquisa (noindex).',
+  'seo.site_noindex': 'Todo o site está oculto dos motores de pesquisa (noindex).',
+  'seo.share_image_missing':
+    'O site não tem imagem de partilha: as ligações em mensagens e redes sociais aparecerão sem imagem.',
 };

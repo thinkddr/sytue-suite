@@ -235,7 +235,13 @@ func (p *Pantalla) botonES() fyne.CanvasObject {
 			e.Inerte = inerte || f == nil
 			return e
 		}
+		// El orden de la libreta: ofrece el otro, que es lo que hace al pulsarlo.
+		orden := "list.sortByLastName"
+		if p.PorApellido {
+			orden = "list.sortByFirstName"
+		}
 		menuDe(b, p.t("io.menuLabel", nil),
+			elemento(orden, false, p.AlCambiarOrden),
 			elemento("io.importVcard", sinImportar, p.AlImportarVcard),
 			elemento("io.importCsv", sinImportar, p.AlImportarCSV),
 			elemento("io.exportVcard", p.Total == 0, p.AlExportarVcard),

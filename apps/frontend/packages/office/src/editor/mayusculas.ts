@@ -23,6 +23,24 @@
 export const MODOS_MAYUSCULAS = ['sentence', 'lower', 'upper', 'title'] as const;
 export type ModoMayusculas = (typeof MODOS_MAYUSCULAS)[number];
 
+/**
+ * Mayús+F3 de Word: el modo siguiente para el texto elegido, en el ciclo minúsculas →
+ * MAYÚSCULAS → Cada Palabra → minúsculas. Lo decide el propio texto: todo en minúscula
+ * pasa a mayúsculas; todo en mayúscula, a cada palabra; lo demás, a minúsculas. Se mide
+ * con las mismas transformaciones de abajo, no con `toLowerCase`, para que la app nativa
+ * (`rico.SiguienteModoMayusculas`) decida lo mismo con la misma frase.
+ */
+export function siguienteModoMayusculas(texto: string): ModoMayusculas {
+  const con = (m: ModoMayusculas) => {
+    const c = cambioDeMayusculas(m);
+    c.parrafo();
+    return c.tramo(texto);
+  };
+  if (con('lower') === texto) return 'upper';
+  if (con('upper') === texto) return 'title';
+  return 'lower';
+}
+
 export function esModoMayusculas(v: unknown): v is ModoMayusculas {
   return typeof v === 'string' && (MODOS_MAYUSCULAS as readonly string[]).includes(v);
 }

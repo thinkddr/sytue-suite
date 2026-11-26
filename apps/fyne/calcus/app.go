@@ -329,6 +329,10 @@ func (a *App) archivo(ab *abierto, escribe bool) {
 	srv := a.servicio()
 	ctx.Exportar = func(f string) { a.exportar(ab, f) }
 	ctx.ExportarPlantilla = func(f string) { a.exportarCon(ab, f, true) }
+	// El CSV se escribe aquí y no lo pide al servicio: vale sin red, como en la web.
+	ctx.DescargarCSV = func() {
+		srv.GuardarLocal(nombreCSV(api.NombreDescarga(ctx.Titulo), ab.lz.Libro.Hoja()), ab.lz.Libro.CSV())
+	}
 	ctx.Imprimir = func() { a.exportar(ab, editor.FormatoImprimir) }
 	ctx.Versiones = func(listo func([]api.DocVersion)) { srv.Versiones(ab.id, listo) }
 	// «Hacer una copia», con cualquier papel, como la web: guarda lo pendiente y la abre.

@@ -25,6 +25,7 @@ import PlanCard from './PlanCard.js';
 import BorrarCuentaCard from './BorrarCuentaCard.js';
 import RubricaCard from './RubricaCard.js';
 import RevisionSeguridad from './RevisionSeguridad.js';
+import ActividadCard from './ActividadCard.js';
 
 /**
  * Las secciones de Mi cuenta, en el orden en que se pintan. Los `id` son anclas
@@ -40,6 +41,7 @@ export function indiceDeCuenta(t: T, personal: boolean): SettingsIndexEntry[] {
     { id: 'recuperacion', rotulo: t('recovery.title') },
     { id: 'sesiones', rotulo: t('sessions.title') },
     { id: 'dispositivos', rotulo: t('devices.title') },
+    { id: 'actividad', rotulo: t('activity.title') },
     { id: 'contrasenas-app', rotulo: t('app_passwords.title'), alias: ['app-passwords'] },
     { id: 'firma', rotulo: t('signature.title') },
     ...(personal ? [{ id: 'plan', rotulo: t('plan.title') }] : []),
@@ -107,10 +109,13 @@ export function AccountApp({
         >
           <RevisionSeguridad t={t} />
           <PerfilCard t={t} nombreInicial={nombreInicial} email={email} idBaseUrl={idBaseUrl} />
-          <SeguridadCard t={t} mfaRequired={mfaRequired} />
+          <SeguridadCard t={t} locale={locale} mfaRequired={mfaRequired} />
           <RecuperacionCard t={t} />
           <SesionesCard t={t} locale={locale} />
           <DispositivosCard t={t} locale={locale} />
+          {/* Detrás de sesiones y dispositivos: es lo que se mira cuando algo de
+              ahí arriba no cuadra, y lleva de vuelta a ellos. */}
+          <ActividadCard t={t} locale={locale} />
           <AppPasswordsCard t={t} locale={locale} />
           <RubricaCard t={t} locale={locale} />
           {/* El plan, solo en cuentas personales: es lo único comercial que una

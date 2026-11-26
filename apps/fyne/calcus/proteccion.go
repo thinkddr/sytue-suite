@@ -328,7 +328,7 @@ var (
 		CmdPegar: true, CmdDuplicados: true, CmdTextoCols: true, CmdCombinar: true, CmdSubtotal: true,
 		CmdDinamica: true, CmdDinamicaAct: true, CmdDinamicaQuitarla: true,
 		CmdObjetivo: true, CmdSolver: true, CmdTablaDatos: true, CmdEscAplicar: true, CmdEscInforme: true,
-		CmdRellenar: true, CmdTablaAnadir: true, CmdBloque: true,
+		CmdRellenar: true, CmdTablaAnadir: true, CmdBloque: true, CmdLimpiarTexto: true, CmdAutosuma: true,
 	}
 	cmdsFormato = map[editor.Comando]bool{
 		CmdFormatoNum: true, CmdDecimales: true, CmdEstilo: true, CmdBordes: true, CmdQuitarEstil: true, CmdAlinear: true,

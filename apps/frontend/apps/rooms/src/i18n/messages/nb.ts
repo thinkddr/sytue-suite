@@ -994,4 +994,11 @@ export const nb: AppCatalog<typeof en> = {
   'nativeResource.description':
     'Koble denne appen til kontoen din i {tenant}. De eksisterende tilgangstillatelsene dine beholdes.',
   'nativeResource.approve': 'Koble til',
+  'channel.markRead': 'Merk som lest',
+  'channel.copyLink': 'Kopier lenke',
+  'channel.linkCopied': 'Lenke kopiert',
+  'channel.download': 'Last ned samtalen',
+  'channel.downloaded': 'Samtalen er lagret i',
+  'channel.downloadFailed': 'Samtalen kunne ikke lagres',
+  'status.nothingUnread': 'Alt var allerede lest',
 };

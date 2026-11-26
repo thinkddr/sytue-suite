@@ -2,6 +2,7 @@
   "aiBatch.excludeOrg": "Välista organisatsioon Sytue AI automaatsest pakktöötlusest",
   "aiBatch.excludedHint": "Organisatsioon on Sytue AI automaatsest pakktöötlusest välistatud. Uusi fotosid ei töödelda taustal soovituste ega sarnasuste leidmiseks.",
   "album.coverSet": "Albumi kaas on uuendatud",
+  "album.download": "Laadi album alla",
   "album.isCover": "See on albumi kaas",
   "album.linkCopied": "Link kopeeritud",
   "album.newLink": "Uus link",
@@ -257,6 +258,7 @@
   "public.count": "{count} fotot",
   "public.notFound": "See link ei kehti enam.",
   "public.title": "Jagatud album",
+  "shortcuts.favorite": "Märgi lemmikuks või eemalda",
   "shortcuts.first": "Esimene foto",
   "shortcuts.group.gallery": "Galerii",
   "shortcuts.group.viewer": "Vaatur",
@@ -291,6 +293,8 @@
   },
   "trash.purgesToday": "Kustutatakse täna",
   "trash.restore": "Taasta",
+  "trash.restoreAll": "Taasta kõik",
+  "trash.restoredAll": "Tagasi su fotodes: {count}",
   "trash.retention": {
     "one": "Galeriist eemaldatud fotod jäävad siia 1 päevaks ja seni saab neid taastada.",
     "other": "Galeriist eemaldatud fotod jäävad siia {count} päevaks ja seni saab neid taastada."
@@ -337,6 +341,7 @@
   "viewer.infoTechnical": "Tehnilised andmed",
   "viewer.infoUploaded": "Üles laaditud (EXIF-kuupäev puudub)",
   "viewer.next": "Järgmine foto",
+  "viewer.openInDrive": "Vaata originaali Sytue Drive’is",
   "viewer.prev": "Eelmine foto",
   "viewer.rotate": "Pööra 90°",
   "viewer.rotateFailed": "Fotot ei õnnestunud pöörata.",

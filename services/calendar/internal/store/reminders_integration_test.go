@@ -181,3 +181,57 @@ func TestDueRemindersInApp(t *testing.T) {
 		t.Errorf("dismiss de id inexistente = %v, want ErrNotFound", err)
 	}
 }
+
+// TestSnoozeReminder: posponer saca el aviso de la campana hasta su nueva hora, lo
+// vuelve a entregar el worker aunque ya se hubiera avisado, y no resucita uno
+// descartado ni toca los de otra persona.
+func TestSnoozeReminder(t *testing.T) {
+	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
+	st := store.New(h.Pool)
+	ctx := tenantCtx("acme")
+
+	cal, err := st.CreateCalendar(ctx, store.NewCalendar{OwnerSub: "user-1", Name: "trabajo", DisplayName: "Trabajo"})
+	if err != nil {
+		t.Fatalf("CreateCalendar: %v", err)
+	}
+	base := time.Now().UTC().Truncate(time.Second)
+	if _, _, err := st.CreateEvent(ctx, eventWithAlarm(cal.ID, "snooze-a", base.Add(90*time.Minute))); err != nil {
+		t.Fatalf("CreateEvent: %v", err)
+	}
+	now := base.Add(4 * time.Hour)
+	// El worker ya lo avisó: posponer tiene que volver a armarlo.
+	noop := func(context.Context, pg.Querier, store.DueReminder) error { return nil }
+	if n, err := st.ClaimDueReminders(ctx, now, 50, noop); err != nil || n != 1 {
+		t.Fatalf("ClaimDueReminders = %d, %v; want 1", n, err)
+	}
+	due, err := st.ListDueReminders(ctx, "user-1", now, nil, 50)
+	if err != nil || len(due) != 1 {
+		t.Fatalf("vencidos = %+v, %v", due, err)
+	}
+
+	hasta := now.Add(10 * time.Minute)
+	if err := st.SnoozeReminder(ctx, "user-1", due[0].ID, hasta); err != nil {
+		t.Fatalf("SnoozeReminder: %v", err)
+	}
+	if l, _ := st.ListDueReminders(ctx, "user-1", now, nil, 50); len(l) != 0 {
+		t.Fatalf("pospuesto y sigue en la campana: %+v", l)
+	}
+	if l, _ := st.ListDueReminders(ctx, "user-1", hasta, nil, 50); len(l) != 1 || !l[0].TriggerAt.Equal(hasta) {
+		t.Fatalf("a su nueva hora = %+v, want 1 con trigger %s", l, hasta)
+	}
+	if n, err := st.ClaimDueReminders(ctx, hasta, 50, noop); err != nil || n != 1 {
+		t.Fatalf("el worker no lo vuelve a entregar: n=%d err=%v", n, err)
+	}
+
+	// Otra persona del mismo tenant no lo pospone.
+	if err := st.SnoozeReminder(ctx, "user-2", due[0].ID, hasta); !errors.Is(err, domain.ErrNotFound) {
+		t.Errorf("posponer el de otro = %v, want ErrNotFound", err)
+	}
+	// Descartado, ya no se pospone.
+	if err := st.DismissReminder(ctx, "user-1", due[0].ID); err != nil {
+		t.Fatalf("DismissReminder: %v", err)
+	}
+	if err := st.SnoozeReminder(ctx, "user-1", due[0].ID, hasta.Add(time.Hour)); !errors.Is(err, domain.ErrNotFound) {
+		t.Errorf("posponer uno descartado = %v, want ErrNotFound", err)
+	}
+}

@@ -8,6 +8,12 @@
 // El diálogo arranca con la dirección de facturación del cliente y un asunto y un
 // texto que se pueden cambiar. Si el despliegue no tiene servidor de correo o la
 // factura aún es un borrador, lo dice y ofrece el PDF para adjuntarlo a mano.
+//
+// Con `recordatorio`, es el RECORDATORIO DE PAGO de una factura vencida: el mismo correo
+// con la factura en PDF, pero con un asunto y un texto de recordatorio (el importe y el
+// vencimiento ya escritos) y apuntado en el historial como recordatorio, no como otro
+// envío: es lo que se mira al decidir si toca el segundo. El servicio solo lo acepta
+// para una factura abierta.
 
 import type { JSX } from 'preact';
 import { useEffect, useId, useState } from 'preact/hooks';
@@ -43,6 +49,7 @@ export function EnviarFactura({
   t,
   onCerrar,
   onEnviada,
+  recordatorio,
 }: {
   facturaId: string;
   /** El número de la factura, para el asunto y el título. */
@@ -51,13 +58,27 @@ export function EnviarFactura({
   onCerrar: () => void;
   /** Ya salió: quien abrió el diálogo refresca el historial. */
   onEnviada?: () => void;
+  /** Es un recordatorio de pago: el importe y el vencimiento, ya con su formato. */
+  recordatorio?: { importe: string; vencimiento: string };
 }): JSX.Element {
   const id = useId();
   const aviso = useToast();
   const [datos, setDatos] = useState<DatosEnvio | null>(null);
   const [para, setPara] = useState('');
-  const [asunto, setAsunto] = useState(() => t('send.defaultSubject', { ref: referencia }));
-  const [mensaje, setMensaje] = useState(() => t('send.defaultMessage', { ref: referencia }));
+  const [asunto, setAsunto] = useState(() =>
+    recordatorio
+      ? t('remind.defaultSubject', { ref: referencia })
+      : t('send.defaultSubject', { ref: referencia }),
+  );
+  const [mensaje, setMensaje] = useState(() =>
+    recordatorio
+      ? t('remind.defaultMessage', {
+          ref: referencia,
+          amount: recordatorio.importe,
+          date: recordatorio.vencimiento,
+        })
+      : t('send.defaultMessage', { ref: referencia }),
+  );
   const [tocado, setTocado] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [fallo, setFallo] = useState('');
@@ -95,9 +116,19 @@ export function EnviarFactura({
     try {
       await api(`factura_venta/${facturaId}/enviar`, {
         method: 'POST',
-        body: JSON.stringify({ para: para.trim(), asunto: asunto.trim(), mensaje }),
+        body: JSON.stringify({
+          para: para.trim(),
+          asunto: asunto.trim(),
+          mensaje,
+          ...(recordatorio ? { recordatorio: true } : {}),
+        }),
       });
-      aviso.notify({ tone: 'success', title: t('send.sent', { to: para.trim() }) });
+      aviso.notify({
+        tone: 'success',
+        title: recordatorio
+          ? t('remind.sent', { to: para.trim() })
+          : t('send.sent', { to: para.trim() }),
+      });
       onEnviada?.();
       onCerrar();
     } catch (err) {
@@ -114,7 +145,9 @@ export function EnviarFactura({
     <Modal
       open
       onClose={onCerrar}
-      title={t('send.title', { ref: referencia })}
+      title={
+        recordatorio ? t('remind.title', { ref: referencia }) : t('send.title', { ref: referencia })
+      }
       footer={
         <>
           <Button variant="ghost" onClick={onCerrar}>

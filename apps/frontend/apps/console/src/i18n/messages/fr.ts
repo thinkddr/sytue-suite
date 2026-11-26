@@ -1339,6 +1339,9 @@ export const fr: AppCatalog<typeof en> = {
     "Elle s'exécute en arrière-plan ; vous pourrez consulter l'état dans quelques minutes.",
   'apps.toast.testFailed': 'La connexion a échoué',
   'apps.toast.actionFailed': 'Opération impossible',
+  'apps.toast.oauthExists': 'Ce compte était déjà connecté',
+  'apps.toast.oauthExistsHint':
+    'La connexion existante, {name}, a été conservée. Reconnectez-la depuis la liste si elle ne fonctionne plus.',
   'apps.toast.gatewayDown':
     "Le service de l'application ou Sytue ID ne répondent pas pour le moment.",
 
@@ -2977,6 +2980,8 @@ export const fr: AppCatalog<typeof en> = {
     '{app} ne répond pas pour le moment. Ce ne sont pas vos valeurs : réessayez dans une minute.',
   'wizard.app.fix.generic':
     'Nous n’avons pas pu nous connecter. Revoyez les valeurs de l’étape précédente et réessayez.',
+  'wizard.app.fix.alreadyConnected':
+    'Ce compte {app} est déjà connecté. Utilisez la connexion existante, ou reconnectez-la depuis la liste si elle ne fonctionne plus.',
   'wizard.app.toast.activateFailed': 'Impossible de l’activer',
   'wizard.app.fix.activateBadData':
     'Vérifiez les valeurs de l’étape « Configurer » : nous n’avons pas pu déclarer la connexion.',

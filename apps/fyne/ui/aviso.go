@@ -672,7 +672,7 @@ func (p *PilaAvisos) colocar(t fyne.Size) {
 	ancho := min(AnchoPilaAvisos, max(t.Width-2*MargenPilaAvisos, 0))
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	x := t.Width - MargenPilaAvisos - ancho
-	y := t.Height - MargenPilaAvisos
+	y := t.Height - MargenPilaAvisos - p.sobreFlotante()
 
 	// Bajo el cerrojo, y NO por `instantanea`: este bucle ESCRIBE en cada aviso
 	// (`ancho`, Resize, Move), y el reloj de otro aviso puede estar recorriéndolo a la
@@ -690,6 +690,40 @@ func (p *PilaAvisos) colocar(t fyne.Size) {
 }
 
 func (r *pilaRenderer) Refresh() { r.Layout(r.p.Size()) }
+
+// sobreFlotante es lo que suben los avisos cuando la ventana lleva a la vista el «+»
+// flotante de crear (BotonFlotante): su alto y el margen de abajo, los `4.5rem` de
+// `[body:has([data-sytue-fab])_&]:bottom-[…]` en Toast.tsx. Los dos van en la misma
+// esquina, y el «Deshacer» de un aviso quedaba encima de donde el dedo va a crear.
+func (p *PilaAvisos) sobreFlotante() float32 {
+	if c := lienzoDe(p); c != nil && hayFlotanteEn(c.Content()) {
+		return LadoBotonFlotante + MargenBotonFlotante
+	}
+	return 0
+}
+
+// hayFlotanteEn dice si bajo `o` hay un botón flotante a la vista. Baja por donde lo
+// montan las apps —contenedores y la raíz de los gestos, como `refrescarFlotantesEn`—, y
+// no por una rama escondida (Drive esconde su capa fuera de «Mi unidad»).
+func hayFlotanteEn(o fyne.CanvasObject) bool {
+	switch v := o.(type) {
+	case nil:
+	case *BotonFlotante:
+		return v.Visible()
+	case *raizGestos:
+		return hayFlotanteEn(v.content)
+	case *fyne.Container:
+		if !v.Visible() {
+			return false
+		}
+		for _, h := range v.Objects {
+			if hayFlotanteEn(h) {
+				return true
+			}
+		}
+	}
+	return false
+}
 
 func colocarAviso(a *Aviso, ancho float32, pos fyne.Position, v tema.Variante) {
 	a.ancho = ancho

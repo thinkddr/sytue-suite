@@ -23,14 +23,14 @@ import (
 // Google conectado en la organización, el pie del menú lleva «Trae tus contactos» (la
 // pieza común `ui.ImportarDatos`); sin ningún origen, el pie se queda vacío.
 func TestTraeTusContactosVaEnElPie(t *testing.T) {
-	pie := func(instancias string) fyne.CanvasObject {
+	pie := func(origenes string) fyne.CanvasObject {
 		t.Helper()
 		var pedidas atomic.Int32
 		gw := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			defer pedidas.Add(1)
 			switch r.URL.Path {
-			case "/api/v1/instances":
-				_, _ = io.WriteString(w, instancias)
+			case "/api/v1/migrations/self/origins":
+				_, _ = io.WriteString(w, origenes)
 			case "/api/v1/migrations/self":
 				_, _ = io.WriteString(w, `{"migrations":[]}`)
 			}
@@ -50,12 +50,12 @@ func TestTraeTusContactosVaEnElPie(t *testing.T) {
 		}
 		return a.Pantalla.menu().(*ui.Lateral).Pie
 	}
-	if o := pie(`{"instances":[{"id":"g","name":"G","template_key":"google","status":"active"}]}`); o == nil {
+	if o := pie(`{"origins":[{"instance_id":"g","name":"G","source":"google","state":"ready"}]}`); o == nil {
 		t.Fatal("con Google conectado no hay pie")
 	}
 	// Sin origen NO hay pie: el 2026-09-28 se veía un filete con nada debajo. VISTO EN
 	// ROJO con el rectángulo transparente de antes.
-	if o := pie(`{"instances":[]}`); o != nil {
+	if o := pie(`{"origins":[]}`); o != nil {
 		t.Fatalf("sin ningún origen hay pie, y con él un filete sin nada debajo: %T", o)
 	}
 }

@@ -173,6 +173,16 @@ func (p *Pista) alEscape() {
 	}
 }
 
+// alPulsar la cierra al elegir: es el `onPointerDown` de Tooltip.tsx. Ya se ha decidido,
+// y si la pulsación abre un menú o cambia de pantalla la burbuja se quedaría encima, o
+// huérfana en el portal. Lo llama todo control que lleve pista al pulsarse (ver
+// `pulsable.Tapped`, `Boton.Tapped`, `FilaLateral.Tapped` y `BotonIcono.Tapped`).
+func (p *Pista) alPulsar() {
+	if p != nil {
+		p.Cerrar()
+	}
+}
+
 // MouseIn arranca el retardo de 300 ms.
 func (p *Pista) MouseIn(*desktop.MouseEvent) { p.alPuntero(true) }
 

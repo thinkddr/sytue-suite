@@ -75,6 +75,8 @@ import type {
 } from '../../sheets/solver';
 import { SCENARIO_MAX_CELLS } from '../../sheets/scenario';
 import { BloquesGroup } from '../BloquesGroup';
+import { FUNCIONES_AUTOSUMA, type FuncionAutosuma } from '../../sheets/autosuma';
+import { MODOS_TEXTO_CELDAS, type ModoTextoCeldas } from '../../sheets/textoCeldas';
 import { TABLE_STYLES, TABLE_TOTAL_FNS } from '../../sheets/table';
 import type { SheetTable, Sparkline, TableTotalFn } from '../../types';
 import type { DocsKey } from '../../../i18n';
@@ -297,6 +299,7 @@ export function DatosTab(): JSX.Element {
           onAction={() => dispatchSheetCommand('dedupe')}
         />
         <TextToColumnsMenu />
+        <CleanTextMenu />
         <ValidationMenu />
       </RibbonGroup>
 
@@ -439,6 +442,20 @@ export function FormulasTab({ ctx }: { ctx: EditorContext }): JSX.Element {
         </>
       ) : null}
 
+      {/* Σ: la función al pie de los números (sheets/autosuma.ts). La suma con un clic y
+          las otras cuatro en el «▾», como el botón de Excel. */}
+      <RibbonGroup label={t('group.functions')}>
+        <RibbonButton
+          commandId="autosum"
+          icon="subtotal"
+          keys="Alt+="
+          onAction={() => dispatchSheetCommand('autosum', 'SUM')}
+        />
+        <AutoSumMenu />
+      </RibbonGroup>
+
+      <RibbonSeparator />
+
       <RibbonGroup label={t('group.whatIf')}>
         <GoalSeekMenu />
         <SolverMenu />
@@ -509,6 +526,131 @@ function TextToColumnsMenu(): JSX.Element {
               </button>
             ))}
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---------- Σ: las otras funciones de la autosuma ---------- */
+
+const FUNCIONES_ROTULO: Record<FuncionAutosuma, DocsKey> = {
+  SUM: 'query.agg.sum',
+  AVERAGE: 'query.agg.avg',
+  COUNT: 'pivot.agg.countNums',
+  MAX: 'query.agg.max',
+  MIN: 'query.agg.min',
+};
+
+const MENU_ITEM =
+  'text-text hover:bg-bg-subtle flex h-8 w-full items-center gap-2 rounded-sm px-2 text-left ' +
+  'pointer-coarse:h-auto pointer-coarse:min-h-[max(44px,2.75rem)] text-sm ' +
+  FOCUS_RING;
+
+function AutoSumMenu(): JSX.Element {
+  const bloqueado = useBloqueado('autosum');
+  const t = useT();
+  const { open, setOpen, rootRef } = usePopover();
+  return (
+    <div ref={rootRef} class="relative">
+      <button
+        type="button"
+        class={
+          'disabled:pointer-events-none disabled:opacity-40 ' +
+          'text-text-muted inline-flex h-7 w-5 items-center justify-center rounded-sm ' +
+          'hover:bg-bg-subtle hover:text-text aria-expanded:bg-selected aria-expanded:text-text ' +
+          FOCUS_RING
+        }
+        aria-label={t('sheet.autosum.more')}
+        title={t('sheet.autosum.more')}
+        aria-haspopup="true"
+        aria-expanded={open}
+        disabled={bloqueado}
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => setOpen(!open)}
+      >
+        <EditorIcon name="chevronDown" />
+      </button>
+      {open && (
+        <div
+          role="group"
+          aria-label={t('sheet.autosum')}
+          class={`${POPOVER_SHELL} left-0 w-48 p-1`}
+        >
+          {FUNCIONES_AUTOSUMA.map((fn) => (
+            <button
+              key={fn}
+              type="button"
+              class={MENU_ITEM}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                setOpen(false);
+                dispatchSheetCommand('autosum', fn);
+              }}
+            >
+              {t(FUNCIONES_ROTULO[fn])}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---------- Limpiar texto (sheets/textoCeldas.ts) ---------- */
+
+const MODOS_ROTULO: Record<ModoTextoCeldas, DocsKey> = {
+  trim: 'data.cleanText.trim',
+  sentence: 'format.case.sentence',
+  lower: 'format.case.lower',
+  upper: 'format.case.upper',
+  title: 'format.case.title',
+};
+
+function CleanTextMenu(): JSX.Element {
+  const bloqueado = useBloqueado('cleantext');
+  const t = useT();
+  const { open, setOpen, rootRef } = usePopover();
+  return (
+    <div ref={rootRef} class="relative">
+      <button
+        type="button"
+        class={
+          'disabled:pointer-events-none disabled:opacity-40 ' +
+          'text-text-muted inline-flex h-7 w-7 items-center justify-center rounded-sm ' +
+          'hover:bg-bg-subtle hover:text-text aria-expanded:bg-selected aria-expanded:text-text ' +
+          FOCUS_RING
+        }
+        aria-label={t('data.cleanText')}
+        title={t('data.cleanText')}
+        aria-haspopup="true"
+        aria-expanded={open}
+        disabled={bloqueado}
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => setOpen(!open)}
+      >
+        <EditorIcon name="changeCase" />
+      </button>
+      {open && (
+        <div
+          role="group"
+          aria-label={t('data.cleanText')}
+          class={`${POPOVER_SHELL} left-0 w-56 p-1`}
+        >
+          {MODOS_TEXTO_CELDAS.map((modo) => (
+            <button
+              key={modo}
+              type="button"
+              class={MENU_ITEM}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                setOpen(false);
+                dispatchSheetCommand('cleantext', modo);
+              }}
+            >
+              {t(MODOS_ROTULO[modo])}
+            </button>
+          ))}
         </div>
       )}
     </div>

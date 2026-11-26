@@ -191,6 +191,9 @@ type Visor struct {
 	AlParecidas, AlEditar, AlCerca, AlMapa, AlVerIA func()
 	AlEditarDesc, AlCancelarDesc, AlGuardarDesc     func()
 	AlDescargar                                     func(formato string)
+	// AlAbrirEnDrive abre el fichero original en Sytue Drive (un elemento más del menú
+	// de descargar, como en la web). nil: no se ofrece.
+	AlAbrirEnDrive func()
 	// AlSistema guarda la foto en la galería del sistema, con el rótulo `ClaveSistema`;
 	// nil, no se ofrece (va al final del desplegable de descargar).
 	AlSistema    func()
@@ -466,6 +469,10 @@ func mandoDescargar(v Vista, d Visor) *ui.BotonIcono {
 		}
 		if d.AlSistema != nil {
 			elems = append(elems, ui.NuevoElementoMenu(v.Traduce(d.ClaveSistema), iconos.Ninguno, d.AlSistema))
+		}
+		if d.AlAbrirEnDrive != nil {
+			elems = append(elems, ui.NuevoSeparadorMenu(),
+				ui.NuevoElementoMenu(v.Traduce("viewer.openInDrive"), iconos.Ninguno, d.AlAbrirEnDrive))
 		}
 		mostrarMenu(v.Traduce("viewer.download"), descargar, elems)
 	})

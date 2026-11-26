@@ -766,4 +766,17 @@ export const hr: AppCatalog<typeof en> = {
   'search.loadMoreFailed': 'Nije moguće učitati još rezultata. Pokušajte ponovno.',
   'privacy.notice':
     'Ne prodajemo vaše podatke niti ih ustupamo trećim stranama. Ne koristimo ih za profiliranje, za oglašavanje ni za treniranje ili poboljšavanje naših ili bilo čijih usluga. Šifrirani su u prijenosu i u mirovanju te napuštaju našu europsku infrastrukturu samo u mjeri nužnoj za naplatu i u integracijama koje uključite, u kojima će vas treća strana pitati za odobrenje podataka koje će upotrijebiti.',
+  'inbox.markAllOf': 'Označi {app} kao pročitano',
+  'inbox.markUnread': 'Označi kao nepročitano',
+  'inbox.muteLikeThis': 'Utišaj obavijesti poput ove',
+  'inbox.mutedLikeThis':
+    'Više nećete primati takve obavijesti. Možete to promijeniti dolje, u „Što želite primati”.',
+  'inbox.muteFailed': 'Utišavanje nije uspjelo. Pokušajte ponovno.',
+  'inbox.actionsOf': 'Radnje za „{title}”',
+  'downloads.checksum': 'Provjeri preuzimanje',
+  'downloads.checksumHelp':
+    'Njegov SHA-256 otisak. Izračunajte otisak preuzete datoteke i provjerite podudaraju li se.',
+  'downloads.checksumLabel': 'SHA-256 otisak',
+  'downloads.copyChecksum': 'Kopiraj otisak',
+  'downloads.checksumCopied': 'Otisak kopiran',
 };

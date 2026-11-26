@@ -384,10 +384,14 @@ export const is: Catalog = {
   'import.fromGoogle': 'Sækja frá Google',
   'import.fromMicrosoft': 'Sækja frá Microsoft 365',
   'import.running': 'Afritar gögnin þín… {count} atriði hingað til.',
-  'import.done': '{count} atriði flutt, {skipped} sleppt.',
+  'import.done': '{what}: {count} atriði flutt, {skipped} sleppt. Lokið {date}.',
   'import.someFailed':
     'Ekki tókst að afrita hluta gagnanna. Umsjón fyrirtækisins getur séð hvers vegna.',
   'import.failed': 'Ekki tókst að hefja innflutninginn. Reyndu aftur eftir smástund.',
+  'import.unavailable':
+    'Ekki er hægt að lesa tenginguna við {source} núna: hún er útrunnin, afturkölluð eða var aldrei heimiluð. Biddu umsjón fyrirtækisins að tengja hana aftur.',
+  'import.needsAdmin':
+    'Tengingin við {source} getur ekki enn afritað gögn hvers og eins. Biddu umsjón fyrirtækisins að ljúka uppsetningunni.',
   'dataflow.label': 'Hvað verður um gögnin',
   'dataflow.in.title': 'Kemur aðeins inn í Sytue One',
   'dataflow.in.body':

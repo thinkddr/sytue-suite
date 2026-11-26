@@ -377,4 +377,9 @@ export const sv: AppCatalog<typeof en> = {
   'gallery.encrypted.editHint':
     'Redigeringen görs på den här enheten och sparas krypterad som en ny version av bilden.',
   'gallery.encrypted.albumEmpty': 'Det här krypterade albumet har inga bilder ännu.',
+  'shortcuts.favorite': 'Markera eller ta bort som favorit',
+  'trash.restoreAll': 'Återställ allt',
+  'trash.restoredAll': 'Tillbaka bland dina foton: {count}',
+  'album.download': 'Ladda ned album',
+  'viewer.openInDrive': 'Visa originalet i Sytue Drive',
 };

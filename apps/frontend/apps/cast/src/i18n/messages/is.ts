@@ -356,4 +356,8 @@ export const is: AppCatalog<typeof en> = {
   'moderation.action.unlist': 'Fjarlægja af opinberu síðunni',
   'moderation.action.unpublish': 'Afturkalla birtingu',
   'moderation.action.block': 'Útiloka einstaklinginn í fyrirtækinu',
+  'player.loop': 'Endurtaka',
+  'watch.chapters': 'Kaflar',
+  'watch.jumpTo': 'Fara á {time}',
+  'share.startAt': 'Byrja á {time}',
 };

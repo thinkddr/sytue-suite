@@ -135,6 +135,11 @@ type fakeStore struct {
 	alertPolicy       domain.AlertPolicy
 	alertErr          error
 	confirmedAlertTok string
+
+	// Congelación de producción: nil = no congelado.
+	freeze       *domain.DeployFreeze
+	freezeErr    error
+	freezeReason *string
 }
 
 func (f *fakeStore) EnsureOrganization(_ context.Context, _ string, _ domain.Plan, _ string) (domain.Organization, error) {
@@ -465,6 +470,28 @@ func (f *fakeStore) ConfirmAlertPolicyByToken(_ context.Context, tokenHash strin
 		return p, nil
 	}
 	return domain.AlertPolicy{}, domain.ErrNotFound
+}
+
+func (f *fakeStore) GetDeployFreeze(context.Context, uuid.UUID) (domain.DeployFreeze, bool, error) {
+	if f.freeze == nil {
+		return domain.DeployFreeze{}, false, f.freezeErr
+	}
+	return *f.freeze, true, f.freezeErr
+}
+
+func (f *fakeStore) SetDeployFreeze(_ context.Context, projectID uuid.UUID, reason, by string) (domain.DeployFreeze, error) {
+	if f.freezeErr != nil {
+		return domain.DeployFreeze{}, f.freezeErr
+	}
+	f.freezeReason = &reason
+	f.freeze = &domain.DeployFreeze{ProjectID: projectID, Reason: reason, FrozenBy: by}
+	return *f.freeze, nil
+}
+
+func (f *fakeStore) ClearDeployFreeze(context.Context, uuid.UUID) (bool, error) {
+	had := f.freeze != nil
+	f.freeze = nil
+	return had, f.freezeErr
 }
 
 var _ dataStore = (*fakeStore)(nil)

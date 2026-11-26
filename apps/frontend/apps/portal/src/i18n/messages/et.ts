@@ -750,4 +750,17 @@ export const et: AppCatalog<typeof en> = {
   'search.loadMoreFailed': 'Rohkem tulemusi ei õnnestunud laadida. Proovi uuesti.',
   'privacy.notice':
     'Me ei müü teie andmeid ega anna neid kolmandatele isikutele. Me ei kasuta neid profileerimiseks, reklaamiks ega meie või kellegi teise teenuste treenimiseks või parandamiseks. Need on krüpteeritud nii edastamisel kui ka säilitamisel ja lahkuvad meie Euroopa taristust üksnes arveldamiseks hädavajalikus ulatuses ning teie sisselülitatud integratsioonides, kus kolmas osapool küsib teie nõusolekut kasutatavate andmete kohta.',
+  'inbox.markAllOf': 'Märgi {app} loetuks',
+  'inbox.markUnread': 'Märgi lugemata',
+  'inbox.muteLikeThis': 'Vaigista sellised teavitused',
+  'inbox.mutedLikeThis':
+    'Selliseid teavitusi sa enam ei saa. Saad seda muuta allpool, jaotises „Mida soovid saada“.',
+  'inbox.muteFailed': 'Vaigistamine ei õnnestunud. Proovi uuesti.',
+  'inbox.actionsOf': 'Toimingud: „{title}“',
+  'downloads.checksum': 'Kontrolli allalaadimist',
+  'downloads.checksumHelp':
+    'Selle SHA-256 sõrmejälg. Arvuta allalaaditud faili oma ja kontrolli, et need ühtivad.',
+  'downloads.checksumLabel': 'SHA-256 sõrmejälg',
+  'downloads.copyChecksum': 'Kopeeri sõrmejälg',
+  'downloads.checksumCopied': 'Sõrmejälg kopeeritud',
 };

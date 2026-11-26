@@ -375,4 +375,10 @@ export const ga: AppCatalog<typeof en> = {
   'relation.coworker': 'Comhghleacaí',
   'relation.emergency': 'Éigeandáil',
   'relation.other': 'Eile',
+  'batch.copyEmails': 'Cóipeáil na seoltaí ríomhphoist',
+  'batch.emailsCopied': 'Cóipeáladh na seoltaí ríomhphoist',
+  'birthdays.anniversary': 'Comóradh',
+  'list.sortByLastName': 'Sórtáil de réir sloinne',
+  'list.sortByFirstName': 'Sórtáil de réir céadainm',
+  'detail.shareByEmail': 'Comhroinn trí ríomhphost',
 };

@@ -15,14 +15,34 @@ import (
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 )
 
-// rotulosDeCasillas son los nombres accesibles de las casillas visibles, en orden.
+// rotulosDeCasillas son los nombres accesibles de las casillas visibles, en orden. La
+// fila vacía de la reserva del «+» flotante no cuenta: es una fila de la lista ESCONDIDA
+// (no se pinta ni la anuncia un lector de pantalla), con la casilla de la plantilla.
 func rotulosDeCasillas(o fyne.CanvasObject) []string {
 	var r []string
-	recorrer(o, func(o fyne.CanvasObject) {
+	var bajar func(fyne.CanvasObject)
+	bajar = func(o fyne.CanvasObject) {
 		if c, ok := o.(*ui.Eleccion); ok && c.SinEtiqueta {
 			r = append(r, c.AccessibilityLabel())
 		}
-	})
+		switch x := o.(type) {
+		case *fyne.Container:
+			for _, h := range x.Objects {
+				bajar(h)
+			}
+		case fyne.Widget:
+			if _, fila := x.(*filaArrastrable); fila && !x.Visible() {
+				return
+			}
+			if f, fila := x.(*ui.FilaDrive); fila && !f.Visible() {
+				return
+			}
+			for _, h := range test.WidgetRenderer(x).Objects() {
+				bajar(h)
+			}
+		}
+	}
+	bajar(o)
 	return r
 }
 

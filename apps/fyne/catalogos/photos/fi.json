@@ -2,6 +2,7 @@
   "aiBatch.excludeOrg": "Sulje organisaatio pois Sytue AI:n automaattierästä",
   "aiBatch.excludedHint": "Organisaatio on suljettu pois Sytue AI:n automaattierästä. Uusia kuvia ei käsitellä taustalla ehdotuksia tai samankaltaisuuksia varten.",
   "album.coverSet": "Albumin kansikuva päivitetty",
+  "album.download": "Lataa albumi",
   "album.isCover": "Tämä on albumin kansikuva",
   "album.linkCopied": "Linkki kopioitu",
   "album.newLink": "Uusi linkki",
@@ -257,6 +258,7 @@
   "public.count": "{count} kuvaa",
   "public.notFound": "Tämä linkki ei ole enää voimassa.",
   "public.title": "Jaettu albumi",
+  "shortcuts.favorite": "Merkitse suosikiksi tai poista",
   "shortcuts.first": "Ensimmäinen kuva",
   "shortcuts.group.gallery": "Galleria",
   "shortcuts.group.viewer": "Katselin",
@@ -291,6 +293,8 @@
   },
   "trash.purgesToday": "Poistetaan tänään",
   "trash.restore": "Palauta",
+  "trash.restoreAll": "Palauta kaikki",
+  "trash.restoredAll": "Palautettu kuviisi: {count}",
   "trash.retention": {
     "one": "Galleriasta poistamasi kuvat säilyvät täällä 1 päivän, ja siihen asti ne voi palauttaa.",
     "other": "Galleriasta poistamasi kuvat säilyvät täällä {count} päivää, ja siihen asti ne voi palauttaa."
@@ -337,6 +341,7 @@
   "viewer.infoTechnical": "Tekniset tiedot",
   "viewer.infoUploaded": "Ladattu (ei EXIF-päivää)",
   "viewer.next": "Seuraava kuva",
+  "viewer.openInDrive": "Näytä alkuperäinen Sytue Drivessa",
   "viewer.prev": "Edellinen kuva",
   "viewer.rotate": "Kierrä 90°",
   "viewer.rotateFailed": "Kuvaa ei voitu kiertää.",

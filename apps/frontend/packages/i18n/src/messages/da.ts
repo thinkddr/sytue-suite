@@ -382,9 +382,13 @@ export const da: Catalog = {
   'import.fromGoogle': 'Hent fra Google',
   'import.fromMicrosoft': 'Hent fra Microsoft 365',
   'import.running': 'Kopierer dine data… {count} elementer indtil videre.',
-  'import.done': '{count} elementer overført, {skipped} udeladt.',
+  'import.done': '{what}: {count} elementer overført, {skipped} udeladt. Færdig {date}.',
   'import.someFailed': 'Nogle af dine data kunne ikke kopieres. Din administrator kan se hvorfor.',
   'import.failed': 'Importen kunne ikke startes. Prøv igen om lidt.',
+  'import.unavailable':
+    'Forbindelsen til {source} kan ikke læses lige nu: den er udløbet, tilbagekaldt eller aldrig godkendt. Bed din administrator om at forbinde den igen.',
+  'import.needsAdmin':
+    'Forbindelsen til {source} kan endnu ikke kopiere hver persons data. Bed din administrator om at gøre opsætningen færdig.',
   'dataflow.label': 'Hvad der sker med oplysningerne',
   'dataflow.in.title': 'Kommer kun ind i Sytue One',
   'dataflow.in.body':

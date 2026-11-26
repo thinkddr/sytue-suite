@@ -429,6 +429,18 @@ func (s *Service) EventReminders(ctx context.Context, ev domain.Event) ([]int, e
 	return caldav.Recordatorios(obj.Data), nil
 }
 
+// EventICS es el recurso iCalendar entero de un evento YA LEÍDO con GetEvent (que es
+// quien pasa la verja de lectura): «Descargar .ics» de la app nativa, que no lee por
+// CalDAV como la web. Es el objeto tal cual se guardó, con su serie, sus excepciones
+// y sus recordatorios: lo que otro calendario necesita para importarlo entero.
+func (s *Service) EventICS(ctx context.Context, ev domain.Event) (string, error) {
+	obj, err := s.store.GetObjectByUID(ctx, ev.CalendarID, ev.UID)
+	if err != nil {
+		return "", err
+	}
+	return obj.Data, nil
+}
+
 // GetEvent devuelve un evento por ID, si el llamante tiene acceso a su
 // calendario (dueño o share); si no, ErrNotFound (404, anti-enumeracion).
 // EsInvitadoDeEvento: ¿quien llama organiza el evento de ese UID o está invitado a él?
@@ -663,6 +675,26 @@ func (s *Service) DueReminders(ctx context.Context, ownerSub string, now time.Ti
 // DismissReminder descarta un recordatorio in-app del usuario.
 func (s *Service) DismissReminder(ctx context.Context, ownerSub string, id uuid.UUID) error {
 	return s.store.DismissReminder(ctx, ownerSub, id)
+}
+
+// Los minutos que se puede posponer un recordatorio: de uno a un día. Más allá no es
+// posponer, es otro recordatorio, y eso se pone en el evento.
+const (
+	MinPosponer = 1
+	MaxPosponer = 24 * 60
+)
+
+// SnoozeReminder pospone un recordatorio in-app del usuario `minutes` minutos desde
+// ahora: vuelve a la campana (y al aviso del sistema) cuando vencen.
+func (s *Service) SnoozeReminder(ctx context.Context, ownerSub string, id uuid.UUID, minutes int) (time.Time, error) {
+	if minutes < MinPosponer || minutes > MaxPosponer {
+		return time.Time{}, domain.ErrInvalidRange
+	}
+	until := time.Now().Add(time.Duration(minutes) * time.Minute).UTC().Truncate(time.Second)
+	if err := s.store.SnoozeReminder(ctx, ownerSub, id, until); err != nil {
+		return time.Time{}, err
+	}
+	return until, nil
 }
 
 // --- Edición de series recurrentes ------------------------------------------

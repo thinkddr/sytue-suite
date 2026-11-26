@@ -382,4 +382,9 @@ export const pt: AppCatalog<typeof en> = {
   'gallery.encrypted.editHint':
     'A edição é feita neste dispositivo e guardada encriptada como nova versão da foto.',
   'gallery.encrypted.albumEmpty': 'Este álbum encriptado ainda não tem fotos.',
+  'shortcuts.favorite': 'Marcar ou retirar das favoritas',
+  'trash.restoreAll': 'Restaurar tudo',
+  'trash.restoredAll': 'De volta às suas fotos: {count}',
+  'album.download': 'Transferir o álbum',
+  'viewer.openInDrive': 'Ver o original no Sytue Drive',
 };

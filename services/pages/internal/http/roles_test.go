@@ -44,11 +44,16 @@ var soloAdministracion = []string{
 	"DELETE /api/v1/sites/{id}/store/gateways/{provider}",
 	"GET /api/v1/sites/{id}/store/orders",
 	"GET /api/v1/sites/{id}/store/orders.csv",
+	// Y lo que se le ha enviado: servir un pedido o deshacerlo.
+	"POST /api/v1/sites/{id}/store/orders/{orderId}/fulfillment",
 	// Las respuestas de los formularios y a quién avisan (datos personales, WEB-02).
 	"GET /api/v1/sites/{id}/forms/",
 	"PUT /api/v1/sites/{id}/forms/{formId}/notify",
 	"GET /api/v1/sites/{id}/forms/{formId}/submissions",
 	"GET /api/v1/sites/{id}/forms/{formId}/submissions.csv",
+	// Marcarlas leídas y borrar una (derecho de supresión de quien la escribió).
+	"POST /api/v1/sites/{id}/forms/{formId}/submissions/read",
+	"DELETE /api/v1/sites/{id}/forms/{formId}/submissions/{sid}",
 	// Datos de fuera que acaban publicados y código que sale de la organización.
 	"POST /api/v1/sites/{id}/bases/table",
 	"POST /api/v1/sites/{id}/ia/export",

@@ -379,4 +379,9 @@ export const es: AppCatalog<typeof en> = {
   'gallery.encrypted.editHint':
     'La edición se hace en este dispositivo y se guarda cifrada como una versión nueva de la foto.',
   'gallery.encrypted.albumEmpty': 'Este álbum cifrado aún no tiene fotos.',
+  'shortcuts.favorite': 'Marcar o quitar de favoritas',
+  'trash.restoreAll': 'Restaurar todo',
+  'trash.restoredAll': 'Devueltas a tus fotos: {count}',
+  'album.download': 'Descargar el álbum',
+  'viewer.openInDrive': 'Ver el original en Sytue Drive',
 };

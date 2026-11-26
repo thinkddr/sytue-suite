@@ -309,6 +309,13 @@ func NuevaBarraSuite(t *i18n.Translator, s *sesion.Suite, p iconos.Producto) *Ba
 		b.paleta.BuscarEnHub = b.buscador.buscarParaPaleta
 	}
 	b.buscador.paleta = b.paleta
+	// En el teléfono, con la suite desplegada, el buscador ocupa la fila mientras tiene
+	// el foco: la barra se vuelve a colocar al ganarlo y al perderlo.
+	b.buscador.alCambiarFoco = func() {
+		if b.suiteDesplegada() {
+			b.Refresh()
+		}
+	}
 	b.avisos = nuevoAvisosBarra(t, s)
 	b.cuenta = nuevaCuentaBarra(t, s)
 	// La foto cambia EN VIVO: el aviso llega por el flujo de la campana y la cuenta
@@ -677,6 +684,13 @@ func (b *BarraSuite) plegada() bool {
 	return b.Size().Width > 0 && b.Size().Width < Estrecho && !b.suiteAbierta
 }
 
+// suiteDesplegada es la otra cara: teléfono y suite desplegada, que es lo que Escape y
+// el «atrás» del sistema pliegan (`Descartar`). En ancho la suite está siempre a la
+// vista y no hay nada que plegar, aunque `suiteAbierta` se quedara puesto al ensanchar.
+func (b *BarraSuite) suiteDesplegada() bool {
+	return b.Size().Width > 0 && b.Size().Width < Estrecho && b.suiteAbierta
+}
+
 // desplegar pone la cara de la suite (o la de la app) y lleva el foco a lo primero de
 // ella: el buscador al desplegar, la entrada al plegar.
 func (b *BarraSuite) desplegar(si bool) {
@@ -867,6 +881,9 @@ func (r *barraSuiteRenderer) Layout(t fyne.Size) {
 	}
 	lado := LadoControlBarra()
 	y := (AltoBarraSuite() - lado) / 2
+	// Lo que aparta el buscador del teléfono vuelve en cualquier otra cara (ver abajo).
+	r.b.avisos.apartar(false)
+	esconder(r.b.cuenta.boton, false)
 	if t.Width > 0 && t.Width < Estrecho {
 		r.layoutTelefono(t, lado, y)
 		return
@@ -875,7 +892,7 @@ func (r *barraSuiteRenderer) Layout(t fyne.Size) {
 	esconder(r.b.cerrarSuite, true)
 	esconder(r.b.tituloApp, true)
 	r.reponerFondo()
-	r.b.cuenta.boton.Nombre = r.b.t.T("account.menu", nil)
+	r.b.cuenta.boton.entrada, r.b.cuenta.boton.Nombre = false, r.b.cuenta.rotulo()
 	r.layoutAncho(t, lado, y, 0, CanalonDeBarra(t.Width), 0)
 }
 
@@ -931,7 +948,7 @@ func (r *barraSuiteRenderer) layoutTelefono(t fyne.Size, lado, y float32) {
 		// El punto de la campana, en la entrada (`indicator` de TopBarButton).
 		b.avisos.colocar(fyne.NewPos(x, y), lado)
 		b.avisos.boton.Hide()
-		b.cuenta.boton.Nombre = r.nombreEntrada()
+		b.cuenta.boton.entrada, b.cuenta.boton.Nombre = true, r.nombreEntrada()
 		// Sin ☰ —sin barra de app, o con una que no lo lleva—, la MARCA del producto en su
 		// sitio y de su tamaño (el lado de un botón): el título empieza en la misma x en
 		// todas las apps y a su izquierda está la identidad de la app, no un hueco.
@@ -964,12 +981,24 @@ func (r *barraSuiteRenderer) layoutTelefono(t fyne.Size, lado, y float32) {
 	b.cerrarSuite.Lado = lado
 	b.cerrarSuite.Move(fyne.NewPos(canalonBarraUnica, y))
 	b.cerrarSuite.Resize(fyne.NewSize(lado, lado))
-	b.cuenta.boton.Nombre = b.t.T("account.menu", nil)
+	b.cuenta.boton.entrada, b.cuenta.boton.Nombre = false, b.cuenta.rotulo()
 	// SIN MARCA: en Fyne no hay selector de aplicaciones (dueño: «el app switcher NO debe
 	// existir en las apps Fyne, solo en web»), y en la web lo que esta cara pone tras el ✕
 	// es justo eso, el selector. Aquí quedan buscador, campana y cuenta.
 	r.layoutAncho(t, lado, y, 0, canalonBarraUnica, canalonBarraUnica+lado)
 	esconder(b.marca, true)
+	// EL BUSCADOR OCUPA LA FILA MIENTRAS SE ESCRIBE EN ÉL, como en la web (TopBar.tsx,
+	// `data-buscando`). Con la campana, el filete y la cuenta al lado le quedaban 137 px
+	// a 320 (207 a 390), y una marca de agua como «Pesquisar no Sytue One…» no cabía.
+	// Con el foco dentro, ellos se apartan y el campo va del ✕ al canalón; al perderlo
+	// vuelven. La x de su izquierda no cambia: solo se alarga hacia la derecha.
+	if b.buscador.campo.Enfocado() {
+		b.avisos.apartar(true)
+		esconder(b.cuenta.boton, true)
+		esconder(r.divisor, true)
+		desde := b.buscador.ultimoX
+		b.buscador.colocar(desde, (AltoBarraSuite()-AltoCampo(CampoMD))/2, max(t.Width-canalonBarraUnica-desde, 0), t)
+	}
 }
 
 // nombreProducto es el nombre de MARCA del producto sin «Sytue» («Mail», «CertiPDF»):
@@ -1288,6 +1317,9 @@ type botonAvatar struct {
 	// carril: el botón va sobre la barra de color (la estrecha) y su velo y su foco son
 	// los del carril. Lo pone la barra.
 	carril bool
+	// entrada: es la entrada a la suite de la cara de la app del teléfono, con su propio
+	// nombre (`ui.suiteOpen`). Lo pone la barra, y mientras tanto la ficha no lo pisa.
+	entrada bool
 }
 
 var (
@@ -1303,8 +1335,37 @@ func nuevoBotonAvatar(nombre, rotulo string, alPulsar func()) *botonAvatar {
 	b := &botonAvatar{avatar: NuevoAvatar(nombre).Con(AvatarXS)}
 	b.Nombre = rotulo
 	b.AlPulsar = alPulsar
+	// SU PISTA, como la campana: el `TopBarButton` de AccountMenu.tsx la lleva debajo
+	// (la barra está arriba del todo). Era el único control de la barra que no decía
+	// qué era al pasar el ratón o al llegar con el tabulador, en la web y aquí. Va en
+	// una caja de lado cero dentro del botón, como la de serie de `BotonIcono`: el
+	// puntero no la encuentra nunca y el `:hover` sigue siendo del botón.
+	b.pista = NuevaPista(rotulo, canvas.NewRectangle(color.NRGBA{}))
+	b.pista.ancla, b.pista.Abajo = b.Size, true
 	b.ExtendBaseWidget(b)
 	return b
+}
+
+// alDia pone la pista al día antes de abrirla: dice el nombre del botón de ahora —la
+// cuenta de quién es, o la entrada a la suite en el teléfono— y sale por el portal de la
+// pantalla en la que está, que la pinta por encima del contenido.
+func (b *botonAvatar) alDia() {
+	if p := b.pista; p != nil && !p.Abierta() {
+		p.Rotulo = b.Nombre
+		p.Portal = portalDePistas(b)
+	}
+}
+
+// MouseIn es `:hover`, con la pista al día.
+func (b *botonAvatar) MouseIn(e *desktop.MouseEvent) {
+	b.alDia()
+	b.pulsable.MouseIn(e)
+}
+
+// FocusGained enciende el anillo y abre la pista al día.
+func (b *botonAvatar) FocusGained() {
+	b.alDia()
+	b.pulsable.FocusGained()
 }
 
 func (b *botonAvatar) MinSize() fyne.Size {
@@ -1323,6 +1384,12 @@ func (b *botonAvatar) CreateRenderer() fyne.WidgetRenderer {
 		anillo: canvas.NewRectangle(color.NRGBA{}),
 	}
 	r.objetos = append(r.aro.Antes(r.caja.Objetos()...), r.anillo, b.avatar)
+	if b.pista != nil {
+		// La última: la burbuja se pinta encima del disco (sin portal, en los guardianes).
+		b.pista.Move(fyne.NewPos(0, 0))
+		b.pista.Resize(fyne.NewSize(0, 0))
+		r.objetos = append(r.objetos, b.pista)
+	}
 	r.Refresh()
 	return r
 }

@@ -402,4 +402,9 @@ export const lv: AppCatalog<typeof en> = {
   'gallery.encrypted.editHint':
     'Rediģēšana notiek šajā ierīcē un tiek saglabāta šifrēta kā jauna fotoattēla versija.',
   'gallery.encrypted.albumEmpty': 'Šajā šifrētajā albumā vēl nav fotoattēlu.',
+  'shortcuts.favorite': 'Atzīmēt vai noņemt no izlases',
+  'trash.restoreAll': 'Atjaunot visu',
+  'trash.restoredAll': 'Atgriezts jūsu fotoattēlos: {count}',
+  'album.download': 'Lejupielādēt albumu',
+  'viewer.openInDrive': 'Skatīt oriģinālu Sytue Drive',
 };

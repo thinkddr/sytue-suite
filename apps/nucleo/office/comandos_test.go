@@ -135,6 +135,9 @@ func TestComandoDelAtajo(t *testing.T) {
 		{`Ctrl+\`, Documento, "clearFormat", ""},
 		{"Ctrl+K", Documento, "insertLink", ""},
 		{"Ctrl+Shift+V", Hoja, "paste", "values"},
+		// En la hoja, la misma combinación es el autofiltro de Excel y Sheets: el registro
+		// solo prohíbe repetirla dentro de un tipo.
+		{"Ctrl+Shift+L", Hoja, "autofilter", ""},
 	}
 	for _, c := range casos {
 		id, valor, ok := ComandoDelAtajo(c.teclas, c.kind)
@@ -143,11 +146,11 @@ func TestComandoDelAtajo(t *testing.T) {
 		}
 	}
 	nada := []struct{ teclas, kind string }{
-		{"Ctrl+Z", Documento},       // `canvas`: lo atiende el historial del editor
-		{"Ctrl+Shift+B", Documento}, // un modificador de más no es negrita
-		{"Ctrl+Alt+B", Documento},   // ni uno de otro tipo
-		{"Ctrl+Shift+L", Hoja},      // la hoja no tiene alinear del texto
-		{"Shift+L", Documento},      // sin Ctrl es escribir
+		{"Ctrl+Z", Documento},                // `canvas`: lo atiende el historial del editor
+		{"Ctrl+Shift+B", Documento},          // un modificador de más no es negrita
+		{"Ctrl+Alt+B", Documento},            // ni uno de otro tipo
+		{"Ctrl+Shift+L", Presentacion + "x"}, // un tipo que no existe no tiene atajos
+		{"Shift+L", Documento},               // sin Ctrl es escribir
 		{"Ctrl+Shift+Mayús+L", Documento},
 	}
 	for _, c := range nada {

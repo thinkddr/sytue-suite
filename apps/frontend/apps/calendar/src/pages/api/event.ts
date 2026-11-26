@@ -105,6 +105,11 @@ export const POST: APIRoute = async (ctx) => {
     ...(rruleRaw ? { rruleRaw } : {}),
     ...(body.eventInput.recurrenceUnchanged === true ? { recurrenceUnchanged: true } : {}),
     ...(color ? { color } : {}),
+    // «Mostrar como»: solo los dos valores del RFC; otra cosa no viaja y el TRANSP
+    // guardado se queda como estaba.
+    ...(body.eventInput.transp === 'OPAQUE' || body.eventInput.transp === 'TRANSPARENT'
+      ? { transp: body.eventInput.transp }
+      : {}),
     // ORGANIZER = usuario autenticado (el navegador no dicta el organizador).
     // Solo emitimos ORGANIZER/ATTENDEE si hay invitados, para no marcar como
     // "reunion" los eventos personales.

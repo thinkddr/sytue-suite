@@ -456,6 +456,8 @@ type Redactor struct {
 	fileteProgramar *canvas.Rectangle
 	cuando          *campoCuando
 	grupoProgramar  *fyne.Container
+	// atajosProgramar son las fechas fijas a un clic (más tarde hoy, mañana…).
+	atajosProgramar *fyne.Container
 	BotonProgramar  *ui.Boton
 }
 
@@ -687,7 +689,7 @@ func (r *Redactor) montar() {
 	}
 	if r.verProgramar {
 		r.montarProgramar()
-		objs = append(objs, r.fileteProgramar, r.grupoProgramar, r.BotonProgramar)
+		objs = append(objs, r.fileteProgramar, r.atajosProgramar, r.grupoProgramar, r.BotonProgramar)
 	}
 	// Las sugerencias van las ÚLTIMAS: encima del asunto y del cuerpo, como la lista
 	// `absolute` de la web.
@@ -705,7 +707,18 @@ func (r *Redactor) montarProgramar() {
 	}
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	r.fileteProgramar = canvas.NewRectangle(tema.Color("border", v))
-	r.cuando = nuevoCampoCuando(time.Now().Add(time.Hour))
+	ahora := time.Now()
+	r.cuando = nuevoCampoCuando(ahora.Add(time.Hour))
+	// Las fechas de siempre a un clic (las de posponer): rellenan los campos, que siguen
+	// mandando. Se calculan al montar el panel, no en cada pintado.
+	var atajos []fyne.CanvasObject
+	for _, o := range OpcionesDePosponer(ahora) {
+		atajos = append(atajos, ui.NuevoBoton(r.T.T(o.Clave, nil), func() {
+			r.cuando.fecha.PonerTexto(ui.EscribirFecha(o.Cuando))
+			r.cuando.hora.PonerTexto(ui.EscribirHora(o.Cuando))
+		}).Con(ui.Secundario, ui.TallaSM))
+	}
+	r.atajosProgramar = container.New(ui.Flujo{Hueco: tema.Espacio(2)}, atajos...)
 	r.grupoProgramar = ui.GrupoCampo(r.T.T("compose.scheduleDateTime", nil), false, r.cuando.objeto(), "", "")
 	r.BotonProgramar = ui.NuevoBoton(r.T.T("compose.schedule", nil), func() {
 		if r.AlProgramar != nil {
@@ -1138,6 +1151,15 @@ func (c *columnaRedactor) panelProgramar(y, ancho float32, poner bool) float32 {
 		r.fileteProgramar.Resize(fyne.NewSize(ancho, tema.Borde))
 	}
 	y += tema.Borde + aireProgramar
+	// La fila de fechas fijas (`mb-3 flex flex-wrap gap-2`), partida al ancho.
+	if objs := r.atajosProgramar.Objects; len(objs) > 0 {
+		_, _, h := ui.Flujo{Hueco: tema.Espacio(2)}.Colocar(objs, ancho)
+		if poner {
+			r.atajosProgramar.Move(fyne.NewPos(0, y))
+			r.atajosProgramar.Resize(fyne.NewSize(ancho, h))
+		}
+		y += h + tema.Espacio(3)
+	}
 	mb := r.BotonProgramar.MinSize()
 	mg := r.grupoProgramar.MinSize()
 	if l := fyne.CurrentApp().Driver().CanvasForObject(r.grupoProgramar); l != nil && l.Size().Width < ui.Estrecho {

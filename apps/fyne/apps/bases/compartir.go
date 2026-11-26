@@ -456,12 +456,14 @@ func (p *Pantalla) exportar(formato string) {
 	if t == nil || p.Guardar == nil {
 		return
 	}
-	id, nombre := t.ID, strings.TrimSpace(t.Name)+"."+formato
+	// Se exporta lo que se ve: la vista y la búsqueda y el orden del momento, como la web
+	// (`consultaDeExportacion`).
+	id, nombre, vista, l := t.ID, strings.TrimSpace(t.Name)+"."+formato, b.VistaID, b.lectura.api()
 	var ruta string
 	p.hacer(func() error {
 		ctx, cancelar := p.ctx()
 		defer cancelar()
-		cuerpo, err := p.svc.Export(ctx, id, formato)
+		cuerpo, err := p.svc.ExportCon(ctx, id, formato, vista, l)
 		if err != nil {
 			return err
 		}

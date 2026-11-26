@@ -41,7 +41,13 @@ import { useDesborda, useSaltoF6 } from './banda';
 import { usePopoversFijos } from './popovers';
 import { BandaDesplegada } from './primitives';
 import { PlantillaOrgItems } from './PlantillaOrgItems';
-import { exportExt, fijarPdfAccesible, pdfAccesible } from '../exportName';
+import { baseDescarga, exportExt, fijarPdfAccesible, pdfAccesible } from '../exportName';
+import { readSheetForCsv } from '../sheets/mando';
+import { BOM_UTF8, csvDeFilas, nombreCsv } from '../sheets/csv';
+import { descargarBlob } from '../../pdf/imagenes';
+import { textoDelDocumento, textoPlanoDeDescarga } from '../recuento';
+import { getDiapositivas } from '../slides/mando';
+import { notasComoTexto } from '../slides/presentar';
 import { r } from '../../lib/rutas';
 import type { DocsKey } from '../../i18n';
 import type { EditorContext } from '../types';
@@ -395,6 +401,32 @@ function ArchivoMenu({ ctx }: { ctx: EditorContext }): JSX.Element {
     }
   };
 
+  const descargarCsv = (): void => {
+    const hoja = readSheetForCsv();
+    if (!hoja) return;
+    const csv = BOM_UTF8 + csvDeFilas(hoja.filas);
+    descargarBlob(
+      new Blob([csv], { type: 'text/csv;charset=utf-8' }),
+      nombreCsv(baseDescarga(ctx.title), hoja.hoja),
+    );
+  };
+
+  const descargarTexto = (): void => {
+    const texto = textoPlanoDeDescarga(textoDelDocumento(ctx.content));
+    descargarBlob(
+      new Blob([texto], { type: 'text/plain;charset=utf-8' }),
+      `${baseDescarga(ctx.title)}.txt`,
+    );
+  };
+
+  const descargarNotas = (): void => {
+    const texto = notasComoTexto(getDiapositivas(), (n) => ctx.t('slides.number', { n }));
+    descargarBlob(
+      new Blob([texto], { type: 'text/plain;charset=utf-8' }),
+      `${baseDescarga(ctx.title)}.txt`,
+    );
+  };
+
   const exportar = async (
     format: (typeof OFFICE_EXPORTS)[number]['id'],
     plantilla = false,
@@ -477,6 +509,25 @@ function ArchivoMenu({ ctx }: { ctx: EditorContext }): JSX.Element {
               ) : null}
             </Fragment>
           ))}
+          {/* La hoja activa como CSV (sheets/csv.ts): se escribe aquí, en el dispositivo, así
+              que no depende de la conexión ni del servicio. */}
+          {ctx.kind === 'spreadsheet' ? (
+            <MenuItem size="sm" onClick={run(descargarCsv)}>
+              {ctx.t('file.downloadCsv')}
+            </MenuItem>
+          ) : null}
+          {/* Las notas del orador de cada diapositiva, en texto (slides/presentar.ts). */}
+          {ctx.kind === 'presentation' ? (
+            <MenuItem size="sm" onClick={run(descargarNotas)}>
+              {ctx.t('file.downloadNotes')}
+            </MenuItem>
+          ) : null}
+          {/* El documento en texto sin formato, también escrito aquí (recuento.ts). */}
+          {ctx.kind === 'document' ? (
+            <MenuItem size="sm" onClick={run(descargarTexto)}>
+              {ctx.t('file.downloadTxt')}
+            </MenuItem>
+          ) : null}
           {/* Como PLANTILLA de Office u OpenDocument: el mismo paquete que Word, Excel,
               PowerPoint o LibreOffice abren como documento nuevo (plantillas-1). */}
           {(['ooxml', 'odf'] as const).map((formato) => (

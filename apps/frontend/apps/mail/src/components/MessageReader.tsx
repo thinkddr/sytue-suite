@@ -468,6 +468,15 @@ export function MessageReader({
   // deep-link a la pantalla de compartir de Sytue Rooms con el asunto y el enlace del
   // correo; allí se elige la sala y se publica. Se abre en otra pestaña, como «Crear
   // evento»: compartir no es motivo para perder el correo que se estaba leyendo.
+  async function copiarDireccion(direccion: string): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(direccion);
+      toast.notify({ tone: 'success', title: t('reader.addressCopied') });
+    } catch {
+      toast.notify({ tone: 'danger', title: t('reader.copyAddressFailed') });
+    }
+  }
+
   async function handleShareToRooms(): Promise<void> {
     if (!latest || sharingRooms) return;
     setSharingRooms(true);
@@ -773,6 +782,16 @@ export function MessageReader({
                 ) : null}
                 {/* La búsqueda es la del servicio de Sytue: lo de una cuenta externa no
                     está en ella, y ofrecerlo daría «sin resultados» por respuesta. */}
+                {/* La dirección tal cual, para pegarla en otro sitio (un formulario, un
+                    chat): el nombre visible no siempre la deja ver. */}
+                {remitente ? (
+                  <MenuItem
+                    icon={<Icon name="copies" size={16} />}
+                    onClick={() => void copiarDireccion(remitente)}
+                  >
+                    {t('reader.copyAddress')}
+                  </MenuItem>
+                ) : null}
                 {onSearchSender && !externo && remitente ? (
                   <MenuItem
                     icon={<Icon name="search" size={16} />}
@@ -1000,7 +1019,9 @@ export function MessageReader({
           panorámicas la línea de texto siga siendo legible. `min(100%, …)`
           evita el desbordamiento cuando el panel es más estrecho que el suelo.
           El fondo es el de la hoja: sobre papel, `bg-bg` es el gris del lienzo. */}
-      <div class="@container min-h-0 flex-1 overflow-y-auto bg-[var(--sytue-sheet-bg)] px-6 py-6 xl:px-8 2xl:px-10">
+      {/* `sytue-reserva-flotante`: en escritorio el «+» de Redactar flota sobre el lector,
+          y sin el hueco el final del último mensaje se quedaba debajo. */}
+      <div class="sytue-reserva-flotante @container min-h-0 flex-1 overflow-y-auto bg-[var(--sytue-sheet-bg)] px-6 py-6 xl:px-8 2xl:px-10">
         <div class="mx-auto flex w-full max-w-[min(100%,clamp(44rem,92cqw,88rem))] flex-col gap-3">
           <ConfianzaImagenes.Provider value={confianza ?? SIN_CONFIANZA}>
             {ordered.map((msg) => (
@@ -1522,7 +1543,17 @@ function MessageBodyView({
     const html = resolverCidsEnLinea(body.html, adjuntos, (i) =>
       attachmentDownloadUrl(emailId, i, true),
     );
-    return <HtmlBody t={t} html={html} remitente={remitente} contexto={contexto} />;
+    return (
+      <CuerpoConFormato
+        key={emailId}
+        t={t}
+        html={html}
+        texto={body.text}
+        remitente={remitente}
+        contexto={contexto}
+        onWriteTo={onWriteTo}
+      />
+    );
   }
   if (body?.text) {
     return (
@@ -1551,6 +1582,53 @@ function MessageBodyView({
     <p class="text-text-subtle text-base leading-relaxed italic">
       {body === null ? t('reader.loadingBody') : t('reader.noTextContent')}
     </p>
+  );
+}
+
+/**
+ * El cuerpo HTML con «Ver como texto sin formato»: la parte de texto que el propio
+ * correo trae, sin maqueta, sin imágenes y con las direcciones de los enlaces a la
+ * vista. Es lo que se mira ante un correo raro (qué dice de verdad, adónde lleva) y lo
+ * que lee mejor quien no quiere la maqueta. Solo si el correo trae esa parte: no se
+ * inventa desde el HTML. La app nativa lee siempre así.
+ */
+function CuerpoConFormato({
+  t,
+  html,
+  texto,
+  remitente,
+  contexto,
+  onWriteTo,
+}: {
+  t: T;
+  html: string;
+  texto?: string | undefined;
+  remitente?: string | undefined;
+  contexto?: ContextoDelRemitente | undefined;
+  onWriteTo?: ((address: string) => void) | undefined;
+}): JSX.Element {
+  const [plano, setPlano] = useState(false);
+  const hayTexto = Boolean(texto?.trim());
+  return (
+    <div>
+      {hayTexto ? (
+        <div class="mb-2 flex justify-end">
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-pressed={plano}
+            onClick={() => setPlano((v) => !v)}
+          >
+            {plano ? t('reader.viewFormatted') : t('reader.viewPlain')}
+          </Button>
+        </div>
+      ) : null}
+      {plano && texto ? (
+        <TextoConCita t={t} texto={texto} alEscribirA={onWriteTo} />
+      ) : (
+        <HtmlBody t={t} html={html} remitente={remitente} contexto={contexto} />
+      )}
+    </div>
   );
 }
 

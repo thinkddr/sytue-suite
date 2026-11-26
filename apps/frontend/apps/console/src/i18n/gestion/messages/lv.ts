@@ -1,0 +1,87 @@
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: (c) 2026 Daniel Delgado Ramos
+ *
+ * Las herramientas de gestión de personas de Sytue Admin (acceso efectivo,
+ * sesiones, bajas recuperables, lotes, export del directorio, dispositivos,
+ * auditoría y roles): traducción del inglés (`en.ts`), que es la fuente de verdad.
+ */
+import type { AppCatalog } from '@sytue/i18n';
+import type { en } from './en.js';
+
+export const lv: AppCatalog<typeof en> = {
+  'gestion.acceso.titulo': 'Ko drīkst darīt un kāpēc',
+  'gestion.acceso.ver': 'Rādīt',
+  'gestion.acceso.error': 'Faktisko piekļuvi neizdevās ielādēt.',
+  'gestion.acceso.ayuda':
+    'To aprēķina Sytue ID ar to pašu noteikumu, ar kuru tas autorizē. Katrai atļaujai redzams tās avots; ja to noņemat, pārbaudiet arī pārējos šeit uzskaitītos.',
+  'gestion.acceso.sinPermisos': 'Nav administrēšanas atļauju.',
+  'gestion.acceso.fuente.integrado': 'Iebūvētā loma: {role}',
+  'gestion.acceso.fuente.rol': 'Loma: {name}',
+  'gestion.acceso.fuente.elevacion': 'Paaugstināts līdz {name} līdz {when}',
+  'gestion.acceso.pendientes': 'Paaugstinājumi, kas gaida apstiprinājumu',
+  'gestion.acceso.pendiente': '{role}, pieprasīts {when}',
+  'gestion.acceso.grupos': 'Grupas',
+  'gestion.acceso.sinGrupos': 'Nav nevienā grupā.',
+  'gestion.acceso.calculado': 'Aprēķināts {when}',
+  'gestion.sesiones.titulo': 'Atvērtās sesijas',
+  'gestion.sesiones.ver': 'Rādīt',
+  'gestion.sesiones.error': 'Sesijas neizdevās ielādēt.',
+  'gestion.sesiones.vacia': 'Nav atvērtu sesiju.',
+  'gestion.sesiones.inicio': 'pieteicies {when}',
+  'gestion.sesiones.caduca': 'beidzas {when}',
+  'gestion.sesiones.mfa': 'Otrais faktors',
+  'gestion.sesiones.sinMfa': 'Tikai parole',
+  'gestion.sesiones.total': 'Atvērtās sesijas: {count}',
+  'gestion.bajas.titulo': 'Slēgtie konti, ko vēl var atjaunot',
+  'gestion.bajas.ayuda':
+    'Slēgts konts saglabā datus {days} dienas. Atjaunošana to atgriež apturētu: lai atdotu piekļuvi, atkārtoti aktivizējiet to katalogā.',
+  'gestion.bajas.cerrada': 'slēgts {when}',
+  'gestion.bajas.motivo': 'iemesls: {reason}',
+  'gestion.bajas.quedan': 'Atlikušās dienas: {count}',
+  'gestion.bajas.restaurar': 'Atjaunot',
+  'gestion.bajas.confirmarTitulo': 'Atjaunot {name}?',
+  'gestion.bajas.confirmar':
+    'Konts atgriežas apturēts, ar saviem datiem. Neviens ar to nevarēs pieteikties, kamēr to atkārtoti neaktivizēsiet.',
+  'gestion.bajas.restaurada': '{name} atjaunots',
+  'gestion.bajas.reactivar': 'Tas ir apturēts: lai atdotu piekļuvi, aktivizējiet to katalogā.',
+  'gestion.bajas.fallo': 'Kontu neizdevās atjaunot',
+  'gestion.directorio.exportar': 'Eksportēt CSV',
+  'gestion.dispositivos.buscar': 'Meklēt personu, ierīci vai IP',
+  'gestion.dispositivos.confianza': 'Filtrēt pēc uzticamības',
+  'gestion.dispositivos.todos': 'Visas ierīces',
+  'gestion.dispositivos.recuento': 'Parādīti {count} no {total}',
+  'gestion.dispositivos.sinResultados': 'Neviena ierīce neatbilst.',
+  'gestion.auditoria.rango': 'Ātrais periods',
+  'gestion.auditoria.hoy': 'Šodien',
+  'gestion.auditoria.7d': '7 dienas',
+  'gestion.auditoria.30d': '30 dienas',
+  'gestion.roles.duplicar': 'Dublēt',
+  'gestion.roles.copia': '{name} (kopija)',
+  'gestion.lotes.titulo': 'Nesenās masveida darbības',
+  'gestion.lotes.ayuda':
+    'Kas tika piemērots vairākām personām vienlaikus un kam to neizdevās piemērot.',
+  'gestion.lotes.ver': 'Rādīt',
+  'gestion.lotes.error': 'Masveida darbības neizdevās ielādēt.',
+  'gestion.lotes.vacio': 'Masveida darbību vēl nav.',
+  'gestion.lotes.progreso': '{done} no {total}',
+  'gestion.lotes.accion.setRole': 'Mainīt lomu',
+  'gestion.lotes.estado.ejecutando': 'Notiek',
+  'gestion.lotes.estado.terminado': 'Pabeigts',
+  'gestion.lotes.estado.cancelado': 'Atcelts',
+  'gestion.lotes.estado.interrumpido': 'Pārtraukts',
+  'gestion.lotes.detalle': 'Sīkāk',
+  'gestion.lotes.todosBien': 'Piemērots visiem.',
+  'gestion.lote.fallos': 'Nav piemērots',
+  'gestion.lote.cerrar': 'Aizvērt',
+  'gestion.lote.codigo.not_found': 'nav šajā organizācijā',
+  'gestion.lote.codigo.self': 'tas esat jūs',
+  'gestion.lote.codigo.forbidden': 'īpašnieka kontu var mainīt tikai ar īpašnieka tiesībām',
+  'gestion.lote.codigo.deleted': 'konts ir slēgts',
+  'gestion.lote.codigo.last_owner': 'organizācijas pēdējais īpašnieks',
+  'gestion.lote.codigo.last_admin': 'organizācijas pēdējais administrators',
+  'gestion.lote.codigo.error': 'neparedzēta kļūda; mēģiniet vēlreiz',
+  'gestion.lote.seleccionarVisibles': 'Atlasīt visus redzamos ({count})',
+  'gestion.lote.recortado':
+    'Masveida darbība aptver ne vairāk kā {max} personas: atlasītas pirmās {max} redzamās.',
+};

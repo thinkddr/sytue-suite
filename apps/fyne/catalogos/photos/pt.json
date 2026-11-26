@@ -2,6 +2,7 @@
   "aiBatch.excludeOrg": "Excluir a organização do lote automático do Sytue AI",
   "aiBatch.excludedHint": "A organização está excluída do lote automático do Sytue AI. As fotos novas não são processadas em segundo plano para sugestões nem semelhanças.",
   "album.coverSet": "Capa do álbum atualizada",
+  "album.download": "Transferir o álbum",
   "album.isCover": "Esta é a capa do álbum",
   "album.linkCopied": "Ligação copiada",
   "album.newLink": "Nova ligação",
@@ -257,6 +258,7 @@
   "public.count": "{count} fotos",
   "public.notFound": "Esta ligação já não é válida.",
   "public.title": "Álbum partilhado",
+  "shortcuts.favorite": "Marcar ou retirar das favoritas",
   "shortcuts.first": "Primeira foto",
   "shortcuts.group.gallery": "Galeria",
   "shortcuts.group.viewer": "Visualizador",
@@ -291,6 +293,8 @@
   },
   "trash.purgesToday": "Eliminada hoje",
   "trash.restore": "Restaurar",
+  "trash.restoreAll": "Restaurar tudo",
+  "trash.restoredAll": "De volta às suas fotos: {count}",
   "trash.retention": {
     "one": "As fotos que remover da galeria ficam aqui {count} dia e até lá podem ser restauradas.",
     "other": "As fotos que remover da galeria ficam aqui {count} dias e até lá podem ser restauradas."
@@ -337,6 +341,7 @@
   "viewer.infoTechnical": "Detalhes técnicos",
   "viewer.infoUploaded": "Enviada (sem data EXIF)",
   "viewer.next": "Foto seguinte",
+  "viewer.openInDrive": "Ver o original no Sytue Drive",
   "viewer.prev": "Foto anterior",
   "viewer.rotate": "Rodar 90°",
   "viewer.rotateFailed": "Não foi possível rodar a foto.",

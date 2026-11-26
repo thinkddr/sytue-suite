@@ -14,7 +14,11 @@ import type { Presentacion } from '../lib/tipos.js';
 if (typeof document === 'undefined') GlobalRegistrator.register();
 
 let respuesta: Presentacion | null = null;
+// Con el resto del cliente tal cual: el mock vale para toda la pasada de `bun test`, y
+// otra prueba que importe `Comments` necesita `comentarios` y compañía.
+const clienteReal = { ...(await import('../client/castApi.js')) };
 void mock.module('../client/castApi.js', () => ({
+  ...clienteReal,
   presentacion: () => Promise.resolve(respuesta),
 }));
 

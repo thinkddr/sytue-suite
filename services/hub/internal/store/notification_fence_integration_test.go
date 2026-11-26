@@ -126,7 +126,7 @@ func TestNotificacionVuelveAComprobarOlvidoEnLaSentencia(t *testing.T) {
 										return fmt.Errorf("read retired alias: %v", err)
 									}
 								case "read_all":
-									n, err := marcarTodasNotificacionesTx(request, tx, d)
+									n, err := marcarTodasNotificacionesTx(request, tx, d, "")
 									if err != nil {
 										return err
 									}

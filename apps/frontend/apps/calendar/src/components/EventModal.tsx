@@ -55,11 +55,14 @@ import { ScopeDialog } from './ScopeDialog.js';
 import { AsistenteEvento } from './AsistenteEvento.js';
 import type { EventoPropuesto } from '../lib/ai.js';
 import { ColorSwatches } from './CalendarModal.js';
+import type { GridEvent } from './CalendarGrid.js';
+import { solapes } from '../lib/solapes.js';
 import { FindTimePanel } from './FindTimePanel.js';
 import { ResourcePicker, type BookingStatus } from './ResourcePicker.js';
 import {
   finExclusivo,
   shiftEnd,
+  timeLabel,
   toDatetimeLocal,
   weekdayLongLabels,
   weekdayNarrowLabels,
@@ -104,6 +107,8 @@ export interface EditingEvent {
   alarms?: string[] | undefined;
   /** URL del calendario al que pertenece el evento (edicion). */
   calendarUrl?: string | undefined;
+  /** «Mostrar como» guardado (TRANSP); sin él, ocupado. */
+  transp?: 'OPAQUE' | 'TRANSPARENT' | undefined;
   /** iCal crudo del maestro (para el recorte por alcance de una serie). */
   ical?: string | undefined;
   /** Solo lectura: el evento viene de una suscripción ICS externa. Se muestra en
@@ -123,6 +128,13 @@ interface Props {
    * ajustes de Calendar. Al editar uno que ya existe manda lo que tenga guardado.
    */
   recordatorioPorDefecto?: number | null | undefined;
+  /**
+   * Los eventos que la vista ya tiene cargados, para avisar de «Coincide con…». Sin
+   * ellos no se avisa (el formulario abierto desde otra pantalla no sabe qué hay).
+   */
+  ocupados?: readonly GridEvent[] | undefined;
+  /** Correo de quien usa la app: lo que ha rechazado no cuenta como choque. */
+  miCorreo?: string | undefined;
   onClose: () => void;
   onSaved: () => void;
 }
@@ -134,6 +146,8 @@ export function EventModal({
   calendars,
   editing,
   recordatorioPorDefecto = null,
+  ocupados,
+  miCorreo,
   onClose,
   onSaved,
 }: Props): JSX.Element | null {
@@ -160,6 +174,7 @@ export function EventModal({
   const [conferenceError, setConferenceError] = useState(false);
   const [description, setDescription] = useState(editing?.description ?? '');
   const [color, setColor] = useState(editing?.color ?? '');
+  const [showAs, setShowAs] = useState<'OPAQUE' | 'TRANSPARENT'>(editing?.transp ?? 'OPAQUE');
   // Panel «buscar hueco» (asistente de programacion): plegado por defecto.
   const [findTimeOpen, setFindTimeOpen] = useState(false);
   const [repeatFreq, setRepeatFreq] = useState<RepeatFreq>(repeatFreqOf(editing));
@@ -236,6 +251,15 @@ export function EventModal({
     () => localInstant(allDay ? finExclusivo(start, end) : end || start, tzid, allDay),
     [end, start, tzid, allDay],
   );
+  // «Coincide con…»: solo con hora y solo si este evento ocupa; uno «disponible» o de
+  // día completo no choca con nada, por la misma regla que el free/busy del servicio.
+  const choques = useMemo(
+    () =>
+      allDay || showAs === 'TRANSPARENT' || !ocupados
+        ? []
+        : solapes(ocupados, startInstant, endInstant, { uid: editing?.uid, correo: miCorreo }),
+    [ocupados, startInstant, endInstant, allDay, showAs, editing?.uid, miCorreo],
+  );
 
   // Al (re)abrir, sincroniza el formulario con el evento en edicion.
   useEffect(() => {
@@ -251,6 +275,7 @@ export function EventModal({
     setConferenceError(false);
     setDescription(editing?.description ?? '');
     setColor(editing?.color ?? '');
+    setShowAs(editing?.transp ?? 'OPAQUE');
     setFindTimeOpen(false);
     setRepeatFreq(repeatFreqOf(editing));
     setRepeatEnd(repeatEndOf(editing?.recurrence));
@@ -470,6 +495,7 @@ export function EventModal({
         ...(description ? { description } : {}),
         ...(color ? { color } : {}),
         ...(conferenceUrl ? { conferenceUrl } : {}),
+        transp: showAs,
         ...(finalInvitees.length ? { attendees: finalInvitees, partstats } : {}),
         ...(alarms.length ? { alarms } : {}),
         ...(rruleRaw ? { rruleRaw } : {}),
@@ -497,6 +523,7 @@ export function EventModal({
       ...(description ? { description } : {}),
       ...(color ? { color } : {}),
       ...(conferenceUrl ? { conferenceUrl } : {}),
+      transp: showAs,
       ...repeticion,
       ...(finalInvitees.length ? { attendees: finalInvitees, partstats } : {}),
       ...(alarms.length ? { alarms } : {}),
@@ -762,6 +789,25 @@ export function EventModal({
               />
             </FieldGroup>
           </div>
+          {/* «Coincide con…»: un aviso, no un veto. Debajo de las horas, que es lo que
+              se toca para arreglarlo; `status` para que el lector lo diga al cambiar. */}
+          {choques.length > 0 ? (
+            <p role="status" class="text-warning-text flex items-start gap-1.5 text-sm">
+              <Icon name="warning" size={16} class="mt-0.5 shrink-0" />
+              <span>
+                {choques.length === 1
+                  ? t('event.overlaps', {
+                      title: choques[0]!.evento.summary || t('event.untitled'),
+                      time: `${timeLabel(locale, choques[0]!.inicio)}–${timeLabel(locale, choques[0]!.fin)}`,
+                    })
+                  : t('event.overlapsMore', {
+                      title: choques[0]!.evento.summary || t('event.untitled'),
+                      time: `${timeLabel(locale, choques[0]!.inicio)}–${timeLabel(locale, choques[0]!.fin)}`,
+                      count: choques.length - 1,
+                    })}
+              </span>
+            </p>
+          ) : null}
           {/* Zona horaria del evento: solo con hora (los de día completo son flotantes). */}
           {!allDay ? (
             <FieldGroup label={t('event.timeZone')} htmlFor="ev-tz">
@@ -774,6 +820,20 @@ export function EventModal({
               </Select>
             </FieldGroup>
           ) : null}
+          {/* «Mostrar como»: lo que ven los demás al buscar hueco contigo. Un evento
+              «disponible» sigue en tu agenda pero no te ocupa la hora. */}
+          <FieldGroup label={t('event.showAs')} htmlFor="ev-show-as" help={t('event.showAsHint')}>
+            <Select
+              id="ev-show-as"
+              value={showAs}
+              onChange={(e) =>
+                setShowAs(e.currentTarget.value === 'TRANSPARENT' ? 'TRANSPARENT' : 'OPAQUE')
+              }
+            >
+              <option value="OPAQUE">{t('event.showAsBusy')}</option>
+              <option value="TRANSPARENT">{t('event.showAsFree')}</option>
+            </Select>
+          </FieldGroup>
           {/* Buscar hueco (asistente de programacion): huecos libres comunes en la
               franja laboral; al elegir uno, fija el inicio/fin del evento. */}
           {!allDay ? (

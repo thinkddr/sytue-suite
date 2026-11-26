@@ -39,6 +39,9 @@ import {
   quienFirma,
   aPDF,
   textoParaLeer,
+  lineasDeTexto,
+  resumenDeComentarios,
+  textoDelPdf,
   colorARGB,
   pideContrasena,
   invalidaFirmas,
@@ -700,6 +703,18 @@ export function PdfApp({
         case 'ayuda':
           setAtajosAbiertos(true);
           break;
+        case 'irA':
+          // «Ir a la página» de cualquier visor: el número sin buscar el campo de la cinta,
+          // que solo está a la vista en «Ver».
+          if (contenido) {
+            void preguntarEnEditor({
+              mensaje: t('pdf.shortcuts.goTo'),
+              valor: String(paginaActual),
+            }).then((v) => {
+              if (v !== null && v.trim() !== '') irAPagina(Number(v));
+            });
+          }
+          break;
         default:
           accion satisfies never;
       }
@@ -727,6 +742,54 @@ export function PdfApp({
       return null;
     }
   }, [textos, fuente, clave]);
+
+  /* --- El texto fuera del PDF: descargarlo, copiar una página y el resumen --- */
+
+  const nombreTxt = (sufijo = '') =>
+    `${(descarga.nombre ?? 'documento').replace(/\.pdf$/i, '')}${sufijo}.txt`;
+
+  const descargarTexto = async () => {
+    const paginas = await cargarTexto();
+    if (!paginas) {
+      setAviso(t('pdf.ai.noText'));
+      return;
+    }
+    descargarBlob(
+      new Blob([textoDelPdf(paginas)], { type: 'text/plain;charset=utf-8' }),
+      nombreTxt(),
+    );
+  };
+
+  const copiarPagina = async () => {
+    const paginas = await cargarTexto();
+    const texto = lineasDeTexto(paginas?.[paginaActual - 1] ?? []).join('\n');
+    if (texto === '') {
+      setAviso(t('pdf.page.noText'));
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(texto);
+      setAviso(t('pdf.text.copied'));
+    } catch {
+      setAviso(t('pdf.snapshot.failed'));
+    }
+  };
+
+  const descargarResumen = () => {
+    const resumen = resumenDeComentarios(contenido?.anotaciones ?? [], {
+      pagina: (n) => t('pdf.page.n', { n }),
+      tipo: (k) => t(`pdf.kind.${k}` as DocsKey),
+      anonimo: t('pdf.comments.anonymous'),
+    });
+    if (resumen === '') {
+      setAviso(t('pdf.comments.empty'));
+      return;
+    }
+    descargarBlob(
+      new Blob([resumen], { type: 'text/plain;charset=utf-8' }),
+      nombreTxt(` - ${t('pdf.panel.comments')}`),
+    );
+  };
 
   /* --- Leer en voz alta -------------------------------------------------- */
 
@@ -866,6 +929,9 @@ export function PdfApp({
         urlDescarga={descarga.url}
         nombreDescarga={descarga.nombre}
         onImprimir={() => void imprimir()}
+        onDescargarTexto={() => void descargarTexto()}
+        onResumenComentarios={descargarResumen}
+        onCopiarPagina={() => void copiarPagina()}
         panelAbierto={panelAbierto}
         onPanelAbierto={setPanelAbierto}
         noDisponible={noDisponible}
@@ -1095,6 +1161,13 @@ export function PdfApp({
         <div
           ref={scrollRef}
           onScroll={alDesplazar}
+          // Ctrl+rueda (y el pellizco del panel táctil, que llega igual) acerca y aleja la
+          // página como en cualquier visor; sin esto ampliaba la interfaz entera.
+          onWheel={(e) => {
+            if (!(e.ctrlKey || e.metaKey) || e.deltaY === 0) return;
+            e.preventDefault();
+            cambiarZoom(e.deltaY < 0 ? 0.15 : -0.15);
+          }}
           // `relative` no es decoración: hace que este contenedor sea el
           // `offsetParent` de las hojas, que es lo que `irAPagina` y
           // `alDesplazar` dan por hecho al comparar `offsetTop` con

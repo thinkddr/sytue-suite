@@ -23,6 +23,8 @@ import (
 )
 
 func TestMain(m *testing.M) {
+	// El día del arnés: sus facturas aún no han vencido, como cuando se midieron.
+	ahora = func() time.Time { return time.Date(2026, 9, 23, 12, 0, 0, 0, time.UTC) }
 	test.NewApp().Settings().SetTheme(tema.Sytue{})
 	tema.FormaDeLosGuardianes()
 	os.Exit(m.Run())

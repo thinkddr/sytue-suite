@@ -989,4 +989,11 @@ export const et: AppCatalog<typeof en> = {
   'nativeResource.description':
     'Ühenda see rakendus oma kontoga organisatsioonis {tenant}. Sinu senised juurdepääsuõigused säilivad.',
   'nativeResource.approve': 'Ühenda',
+  'channel.markRead': 'Märgi loetuks',
+  'channel.copyLink': 'Kopeeri link',
+  'channel.linkCopied': 'Link kopeeritud',
+  'channel.download': 'Laadi vestlus alla',
+  'channel.downloaded': 'Vestlus salvestati asukohta',
+  'channel.downloadFailed': 'Vestlust ei õnnestunud salvestada',
+  'status.nothingUnread': 'Kõik oli juba loetud',
 };

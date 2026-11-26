@@ -28,6 +28,17 @@ test('un fallo vuelve con su código y sin «conectada»', () => {
   ).toBe('/admin/migrations?instance=i1&oauth_error=exchange');
 });
 
+test('una cuenta ya conectada vuelve a la conexión que había, no al borrador descartado', () => {
+  expect(
+    destinoTrasConsentimiento('/admin', {
+      instance: 'borrador',
+      existing: 'la-de-antes',
+      section: 'apps',
+      error: 'exists',
+    }),
+  ).toBe('/admin/apps?instance=la-de-antes&oauth_error=exists');
+});
+
 test('una sección fuera de la lista cae en el catálogo de apps, nunca fuera de la consola', () => {
   for (const section of [
     '../evil',

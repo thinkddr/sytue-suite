@@ -218,7 +218,7 @@ func seccionBotones(tema.Variante) (fyne.CanvasObject, func(fyne.Canvas)) {
 		ui.NuevoBotonIcono(iconos.Papelera, "Mover a la papelera", nil),
 		ui.NuevoEnlace("Ver el calendario", tema.TextoBase, ui.Medio, "primary-text", nil),
 		tecla,
-		ui.NuevoBotonFlotante("Redactar", iconos.Lapiz, nil))
+		ui.NuevoBotonFlotante("Redactar", nil))
 	return columna(tema.Espacio(3),
 		rotulo("Variantes"), variantes,
 		rotulo("Tallas"), tallas,

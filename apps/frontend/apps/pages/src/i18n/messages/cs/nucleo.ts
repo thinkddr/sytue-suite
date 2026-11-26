@@ -392,4 +392,33 @@ export const nucleo = {
 
   'forms.empty': 'Zatím žádné odpovědi',
   'forms.empty_help': 'Až někdo odešle formulář na vašem webu, uvidíte jej zde.',
+  'sites.search': 'Hledat weby',
+  'sites.search_empty': 'Žádný web neodpovídá „{q}“.',
+  'sites.sort_label': 'Seřadit weby',
+  'sites.sort_recent': 'Nedávno upravené',
+  'sites.sort_name': 'Název (A–Z)',
+  'sites.view_live': 'Zobrazit web',
+  'sites.view_live_aria': 'Zobrazit publikovaný web {nombre} (otevře se na nové kartě)',
+  'seo.title': 'Co uvidí vyhledávače',
+  'seo.intro':
+    'Kontrola konceptu: názvy, popisy a obrázky, na kterých závisí vyhledávače a čtečky obrazovky. Jsou to upozornění; publikování nebrání.',
+  'seo.open_editor': 'Otevřít editor',
+  'seo.recheck': 'Zkontrolovat znovu',
+  'seo.error': 'Kontrolu se nepodařilo načíst. Zkuste to znovu.',
+  'seo.all_good': 'Vše v pořádku: každá stránka má název a popis a obrázky mají alternativní text.',
+  'seo.summary': 'Upozornění: {count}',
+  'seo.badge_warning': 'Zlepšit',
+  'seo.badge_info': 'Poznámka',
+  'seo.on_page': 'Stránka: {page}',
+  'seo.title_missing': 'Stránka nemá název: vyhledávač si nějaký vymyslí.',
+  'seo.title_long': 'Název má {count} znaků; vyhledávač ho zkrátí zhruba po 60.',
+  'seo.title_duplicate': 'Jiná stránka má stejný název: ve výsledcích si budou konkurovat.',
+  'seo.description_missing': 'Stránka nemá popis: vyhledávač zobrazí náhodný kus textu.',
+  'seo.description_long': 'Popis má {count} znaků; zobrazí se zhruba 160.',
+  'seo.image_alt_missing':
+    'Obrázky bez alternativního textu: {count}. Čtečky obrazovky ani vyhledávače nevědí, co zobrazují; pokud nic neukazují, označte je jako dekorativní.',
+  'seo.page_noindex': 'Tato stránka je skrytá před vyhledávači (noindex).',
+  'seo.site_noindex': 'Celý web je skrytý před vyhledávači (noindex).',
+  'seo.share_image_missing':
+    'Web nemá obrázek pro sdílení: odkazy ve zprávách a sociálních sítích se zobrazí bez obrázku.',
 };

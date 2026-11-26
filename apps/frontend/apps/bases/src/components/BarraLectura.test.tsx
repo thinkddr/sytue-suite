@@ -12,7 +12,13 @@ import { render } from 'preact';
 import { act } from 'preact/test-utils';
 import type { BasesField } from '@sytue/api-clients/bases';
 import { BarraLectura, ESPERA_BUSQUEDA_MS } from './BarraLectura.js';
-import { SIN_LECTURA, opcionesDeLectura, type Lectura } from '../lib/lectura.js';
+import {
+  SIN_LECTURA,
+  consultaDeExportacion,
+  hoyLocal,
+  opcionesDeLectura,
+  type Lectura,
+} from '../lib/lectura.js';
 
 const registrado = typeof document === 'undefined';
 if (registrado) GlobalRegistrator.register();
@@ -34,12 +40,27 @@ const campo = (id: string, kind: BasesField['kind']): BasesField => ({
 });
 const campos = [campo('nombre', 'text'), campo('cifra', 'number'), campo('enlace', 'link')];
 
-test('opcionesDeLectura solo envía lo pedido', () => {
-  expect(opcionesDeLectura(SIN_LECTURA)).toEqual({});
-  expect(opcionesDeLectura({ q: '  ana ', campo: 'cifra', dir: 'desc' })).toEqual({
+test('opcionesDeLectura solo envía lo pedido, y siempre el día de quien mira', () => {
+  expect(opcionesDeLectura(SIN_LECTURA, '2026-11-25')).toEqual({ today: '2026-11-25' });
+  expect(opcionesDeLectura({ q: '  ana ', campo: 'cifra', dir: 'desc' }, '2026-11-25')).toEqual({
     q: 'ana',
     sort: 'cifra:desc',
+    today: '2026-11-25',
   });
+});
+
+test('el día es el del huso de quien mira, no el de UTC', () => {
+  // 00:30 del 26 en el reloj local: es el 26, aunque en UTC aún pueda ser el 25.
+  expect(hoyLocal(new Date(2026, 10, 26, 0, 30))).toBe('2026-11-26');
+});
+
+test('exportar lleva la vista, la búsqueda, el orden y el día: lo que se ve', () => {
+  expect(consultaDeExportacion('csv', '', SIN_LECTURA, '2026-11-25')).toBe(
+    'format=csv&today=2026-11-25',
+  );
+  expect(
+    consultaDeExportacion('json', 'v1', { q: 'ana', campo: 'cifra', dir: 'asc' }, '2026-11-25'),
+  ).toBe('format=json&view=v1&q=ana&sort=cifra%3Aasc&today=2026-11-25');
 });
 
 test('la búsqueda espera a que se deje de teclear y el orden se aplica al elegirlo', async () => {

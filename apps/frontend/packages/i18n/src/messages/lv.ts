@@ -397,10 +397,14 @@ export const lv: Catalog = {
   'import.fromGoogle': 'Pārnest no Google',
   'import.fromMicrosoft': 'Pārnest no Microsoft 365',
   'import.running': 'Kopē jūsu datus… līdz šim {count} vienumi.',
-  'import.done': 'Pārnesti {count} vienumi, izlaisti {skipped}.',
+  'import.done': '{what}: pārnesti {count} vienumi, izlaisti {skipped}. Pabeigts {date}.',
   'import.someFailed':
     'Daļu jūsu datu neizdevās nokopēt. Organizācijas administrācija var redzēt, kāpēc.',
   'import.failed': 'Importu neizdevās sākt. Pēc brīža mēģiniet vēlreiz.',
+  'import.unavailable':
+    'Savienojumu ar {source} pašlaik nevar nolasīt: tam beidzies termiņš, tas atsaukts vai nekad nav autorizēts. Lūdziet organizācijas administrācijai to savienot vēlreiz.',
+  'import.needsAdmin':
+    'Savienojums ar {source} vēl nevar kopēt katras personas datus. Lūdziet organizācijas administrācijai pabeigt iestatīšanu.',
   'dataflow.label': 'Kas notiek ar datiem',
   'dataflow.in.title': 'Tikai nonāk Sytue One',
   'dataflow.in.body':

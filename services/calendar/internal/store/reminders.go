@@ -166,6 +166,33 @@ func (s *Store) DismissReminder(ctx context.Context, ownerSub string, id uuid.UU
 	})
 }
 
+// SnoozeReminder pospone un recordatorio in-app del usuario: vuelve a vencer en
+// `until` y se olvida de que ya se avisó (fired_at a NULL), así que el worker lo
+// vuelve a entregar a su hora como cualquier otro. Uno ya descartado no se pospone
+// (el «Descartar» manda) y uno ajeno o inexistente da ErrNotFound, como al
+// descartar: una sola sentencia, sin leer antes.
+//
+// ponytail: guardar el evento vuelve a calcular sus recordatorios desde el VALARM
+// (replaceReminders) y con ello se pierde lo pospuesto. Es lo esperable —quien
+// cambia la hora del evento cambia también cuándo avisa— y no compensa una columna
+// aparte para conservarlo.
+func (s *Store) SnoozeReminder(ctx context.Context, ownerSub string, id uuid.UUID, until time.Time) error {
+	t := tenancy.MustFrom(ctx)
+	return s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+		ct, err := tx.Exec(ctx,
+			`UPDATE calendar_reminders SET trigger_at = $4, fired_at = NULL
+			  WHERE tenant=$1 AND owner_sub=$2 AND id=$3 AND dismissed_at IS NULL`,
+			t.Slug, ownerSub, id, until.UTC())
+		if err != nil {
+			return fmt.Errorf("store: posponer recordatorio: %w", err)
+		}
+		if ct.RowsAffected() == 0 {
+			return domain.ErrNotFound
+		}
+		return nil
+	})
+}
+
 // ClaimDueReminders reclama hasta `limit` recordatorios cuyo disparo ya venció y
 // aún no se avisaron, publica cada uno con `publish` y los marca como disparados,
 // todo en UNA transacción (at-least-once vía outbox: si el commit falla, ni se

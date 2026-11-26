@@ -1297,6 +1297,9 @@ export const en = {
     'It runs in the background; you can check the status in a few minutes.',
   'apps.toast.testFailed': 'The connection failed',
   'apps.toast.actionFailed': 'Could not complete',
+  'apps.toast.oauthExists': 'This account is already connected',
+  'apps.toast.oauthExistsHint':
+    'The existing connection, {name}, has been kept. Reconnect it from the list if it stopped working.',
   'apps.toast.gatewayDown': 'The application service or Sytue ID are not responding right now.',
 
   // --- Inicio de sesión único (SSO) -----------------------------------------
@@ -2895,6 +2898,8 @@ export const en = {
     '{app} is not responding right now. It is not your values: try again in a minute.',
   'wizard.app.fix.generic':
     'We could not connect. Review the values in the previous step and try again.',
+  'wizard.app.fix.alreadyConnected':
+    'This {app} account is already connected. Use the existing connection, or reconnect it from the list if it stopped working.',
   'wizard.app.toast.activateFailed': 'Could not activate it',
   'wizard.app.fix.activateBadData':
     'Check the values in the “Configure” step: we could not register the sign-in.',

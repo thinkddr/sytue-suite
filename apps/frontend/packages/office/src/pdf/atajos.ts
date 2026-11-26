@@ -23,6 +23,7 @@ export type AccionVisor =
   | 'anterior'
   | 'primera'
   | 'ultima'
+  | 'irA'
   | 'ayuda';
 
 /** Una pulsación: `KeyboardEvent.key`, con Ctrl (⌘ en el Mac) o sin él. */
@@ -64,10 +65,19 @@ export const GRUPOS_VISOR: { titulo: DocsKey; atajos: AtajoVisor[] }[] = [
       {
         teclas: (t) => [t('slides.present.key.home'), t('slides.present.key.end')],
         descripcion: 'pdf.shortcuts.ends',
+        // Con Ctrl también, que es lo que hace cualquier visor de escritorio: sin él,
+        // Ctrl+Inicio no hacía nada y había que soltar la tecla para volver al principio.
         combinaciones: [
           { combinacion: tecla('Home'), accion: 'primera' },
           { combinacion: tecla('End'), accion: 'ultima' },
+          { combinacion: ctrl('Home'), accion: 'primera' },
+          { combinacion: ctrl('End'), accion: 'ultima' },
         ],
+      },
+      {
+        teclas: conCtrl('G'),
+        descripcion: 'pdf.shortcuts.goTo',
+        combinaciones: [{ combinacion: ctrl('g'), accion: 'irA' }],
       },
       {
         teclas: () => ['↑', '↓', '←', '→'],

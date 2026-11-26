@@ -18,7 +18,7 @@ export function fechaCorta(fecha: Date): string {
 }
 
 /** `AAAA-MM-DD HH:MM`, también en hora local. */
-function fechaLarga(fecha: Date): string {
+export function fechaLarga(fecha: Date): string {
   const dos = (n: number) => String(n).padStart(2, '0');
   return `${fechaCorta(fecha)} ${dos(fecha.getHours())}:${dos(fecha.getMinutes())}`;
 }
@@ -80,4 +80,37 @@ export function descargarTexto(nombre: string, texto: string): void {
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
+}
+
+/**
+ * IMPRIMIR LOS CÓDIGOS, Y SOLO LOS CÓDIGOS.
+ *
+ * Ctrl+P en Mi cuenta imprime la página entera: el perfil, las sesiones, los
+ * dispositivos… y los códigos en mitad de una hoja que nadie quiere archivar. El
+ * botón marca el documento (`data-imprimir="codigos"`) mientras dura el diálogo de
+ * impresión, y la hoja de esta app (`styles/app.css`) esconde todo lo que no es el
+ * bloque `ID_IMPRIMIBLE`. Un `<iframe>` con su propio HTML habría sido lo obvio,
+ * pero la CSP de esta app no deja estilos en línea y un folio sin estilos sale con
+ * los códigos en una sola columna de letra de sistema.
+ */
+export const ID_IMPRIMIBLE = 'codigos-recuperacion-imprimibles';
+export const MARCA_IMPRESION = 'codigos';
+
+/** `imprimir` se inyecta en las pruebas; en el navegador es `window.print`. */
+export function imprimirCodigos(imprimir: () => void = () => window.print()): void {
+  const raiz = document.documentElement;
+  raiz.dataset.imprimir = MARCA_IMPRESION;
+  // `print()` bloquea hasta que se cierra el diálogo en los navegadores de
+  // escritorio; en los que no (Safari de iOS), `afterprint` llega después. Se quita
+  // la marca en los dos casos: si se queda, el siguiente Ctrl+P saldría recortado.
+  const quitar = (): void => {
+    delete raiz.dataset.imprimir;
+    window.removeEventListener('afterprint', quitar);
+  };
+  window.addEventListener('afterprint', quitar);
+  try {
+    imprimir();
+  } finally {
+    if (!('onafterprint' in window)) quitar();
+  }
 }

@@ -106,9 +106,9 @@ type Explorador struct {
 	// AlMoverA mueve lo arrastrado a una carpeta soltándolo encima; nil, no se arrastra.
 	AlMoverA func(origenes []Elemento, destino Elemento)
 	// AlMenu abre el menú de acciones de un elemento —el «⋯» de la fila o de la
-	// tarjeta— colgado de `disparador`. AlNuevo abre el de «Nuevo», colgado del botón.
-	AlMenu  func(el Elemento, disparador fyne.CanvasObject)
-	AlNuevo func(disparador fyne.CanvasObject)
+	// tarjeta— colgado de `disparador`. El de «Nuevo» no es suyo: cuelga del «+» flotante
+	// de la pantalla.
+	AlMenu func(el Elemento, disparador fyne.CanvasObject)
 	// Miniaturas son las de las imágenes ya traídas, por id; un nil guardado es que
 	// no la hay (el servicio dijo que no), y no se vuelve a pedir. AlMiniatura la pide
 	// cuando una tarjeta de imagen se pinta sin ella: la web la pide `lazy`, solo de lo
@@ -378,29 +378,14 @@ func (e *Explorador) cabecera(v tema.Variante) fyne.CanvasObject {
 
 	buscador := e.campoBusqueda()
 
-	// «Nuevo» es el disparador de un menú —carpeta, documento, hoja, presentación—, con
-	// su `chevronDown` de 14 detrás y el `gap-1.5` de su clase escrita a mano: 76,25
-	// medidos en producción.
-	var nuevo *ui.Boton
-	nuevo = ui.NuevoBoton(e.t("files.new"), func() {
-		if e.AlNuevo != nil {
-			e.AlNuevo(nuevo)
-		}
-	}).Con(ui.Secundario, ui.TallaSM)
-	nuevo.IconoDetras, nuevo.TamIcono, nuevo.Hueco = iconos.ChevronAbajo, LadoGalonNuevo, HuecoNuevo
-	nuevo.Inerte = e.SinRed() || e.Ocupado
-	// Medido: 71 de ancho con la flecha, y sin ella salía de 50. La rueda solo gira al
-	// SUBIR; lo demás que ocupa (crear, copiar, borrar) solo lo apaga.
-	subir := ui.NuevoBoton(e.t("files.upload"), e.AlSubir).Con(ui.Primario, ui.TallaSM)
-	subir.Inerte = e.SinRed() || (e.Ocupado && !e.Subiendo())
-	subir.Cargando = e.Subiendo()
-	conGlifo(subir, glifoSubir, v)
-
+	// «Nuevo» y «Subir» ya no van aquí: crear es el «+» flotante de la pantalla, en todos
+	// los anchos, que abre el menú de «Nuevo» con «Subir» delante (`capaNuevo`). Lo que se
+	// sube lo sigue diciendo la franja de progreso (`barraSubida`).
 	conmutador := NuevoConmutadorVista(e.t("files.viewLabel"), e.t("files.viewList"), e.t("files.viewGrid"), e.Rejilla, e.AlCambiarVista)
 
 	c := &CabeceraVista{
 		Ruta:       migas,
-		Acciones:   []fyne.CanvasObject{buscador, nuevo, subir},
+		Acciones:   []fyne.CanvasObject{buscador},
 		Conmutador: conmutador,
 		Ventana:    e.Ventana,
 	}
@@ -476,6 +461,15 @@ func (e *Explorador) campoBusqueda() *ui.Entrada {
 	})
 	e.buscador = b
 	return b
+}
+
+// borrarBusqueda vacía el buscador y vuelve a la carpeta. El campo avisa a `AlBuscar`
+// al cambiar; si no lo hiciera (un campo aún sin pintar), se le avisa aquí.
+func (e *Explorador) borrarBusqueda() {
+	e.campoBusqueda().PonerTexto("")
+	if e.Consulta != "" && e.AlBuscar != nil {
+		e.AlBuscar("")
+	}
 }
 
 // LadoGalonNuevo es el `chevronDown` de 14 de «Nuevo» y HuecoNuevo su `gap-1.5`.
@@ -719,6 +713,11 @@ func (e *Explorador) vacio(v tema.Variante) fyne.CanvasObject {
 			e.t("files.search.emptyTitle", i18n.Vars{"query": strings.TrimSpace(e.Consulta)}),
 			e.t("files.search.emptyBody"))
 		x.Ilustracion = ilustracion(iconos.VacioBusqueda, v)
+		// «Borrar la búsqueda»: volver a la carpeta sin ir a buscar la «×» del campo,
+		// como el botón del estado vacío de la web.
+		if e.AlBuscar != nil {
+			x.Accion = ui.NuevoBoton(e.t("files.search.clear"), e.borrarBusqueda).Con(ui.Secundario, ui.TallaSM)
+		}
 		return centrar(x, v)
 	}
 	x := ui.NuevoVacio(e.t("files.empty.title"), e.t("files.empty.body"))
@@ -904,7 +903,7 @@ func (e *Explorador) prepararFilas(conCasilla bool, lineas int, v tema.Variante)
 		e.rellenarFila,
 	)
 	e.filas.HideSeparators = true
-	// Una fila vacía al final en el teléfono: el «Subir» flotante tapaba la última.
+	// Una fila vacía al final: el «+» flotante tapaba la última.
 	e.reservaFilas = ui.ReservarEnLista(&e.filas.List)
 	// El `widget.List` separa sus filas con el relleno del TEMA —7 px con el de la
 	// suite, y también con HideSeparators—: 35.000 px de desvío en 5.000 filas.
@@ -967,11 +966,11 @@ func (e *Explorador) ajustarDesplazamiento(conFranja bool) {
 	}
 }
 
-// ajustarReserva pone la fila de la reserva del «Subir» flotante en la lista, salvo con la
+// ajustarReserva pone la fila de la reserva del «+» flotante en la lista, salvo con la
 // franja compacta, que la lleva al final de su desplazamiento.
 func (e *Explorador) ajustarReserva(compacta bool) {
 	if compacta {
-		e.reservaFilas.Ajustar(ui.Estrecho) // `Estrecho` la apaga
+		e.reservaFilas.Quitar()
 		return
 	}
 	e.reservaFilas.Ajustar(e.Ventana)
@@ -983,7 +982,8 @@ func (e *Explorador) montarLista(col *columnaLista, hijos []fyne.CanvasObject, l
 	}
 	// Conserva el desplazable y su contenido entre repintados.
 	col.altoFilas = float32(min(len(e.deLista), 2)) * ui.AltoFilaDriveCon(lineas)
-	if e.Ventana > 0 && e.Ventana < ui.Estrecho {
+	// El «+» flota en todos los anchos (2026-11-25): la reserva va con cualquier ventana.
+	if e.Ventana > 0 {
 		col.reserva = ui.ReservaFlotante
 	}
 	var contenido *fyne.Container
@@ -1124,9 +1124,9 @@ type columnaLista struct {
 	compacta   bool
 	ancho      float32
 	altoFilas  float32
-	// reserva es el hueco del «Subir» flotante al final del desplazamiento de la franja
-	// compacta (ui.ReservaFlotante en el teléfono): la lista de dos filas queda encima
-	// del botón al bajar del todo. Sin compactar, la reserva va en la lista. altoVista
+	// reserva es el hueco del «+» flotante al final del desplazamiento de la franja
+	// compacta (ui.ReservaFlotante): la lista de dos filas queda encima del botón al
+	// bajar del todo. Sin compactar, la reserva va en la lista. altoVista
 	// es el alto del desplazamiento, que acota la reserva (ver pieCompacta).
 	reserva, altoVista float32
 }
@@ -1780,7 +1780,10 @@ func (e *Explorador) flechaEnTarjetas(t *TarjetaDrive, tecla fyne.KeyName) bool 
 // Espacio la seleccionaba y nadie escucha la selección.
 type listaFilas struct {
 	widget.List
-	alAbrir   func(int)
+	alAbrir func(int)
+	// reales es el número de filas de verdad, sin la de la reserva del «+» flotante que
+	// `ui.ReservarEnLista` le añade a `Length`: Fin y ↓ no van más allá.
+	reales    func() int
 	resaltada widget.ListItemID
 	// sincronizando: OnHighlighted también salta al pasar el ratón por una fila, sin mover
 	// el resalte del teclado; solo vale cuando lo provoca la propia lista (teclas y foco).
@@ -1792,7 +1795,7 @@ func nuevaListaFilas(
 	alAbrir func(int), largo func() int, crear func() fyne.CanvasObject,
 	rellenar func(widget.ListItemID, fyne.CanvasObject),
 ) *listaFilas {
-	l := &listaFilas{alAbrir: alAbrir}
+	l := &listaFilas{alAbrir: alAbrir, reales: largo}
 	l.Length, l.CreateItem, l.UpdateItem = largo, crear, rellenar
 	l.OnHighlighted = func(i widget.ListItemID) {
 		if l.sincronizando {
@@ -1820,8 +1823,15 @@ func (l *listaFilas) TypedKey(ev *fyne.KeyEvent) {
 	case fyne.KeySpace:
 		// Abre TypedRune. La lista la SELECCIONARÍA, y una fila seleccionada se queda
 		// pintada con el color de selección sin que nadie la haya marcado.
+	case fyne.KeyDown:
+		// La fila de la reserva del «+» flotante no es de nadie: ↓ se para en la última
+		// de verdad, como Fin.
+		if l.resaltada >= l.reales()-1 {
+			return
+		}
+		l.List.TypedKey(ev)
 	case fyne.KeyHome, fyne.KeyEnd:
-		if d := ui.VecinoEnLista(l.resaltada, l.Length(), ev.Name); d >= 0 {
+		if d := ui.VecinoEnLista(l.resaltada, l.reales(), ev.Name); d >= 0 {
 			antes := l.resaltada
 			l.Highlight(d)
 			l.RefreshItem(antes)

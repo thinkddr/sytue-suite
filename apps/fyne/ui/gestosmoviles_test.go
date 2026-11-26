@@ -13,8 +13,6 @@ import (
 	"fyne.io/fyne/v2/driver/mobile"
 	"fyne.io/fyne/v2/test"
 	"fyne.io/fyne/v2/widget"
-
-	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 )
 
 func TestGestoRevisionListaValidaLimitesFirmados(t *testing.T) {
@@ -415,7 +413,7 @@ func TestGestoActualizarYMenuFuncionanBajoCapasHermanasEIndicador(t *testing.T) 
 	armazon := NuevoArmazon(lista)
 	armazon.Menu = NuevoLateral("Menú", widget.NewLabel("carpetas"))
 	fabPulsado := 0
-	fab := NuevoBotonFlotante("Nuevo", iconos.Mas, func() { fabPulsado++ })
+	fab := NuevoBotonFlotante("Nuevo", func() { fabPulsado++ })
 	avisos := NuevaPilaAvisos()
 
 	b := barraPruebaA(t, 390)

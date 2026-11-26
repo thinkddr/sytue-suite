@@ -793,4 +793,17 @@ export const mt: AppCatalog<typeof en> = {
   'search.loadMoreFailed': 'Ma setgħux jitgħabbew aktar riżultati. Erġa’ pprova.',
   'privacy.notice':
     "Ma nbigħux id-data tiegħek u ma naqsmuhiex ma' terzi. Ma nużawhiex biex nagħmlulek profil, għar-reklamar, jew biex inħarrġu jew intejbu s-servizzi tagħna jew ta' ħaddieħor. Hija kriptata waqt it-trasmissjoni u fil-ħażna, u toħroġ mill-infrastruttura Ewropea tagħna biss fejn ikun strettament meħtieġ biex noħorġulek il-fattura u fl-integrazzjonijiet li tattiva int, fejn it-terza parti titolbok l-approvazzjoni għad-data li se tuża.",
+  'inbox.markAllOf': "Immarka dawk ta' {app} bħala moqrija",
+  'inbox.markUnread': 'Immarka bħala mhux moqri',
+  'inbox.muteLikeThis': 'Isikket notifiki bħal din',
+  'inbox.mutedLikeThis':
+    "M'intix se tirċievi aktar notifiki bħal dik. Tista' tibdilha hawn taħt, f'“X'trid tirċievi”.",
+  'inbox.muteFailed': "Ma setgħux jiġu msikkta. Erġa' pprova.",
+  'inbox.actionsOf': 'Azzjonijiet għal “{title}”',
+  'downloads.checksum': 'Ivverifika t-tniżżil',
+  'downloads.checksumHelp':
+    'Il-marka SHA-256 tiegħu. Ikkalkula dik tal-fajl li niżżilt u ċċekkja li jaqblu.',
+  'downloads.checksumLabel': 'Marka SHA-256',
+  'downloads.copyChecksum': 'Ikkopja l-marka',
+  'downloads.checksumCopied': 'Il-marka ġiet ikkupjata',
 };

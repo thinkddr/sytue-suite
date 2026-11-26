@@ -42,6 +42,7 @@ import { formatBytes } from '@sytue/ui';
 import { cloudBaseUrl } from './auth.js';
 import { appT, metricLabel } from '../i18n/index.js';
 import * as seed from './data.js';
+import { marcarProduccionActual } from './despliegues.js';
 import { formatNumber } from './format.js';
 import { METRICS, SUITE_SEAT_PRICE_EUR, SUITE_PRODUCTS } from './pricing.js';
 import type {
@@ -255,6 +256,10 @@ const SDK_STATUS_TO_VIEW: Record<SdkDeployment['status'], Deployment['status']> 
   ready: 'ready',
   error: 'error',
   canceled: 'canceled',
+  // Una producción reemplazada. Faltaba en el mapa y caía en el `?? 'queued'` de
+  // abajo: las producciones anteriores salían «En cola» y, como «en cola» no es
+  // accionable, el panel escondía justo el rollback a ellas.
+  retired: 'retired',
 };
 
 // Los nombres del control-plane son snake_case; los camelCase que había aquí NO
@@ -296,6 +301,8 @@ function mapDeployment(d: SdkDeployment, projectSlug: string): Deployment {
           ),
         }
       : {}),
+    ...(d.status === 'error' && d.error ? { errorMessage: d.error } : {}),
+    ...(d.build_id ? { buildId: d.build_id } : {}),
   };
 }
 
@@ -482,7 +489,7 @@ export async function loadDeployments(
     const match = sdkProjects.find((p) => slugFromSdk(p) === slug);
     if (!match) throw new Error('not_found_live');
     const list = await cloud.listDeployments(match.id, { limit: 30 });
-    return { live: true, data: list.map((d) => mapDeployment(d, slug)) };
+    return { live: true, data: marcarProduccionActual(list.map((d) => mapDeployment(d, slug))) };
   } catch (e) {
     return degrade(e, seed.deploymentsFor(slug));
   }
@@ -580,10 +587,34 @@ export async function promoteDeployment(
  * Dispara un despliegue manual de producción (re-build del ref principal).
  * Devuelve false si no hay backend vivo.
  */
-export async function triggerDeploy(session: SytueSession, slug: string): Promise<boolean> {
+export async function triggerDeploy(
+  session: SytueSession,
+  slug: string,
+  /**
+   * Rama/etiqueta y commit concretos. Sin ellos se despliega la rama de producción
+   * del proyecto, que es el «volver a desplegar» de siempre. Con ellos es un
+   * hotfix: publicar una rama sin tener que cambiar antes la de producción.
+   */
+  ref?: { gitRef?: string; commitSha?: string },
+): Promise<boolean> {
   try {
     const projectId = await resolveProjectId(session, slug);
     if (!projectId) throw new Error('not_found_live');
+    if (ref?.gitRef || ref?.commitSha) {
+      // Por el HttpClient crudo: el método del SDK solo sabe del commit, y el
+      // control-plane llama `target` a lo que el SDK manda como `env`.
+      await http(session).json({
+        method: 'POST',
+        path: `/projects/${encodeURIComponent(projectId)}/deployments`,
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          target: 'production',
+          ...(ref.gitRef ? { git_ref: ref.gitRef } : {}),
+          ...(ref.commitSha ? { commit_sha: ref.commitSha } : {}),
+        }),
+      });
+      return true;
+    }
     await client(session).createDeployment(projectId, { env: 'production' });
     return true;
   } catch (err) {
@@ -1264,6 +1295,75 @@ export async function protectPreviews(
     const projectId = await resolveProjectId(session, slug);
     if (!projectId) throw new Error('not_found_live');
     return await client(session).protectPreviews(projectId);
+  } catch (err) {
+    if (httpErrorInfo(err)) throw err;
+    return undefined;
+  }
+}
+
+/** Congelación de los despliegues de producción de un proyecto. */
+export interface DeployFreezeView {
+  frozen: boolean;
+  reason?: string;
+  frozenAt?: string;
+}
+
+/**
+ * ¿Está congelada la producción? (GET /projects/{id}/deploy-freeze). Sin backend
+ * vivo dice «no congelado»: es el estado normal y la demostración no tiene otro.
+ */
+export async function loadDeployFreeze(
+  session: SytueSession,
+  slug: string,
+): Promise<Sourced<DeployFreezeView>> {
+  try {
+    const projectId = await resolveProjectId(session, slug);
+    if (!projectId) throw new Error('not_found_live');
+    const f = await http(session).json<{ frozen?: boolean; reason?: string; frozen_at?: string }>({
+      path: `/projects/${encodeURIComponent(projectId)}/deploy-freeze`,
+    });
+    return {
+      live: true,
+      data: {
+        frozen: f.frozen === true,
+        ...(f.reason ? { reason: f.reason } : {}),
+        ...(f.frozen_at ? { frozenAt: f.frozen_at } : {}),
+      },
+    };
+  } catch (e) {
+    return degrade(e, { frozen: false });
+  }
+}
+
+/**
+ * Congela (con motivo) o descongela la producción. Devuelve el estado que quedó, o
+ * undefined sin backend vivo; un error real del control-plane (403 a un member) se
+ * propaga para que la ruta BFF devuelva su status.
+ */
+export async function setDeployFreeze(
+  session: SytueSession,
+  slug: string,
+  freeze: { frozen: true; reason: string } | { frozen: false },
+): Promise<DeployFreezeView | undefined> {
+  try {
+    const projectId = await resolveProjectId(session, slug);
+    if (!projectId) throw new Error('not_found_live');
+    const path = `/projects/${encodeURIComponent(projectId)}/deploy-freeze`;
+    if (!freeze.frozen) {
+      await http(session).text({ method: 'DELETE', path });
+      return { frozen: false };
+    }
+    const f = await http(session).json<{ reason?: string; frozen_at?: string }>({
+      method: 'PUT',
+      path,
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ reason: freeze.reason }),
+    });
+    return {
+      frozen: true,
+      ...(f.reason ? { reason: f.reason } : {}),
+      ...(f.frozen_at ? { frozenAt: f.frozen_at } : {}),
+    };
   } catch (err) {
     if (httpErrorInfo(err)) throw err;
     return undefined;
@@ -2524,6 +2624,12 @@ export async function loadLogs(
     cursor?: string;
     limit?: number;
     source?: 'build' | 'runtime';
+    /**
+     * Compilación concreta (la de un despliegue del historial). Sin ella, la más
+     * reciente. El control-plane comprueba que la compilación es de la organización
+     * de quien pregunta, así que un id ajeno contesta 404 y no un log ajeno.
+     */
+    buildId?: string;
   },
 ): Promise<Sourced<LogLine[]> & { nextCursor?: string }> {
   try {
@@ -2536,11 +2642,14 @@ export async function loadLogs(
     // arrancar. Son dos preguntas distintas —«por qué no compila» y «qué está pasando
     // ahora»— y se responden con dos registros distintos.
     if (opts?.source === 'build') {
-      const builds = await http(session).json<{ builds?: Array<{ id: string }> }>({
-        path: `/projects/${encodeURIComponent(match.id)}/builds`,
-        query: { limit: 1 },
-      });
-      const buildId = builds.builds?.[0]?.id;
+      let buildId = opts.buildId;
+      if (!buildId) {
+        const builds = await http(session).json<{ builds?: Array<{ id: string }> }>({
+          path: `/projects/${encodeURIComponent(match.id)}/builds`,
+          query: { limit: 1 },
+        });
+        buildId = builds.builds?.[0]?.id;
+      }
       if (!buildId) throw new Error('no_builds');
       const text = await http(session).text({
         path: `/builds/${encodeURIComponent(buildId)}/logs`,

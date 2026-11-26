@@ -879,6 +879,13 @@ func ExportTemplateFilename(titulo string, k DocKind, formato string) string {
 }
 
 func exportFilename(titulo string, k DocKind, formato string, plantilla bool) string {
+	return NombreDescarga(titulo) + "." + exportExt(k, formato, plantilla)
+}
+
+// NombreDescarga es `baseDescarga` de la web: el título saneado para usarlo de nombre de
+// fichero, sin extensión. Lo comparten las descargas del servicio y las que se escriben en
+// el dispositivo (el CSV de una hoja).
+func NombreDescarga(titulo string) string {
 	base := strings.TrimSpace(titulo)
 	if base == "" {
 		base = "documento"
@@ -887,7 +894,7 @@ func exportFilename(titulo string, k DocKind, formato string, plantilla bool) st
 	if r := []rune(base); len(r) > 120 {
 		base = string(r[:120])
 	}
-	return base + "." + exportExt(k, formato, plantilla)
+	return base
 }
 
 var reNombreProhibido = regexp.MustCompile(`[\\/:*?"<>|]+`)

@@ -171,6 +171,14 @@ import {
   withAnims,
 } from './anim';
 import {
+  alternarPausa,
+  avanceAutomatico,
+  leerAvance,
+  pasoDeRueda,
+  transcurrido,
+  type Cronometro,
+} from './presentar';
+import {
   alignBoxes,
   boundingBox,
   distributeBoxes,
@@ -222,6 +230,7 @@ import {
   publicarDisenos,
   publicarSeleccion,
   publicarTamano,
+  publicarDiapositivas,
   registrarComandosDeDiapos,
   safeMediaSrc,
   type SlideLayoutId,
@@ -485,6 +494,21 @@ const SHAPE_STROKE = CONTENT_PALETTE[0];
 const SHAPE_FILL_PALETTE = CONTENT_PALETTE.map((c) => (c === '#FFFFFF' ? 'transparent' : c));
 /** Tinta del contenido sobre papel blanco (negro de marca de CONTENT_PALETTE, §5). */
 const INK = CONTENT_PALETTE[0];
+/** Ctrl/⌘+D sobre la tira de diapositivas: duplicar la enfocada. Pura, para probarla. */
+export function esDuplicarDiapo(e: {
+  key: string;
+  ctrlKey: boolean;
+  metaKey: boolean;
+  shiftKey: boolean;
+  altKey: boolean;
+}): boolean {
+  return (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'd';
+}
+
+/** El punto del puntero láser y su halo: el rojo de CONTENT_PALETTE, que es el de la luz
+ *  de un láser; el halo, el mismo con opacidad. La app nativa usa el mismo (`presentar.go`). */
+const LASER = CONTENT_PALETTE[5];
+const LASER_HALO = `${LASER}99`;
 
 /* ---------- Temas de presentación (fase Slides-Temas) ----------
  * Set corto de presets SÓLIDOS (fondo + tinta + fuente), anti-slop: sin
@@ -819,6 +843,7 @@ export type PresentCommand =
   | { kind: 'presenter' }
   | { kind: 'blank'; color: 'black' | 'white' }
   | { kind: 'help' }
+  | { kind: 'laser' }
   | { kind: 'resume' };
 
 /** Teclas que solo modifican a otra: «?» llega con Mayúsculas, y pulsar Mayúsculas no
@@ -871,6 +896,9 @@ export function presentCommand(
     case 'h':
     case 'H':
       return { cmd: { kind: 'help' }, digits: '' };
+    case 'l':
+    case 'L':
+      return { cmd: { kind: 'laser' }, digits: '' };
   }
   const target = presentKeyTarget(key, s.idx, s.last, s.hidden);
   if (target === null) return { cmd: null, digits: '' };
@@ -2122,6 +2150,9 @@ export function PresenterView(props: {
   cur: number;
   step: number;
   elapsedMs: number;
+  /** El cronómetro está en pausa, y quien lo pausa o lo reanuda. */
+  paused: boolean;
+  onPause: () => void;
   clock: string;
   winW: number;
   /** Tamaño de letra de las notas y su cambio (A−: −1, A+: +1). */
@@ -2209,6 +2240,14 @@ export function PresenterView(props: {
           >
             {fmtElapsed(props.elapsedMs)}
           </span>
+          <button
+            type="button"
+            style={btnGhost}
+            aria-pressed={props.paused}
+            onClick={props.onPause}
+          >
+            {t(props.paused ? 'slides.presenter.resume' : 'slides.presenter.pause')}
+          </button>
           <button type="button" style={btnGhost} onClick={props.onReset}>
             {t('slides.presenter.reset')}
           </button>
@@ -2472,8 +2511,16 @@ function Presentation(props: {
   /** Cronómetro del moderador: origen (ms) y «ahora» que refresca cada segundo. El
    *  reloj se lee una vez al montar (inicializador perezoso), no en cada render. */
   const [montadoEn] = useState(Date.now);
-  const startedAtRef = useRef(montadoEn);
+  const [crono, setCrono] = useState<Cronometro>(() => ({ inicio: montadoEn, pausa: null }));
   const [now, setNow] = useState(montadoEn);
+  /** Puntero láser (L): un punto rojo que sigue al ratón, sin el cursor. `laserEn` es
+   *  dónde está, en px del visor; null mientras no se ha movido. */
+  const [laser, setLaser] = useState(false);
+  const [laserEn, setLaserEn] = useState<{ x: number; y: number } | null>(null);
+  /** La rueda: lo girado desde el último paso y cuándo se pasó (presentar.ts). */
+  const ruedaRef = useRef({ resto: 0, ultimo: -Infinity });
+  /** Avance automático en bucle, en segundos (0, a mano): lo de este dispositivo. */
+  const [avance] = useState(leerAvance);
   /** Sentido del último salto: «deslizar»/entrada de caja entran por ese lado y
    *  las animaciones solo se REPRODUCEN al avanzar (dir 1), no al retroceder. */
   const [dir, setDir] = useState<1 | -1>(1);
@@ -2600,10 +2647,43 @@ function Presentation(props: {
       case 'help':
         setHelp(true);
         break;
+      case 'laser':
+        setLaser((v) => !v);
+        break;
       case 'resume':
         setBlank(null);
         break;
     }
+  };
+
+  /* Avance automático en bucle: cada `avance` segundos, la posición siguiente y, al
+   * acabar, la primera (presentar.ts). Se para con la pantalla apagada o la lista de
+   * teclas abierta, y vuelve a contar desde cero tras cada cambio de posición. */
+  useEffect(() => {
+    if (avance <= 0 || blank !== null || help) return;
+    const id = window.setTimeout(() => {
+      const n = avanceAutomatico(props.model.slides, cur, curStep);
+      go(n.slide, n.step, 1);
+    }, avance * 1000);
+    return () => window.clearTimeout(id);
+  });
+
+  /** La rueda pasa de diapositiva como en PowerPoint: abajo, la siguiente. Una muesca
+   *  basta y el panel táctil acumula; tras un paso, 350 ms de calma para no saltar diez. */
+  const onWheel = (e: WheelEvent): void => {
+    if (help) return;
+    e.preventDefault();
+    // La hora del propio evento (monótona, en ms): la calma se mide entre giros.
+    const ahora = e.timeStamp;
+    const r = ruedaRef.current;
+    if (ahora - r.ultimo < 350) return;
+    const abajo = e.deltaMode === 1 ? e.deltaY * 40 : e.deltaY;
+    const { dir, resto } = pasoDeRueda(r.resto, abajo, 50);
+    r.resto = resto;
+    if (dir === 0) return;
+    r.ultimo = ahora;
+    if (blank !== null) setBlank(null);
+    else advance(dir);
   };
 
   useEffect(() => {
@@ -2705,7 +2785,12 @@ function Presentation(props: {
           model={props.model}
           cur={cur}
           step={curStep}
-          elapsedMs={now - startedAtRef.current}
+          elapsedMs={transcurrido(crono, now)}
+          paused={crono.pausa !== null}
+          onPause={() => {
+            setCrono((c) => alternarPausa(c, Date.now()));
+            setNow(Date.now());
+          }}
           clock={new Date(now).toLocaleTimeString(document.documentElement.lang || [], {
             hour: '2-digit',
             minute: '2-digit',
@@ -2716,8 +2801,9 @@ function Presentation(props: {
           onPrev={() => advanceRef.current(-1)}
           onNext={() => advanceRef.current(1)}
           onReset={() => {
-            startedAtRef.current = Date.now();
-            setNow(Date.now());
+            const ahora = Date.now();
+            setCrono((c) => ({ inicio: ahora, pausa: c.pausa === null ? null : ahora }));
+            setNow(ahora);
           }}
           onEnd={() => onExitRef.current()}
         />
@@ -2735,6 +2821,7 @@ function Presentation(props: {
     onExitRef,
     notesSize,
     changeNotesSize,
+    crono,
   ]);
 
   const anim =
@@ -2775,8 +2862,18 @@ function Presentation(props: {
       aria-label={t('slides.present')}
       tabIndex={-1}
       class="sytue-safe-fullscreen fixed inset-0 flex items-center justify-center overflow-hidden outline-none"
-      style={{ background: INK, zIndex: 'var(--z-modal)' }}
+      style={{
+        background: INK,
+        zIndex: 'var(--z-modal)',
+        ...(laser ? { cursor: 'none' } : {}),
+      }}
       onKeyDown={onKeyDown}
+      onWheel={onWheel}
+      onPointerMove={(e) => {
+        if (!laser) return;
+        const caja = rootRef.current?.getBoundingClientRect();
+        if (caja) setLaserEn({ x: e.clientX - caja.left, y: e.clientY - caja.top });
+      }}
       onMouseDown={(e) => {
         if (!help) e.preventDefault(); // el clic no roba el foco (teclado vivo)
       }}
@@ -2995,6 +3092,22 @@ function Presentation(props: {
         title={t('slides.present.help.title')}
         groups={presentShortcuts(t)}
       />
+      {laser && laserEn && blank === null && (
+        // El punto del láser: rojo con su halo, sin recibir el puntero (el clic sigue
+        // pasando de diapositiva). Va en el color de la luz de un láser, no de la marca.
+        <span
+          aria-hidden="true"
+          class="pointer-events-none absolute rounded-full"
+          style={{
+            left: `${laserEn.x - 7}px`,
+            top: `${laserEn.y - 7}px`,
+            width: '14px',
+            height: '14px',
+            background: LASER,
+            boxShadow: `0 0 10px 4px ${LASER_HALO}`,
+          }}
+        />
+      )}
       <p class="sr-only" aria-live="polite">
         {blank === 'black'
           ? t('slides.present.blackScreen')
@@ -3046,6 +3159,7 @@ export function presentShortcuts(t: DocsT): GrupoDeAtajos[] {
         { teclas: ['W', ','], descripcion: t('slides.present.help.white') },
         { teclas: ['N'], descripcion: t('slides.present.help.notes') },
         { teclas: ['P'], descripcion: t('slides.present.help.presenter') },
+        { teclas: ['L'], descripcion: t('slides.present.help.laser') },
         { teclas: ['?', 'H'], descripcion: t('slides.present.help.keys') },
         { teclas: [k('slides.present.key.esc')], descripcion: t('slides.present.exit') },
       ],
@@ -3526,9 +3640,11 @@ export function SlidesCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
     setEditBox(null);
   };
 
-  const duplicateSlide = (): void => {
+  /** Duplica la diapositiva `en` (la activa si no se dice) justo detrás. */
+  const duplicateSlide = (en?: number): void => {
     const cur = stateRef.current;
-    const src = cur.model.slides[cur.active];
+    const origen = en ?? cur.active;
+    const src = cur.model.slides[origen];
     if (!src) return;
     // Las cajas reciben ids nuevos; los conectores se remapean a esos ids (si no,
     // apuntarían a las cajas de la diapositiva original).
@@ -3546,7 +3662,7 @@ export function SlidesCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
     if (src.connectors && src.connectors.length > 0)
       copy.connectors = remapConnectorIds(src.connectors, idMap);
     const slides = [...cur.model.slides];
-    slides.splice(cur.active + 1, 0, copy);
+    slides.splice(origen + 1, 0, copy);
     // Duplicar una diapositiva con imágenes también puede reventar el op-body.
     if (JSON.stringify({ slides }).length > MODEL_MAX_CHARS) {
       notify({
@@ -3557,7 +3673,7 @@ export function SlidesCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
       return;
     }
     apply({ slides });
-    setActive(cur.active + 1);
+    setActive(origen + 1);
     setSelBox(null);
     setEditBox(null);
   };
@@ -4555,6 +4671,12 @@ export function SlidesCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
     publicarTamano(model.size);
   }, [model.size]);
 
+  /* Y las diapositivas, para «Descargar las notas del orador» del menú Archivo. */
+  useEffect(() => {
+    publicarDiapositivas(model.slides);
+    return () => publicarDiapositivas([]);
+  }, [model.slides]);
+
   /* Y los diseños vigentes, para el selector «Disposición» del ribbon. */
   useEffect(() => {
     publicarDisenos(layoutDefs.map((l) => ({ id: l.id, name: l.name })));
@@ -5205,6 +5327,13 @@ export function SlidesCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
                       toggleHidden(i);
                       return;
                     }
+                    // Ctrl+D duplica la diapositiva enfocada, como en PowerPoint y Google
+                    // Slides: sin él había que ir al ratón o a la cinta para lo más usado.
+                    if (esDuplicarDiapo(e)) {
+                      e.preventDefault();
+                      if (!stateRef.current.ctx.soloLectura) duplicateSlide(i);
+                      return;
+                    }
                     if (!(e.ctrlKey || e.metaKey) || !e.shiftKey) return;
                     const to = e.key === 'ArrowUp' ? i - 1 : e.key === 'ArrowDown' ? i + 1 : -1;
                     if (to < 0 || to >= model.slides.length) return;
@@ -5230,7 +5359,11 @@ export function SlidesCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
         </div>
         <div class="border-border flex shrink-0 items-center justify-center gap-1 border-t p-1 max-sm:border-t-0 max-sm:border-l">
           <RibbonButton icon="plus" label={t('slides.new')} onAction={() => addSlide()} />
-          <RibbonButton icon="slideAdd" label={t('slides.duplicate')} onAction={duplicateSlide} />
+          <RibbonButton
+            icon="slideAdd"
+            label={t('slides.duplicate')}
+            onAction={() => duplicateSlide()}
+          />
           <RibbonButton
             icon="eyeOff"
             label={t('slides.hideSlide')}

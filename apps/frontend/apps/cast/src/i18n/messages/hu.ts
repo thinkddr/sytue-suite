@@ -357,4 +357,8 @@ export const hu: AppCatalog<typeof en> = {
   'moderation.action.unlist': 'Eltávolítás a nyilvános oldalról',
   'moderation.action.unpublish': 'Közzététel visszavonása',
   'moderation.action.block': 'A személy letiltása a szervezetben',
+  'player.loop': 'Ismétlés',
+  'watch.chapters': 'Fejezetek',
+  'watch.jumpTo': 'Ugrás ide: {time}',
+  'share.startAt': 'Kezdés ennél: {time}',
 };

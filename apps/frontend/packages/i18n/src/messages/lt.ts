@@ -400,10 +400,14 @@ export const lt: Catalog = {
   'import.fromGoogle': 'Perkelti iš „Google“',
   'import.fromMicrosoft': 'Perkelti iš „Microsoft 365“',
   'import.running': 'Kopijuojami jūsų duomenys… kol kas {count} elem.',
-  'import.done': 'Perkelta {count} elem., praleista {skipped}.',
+  'import.done': '{what}: perkelta {count} elem., praleista {skipped}. Baigta {date}.',
   'import.someFailed':
     'Dalies jūsų duomenų nepavyko nukopijuoti. Organizacijos administravimas gali pamatyti kodėl.',
   'import.failed': 'Nepavyko pradėti importo. Netrukus bandykite dar kartą.',
+  'import.unavailable':
+    'Ryšio su {source} dabar nepavyksta nuskaityti: jis baigė galioti, buvo atšauktas arba niekada nebuvo patvirtintas. Paprašykite organizacijos administravimo jį vėl prijungti.',
+  'import.needsAdmin':
+    'Ryšys su {source} kol kas negali kopijuoti kiekvieno asmens duomenų. Paprašykite organizacijos administravimo užbaigti sąranką.',
   'dataflow.label': 'Kas vyksta su duomenimis',
   'dataflow.in.title': 'Tik patenka į Sytue One',
   'dataflow.in.body':

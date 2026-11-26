@@ -17,6 +17,7 @@ import { formatNumber, type Locale } from '@sytue/i18n';
 import type { DocsKey, DocsT } from '../../../i18n';
 import type { EditorContext, SlideSizePreset } from '../../types';
 import { FUENTES } from '../../valores';
+import { SEGUNDOS_AVANCE, fijarAvance, leerAvance } from '../../slides/presentar';
 import { useT } from '../../context';
 import { EditorIcon } from '../../icons';
 import {
@@ -633,6 +634,8 @@ export function DisenoSlidesTab({ ctx }: { ctx: EditorContext }): JSX.Element {
  */
 export function PresentarTab({ ctx }: { ctx: EditorContext }): JSX.Element {
   const { t } = ctx;
+  // El avance automático es de quien presenta en este dispositivo (presentar.ts).
+  const [avance, setAvance] = useState(leerAvance);
   return (
     <>
       {/* Modo presentación (fase Slides-Presentación): arranca en la activa.
@@ -657,6 +660,23 @@ export function PresentarTab({ ctx }: { ctx: EditorContext }): JSX.Element {
           icon="cast"
           label={t('slides.cast.present')}
           onAction={() => dispatchSlidesCommand('presentar', 'cast')}
+        />
+        {/* Avance automático en bucle: la pantalla de una recepción o de un estand, que
+         * nadie pasa a mano. Al acabar vuelve a la primera, como PowerPoint en quiosco. */}
+        <RibbonSelect
+          commandId="presentar"
+          label={t('slides.autoAdvance')}
+          width={132}
+          value={String(avance)}
+          options={SEGUNDOS_AVANCE.map((s) => ({
+            value: String(s),
+            label: s === 0 ? t('slides.autoAdvance.off') : t('slides.autoAdvance.every', { n: s }),
+          }))}
+          onSelect={(v) => {
+            const n = Number(v);
+            fijarAvance(n);
+            setAvance(n);
+          }}
         />
       </RibbonGroup>
     </>

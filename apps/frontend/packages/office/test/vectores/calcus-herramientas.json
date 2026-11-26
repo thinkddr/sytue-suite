@@ -1,0 +1,121 @@
+{
+  "version": 1,
+  "nota": "Autosuma, «Limpiar texto» y CSV de Calcus. La web los recorre en sheets-herramientas.test.ts y Go en apps/fyne/calcus/herramientas_test.go: el mismo caso, el mismo resultado en las dos. En autosuma, `numeros` son las celdas que calculan un número y `llenas` las que tienen otra cosa; las demás están vacías. `sale` null es «sin plan» (se abre la celda con =SUM().",
+  "autosuma": [
+    {
+      "nombre": "una celda bajo una columna de números con cabecera",
+      "numeros": ["A2", "A3", "A4"],
+      "llenas": ["A1"],
+      "sel": "A5",
+      "sale": [{ "celda": "A5", "rango": "A2:A4" }]
+    },
+    {
+      "nombre": "sin números encima, los de la izquierda",
+      "numeros": ["B3", "C3"],
+      "llenas": ["A3", "D1"],
+      "sel": "D3",
+      "sale": [{ "celda": "D3", "rango": "B3:C3" }]
+    },
+    {
+      "nombre": "un hueco encima corta la columna",
+      "numeros": ["A1"],
+      "llenas": [],
+      "sel": "A3",
+      "sale": null
+    },
+    {
+      "nombre": "sin nada alrededor",
+      "numeros": [],
+      "llenas": ["C5"],
+      "sel": "B2",
+      "sale": null
+    },
+    {
+      "nombre": "varias filas con la última vacía: el total va en ella",
+      "numeros": ["A1", "A2", "A3", "B2", "B3"],
+      "llenas": ["B1"],
+      "sel": "A1:B4",
+      "sale": [
+        { "celda": "A4", "rango": "A1:A3" },
+        { "celda": "B4", "rango": "B1:B3" }
+      ]
+    },
+    {
+      "nombre": "varias filas llenas: el total va debajo",
+      "numeros": ["A1", "A2", "A3"],
+      "llenas": [],
+      "sel": "A1:A3",
+      "sale": [{ "celda": "A4", "rango": "A1:A3" }]
+    },
+    {
+      "nombre": "una columna sin números no lleva total",
+      "numeros": ["A1", "A2", "A3"],
+      "llenas": ["B1", "B2", "B3"],
+      "sel": "A1:B3",
+      "sale": [{ "celda": "A4", "rango": "A1:A3" }]
+    },
+    {
+      "nombre": "una fila: el total a la derecha",
+      "numeros": ["A1", "B1", "C1"],
+      "llenas": [],
+      "sel": "A1:C1",
+      "sale": [{ "celda": "D1", "rango": "A1:C1" }]
+    },
+    {
+      "nombre": "una fila con la última celda vacía: el total va en ella",
+      "numeros": ["A1", "B1"],
+      "llenas": [],
+      "sel": "A1:C1",
+      "sale": [{ "celda": "C1", "rango": "A1:B1" }]
+    },
+    {
+      "nombre": "una fila sin números",
+      "numeros": [],
+      "llenas": ["A1", "B1"],
+      "sel": "A1:B1",
+      "sale": []
+    },
+    {
+      "nombre": "sin sitio debajo en la última fila de la hoja",
+      "numeros": ["A1", "A2", "A3", "A4"],
+      "llenas": [],
+      "sel": "A1:A4",
+      "topes": { "cols": 5, "filas": 4 },
+      "sale": []
+    }
+  ],
+  "formulas": [
+    { "fn": "SUM", "rango": "A2:A4", "sale": "=SUM(A2:A4)" },
+    { "fn": "AVERAGE", "rango": "B3:C3", "sale": "=AVERAGE(B3:C3)" },
+    { "fn": "MAX", "rango": "AA10:AA10", "sale": "=MAX(AA10)" }
+  ],
+  "texto": [
+    { "modo": "trim", "entrada": "  hola   mundo  ", "sale": "hola mundo" },
+    { "modo": "trim", "entrada": "\tA  B ", "sale": "A B" },
+    { "modo": "trim", "entrada": "\n uno \n\n dos  \n", "sale": "uno\n\ndos" },
+    { "modo": "trim", "entrada": "   ", "sale": "" },
+    { "modo": "upper", "entrada": "el año pasó por aquí", "sale": "EL AÑO PASÓ POR AQUÍ" },
+    { "modo": "lower", "entrada": "ÉRASE UNA VEZ EN MADRID", "sale": "érase una vez en madrid" },
+    { "modo": "title", "entrada": "ana garcía-lópez", "sale": "Ana García-López" },
+    { "modo": "sentence", "entrada": "HOLA. ¿QUÉ TAL? bien", "sale": "Hola. ¿Qué tal? Bien" }
+  ],
+  "csv": [
+    {
+      "filas": [
+        ["a", "b"],
+        ["1", "2"]
+      ],
+      "sale": "a,b\r\n1,2\r\n"
+    },
+    {
+      "filas": [["x,y", "dijo \"hola\""], ["línea\nnueva"]],
+      "sale": "\"x,y\",\"dijo \"\"hola\"\"\"\r\n\"línea\nnueva\",\r\n"
+    },
+    { "filas": [], "sale": "" },
+    { "filas": [["", "", "z"]], "sale": ",,z\r\n" }
+  ],
+  "nombres": [
+    { "base": "Ventas", "hoja": "Hoja 1", "sale": "Ventas - Hoja 1.csv" },
+    { "base": "Ventas", "hoja": "a/b", "sale": "Ventas - a_b.csv" }
+  ]
+}

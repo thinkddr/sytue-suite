@@ -242,6 +242,9 @@ type Buzon struct {
 	// cursorAtajo es la fila donde se quedó j/k: tras archivar, la siguiente ocupa su
 	// sitio y j/k sigue desde ahí.
 	cursorAtajo int
+	// irPendiente es cuándo se pulsó la «g» de «ir a» (cero, ninguna): la tecla
+	// siguiente elige la carpeta (atajos.go, `atajoDeIr`).
+	irPendiente time.Time
 	// vuelven es cuándo vuelve cada hilo de «Pospuestos» (posponer.go); nil fuera de
 	// ella, donde cada fila lleva su fecha de llegada.
 	vuelven map[string]time.Time
@@ -364,6 +367,10 @@ func NuevoBuzon(p *Pantalla, s Servicio) *Buzon {
 	p.Menu.AlAbrir = b.abrirAjuste
 	p.AlVolver = func() { b.cerrarHilo(); b.P.Refrescar() }
 	p.Lector.AlDescargarAdjunto = b.descargarAdjunto
+	p.Lector.AlCopiarDireccion = func(d string) {
+		fyne.CurrentApp().Clipboard().SetContent(d)
+		b.avisar(ui.AvisoExito, "reader.addressCopied", nil)
+	}
 	p.Lector.AlOriginal = b.descargarOriginal
 	p.Lector.AlAbrirEnlace = b.abrirEnlace
 	return b

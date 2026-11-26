@@ -396,7 +396,7 @@ func (h *Handlers) OAuthFinish(w http.ResponseWriter, r *http.Request) {
 // «exchange» es un fallo nuestro o del proveedor que merece el log de error; los
 // otros dos son decisiones de la persona y se le explican tal cual.
 func finishError(err error) (code, existing string) {
-	var exists *errMailAccountExists
+	var exists *errAccountExists
 	switch {
 	case errors.As(err, &exists):
 		return "exists", exists.instance
@@ -511,6 +511,15 @@ func (h *Handlers) redeemAndStore(r *http.Request, rd consent.Redeem) error {
 		if err := h.applyMailConsent(ctx, inst, conn, rd, tok.Scope, flow.Scopes, cfg); err != nil {
 			return err
 		}
+	}
+	// De qué cuenta es, para que «Trae tus datos» la enseñe una vez; y una conexión NUEVA
+	// de una cuenta ya conectada se para aquí (import_account.go). No hace nada en las
+	// plantillas que no son orígenes de importación.
+	if err := h.applyImportAccount(ctx, inst, func() connector.Runtime {
+		conn.Secrets[store.SecretKeyBearer] = tok.AccessToken
+		return h.egressRuntime(conn, log.From(ctx))
+	}, cfg); err != nil {
+		return err
 	}
 
 	// El vencimiento va a la config pública para que el asistente pueda enseñarlo. Si

@@ -374,4 +374,8 @@ export const ro: AppCatalog<typeof en> = {
   'moderation.action.unlist': 'Elimină din pagina publică',
   'moderation.action.unpublish': 'Anulează publicarea',
   'moderation.action.block': 'Blochează persoana în organizație',
+  'player.loop': 'Repetă',
+  'watch.chapters': 'Capitole',
+  'watch.jumpTo': 'Mergi la {time}',
+  'share.startAt': 'Începe de la {time}',
 };

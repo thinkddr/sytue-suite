@@ -389,4 +389,9 @@ export const fr: AppCatalog<typeof en> = {
   'gallery.encrypted.editHint':
     'La retouche se fait sur cet appareil et est enregistrée chiffrée comme nouvelle version de la photo.',
   'gallery.encrypted.albumEmpty': 'Cet album chiffré ne contient encore aucune photo.',
+  'shortcuts.favorite': 'Ajouter ou retirer des favoris',
+  'trash.restoreAll': 'Tout restaurer',
+  'trash.restoredAll': 'De retour dans vos photos : {count}',
+  'album.download': 'Télécharger l’album',
+  'viewer.openInDrive': 'Voir l’original dans Sytue Drive',
 };

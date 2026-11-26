@@ -937,6 +937,11 @@ func (f *FilaLateral) Tapped(e *fyne.PointEvent) {
 		cerrarCajonMovil(f)
 	}
 	f.pulsable.Tapped(e)
+	// La pista del carril plegado no es la del `pulsable`, sino la caja de ancho cero
+	// del borde: se cierra aparte o se quedaba a la derecha del carril tras navegar.
+	if f.AlPulsar != nil {
+		f.titulo.alPulsar()
+	}
 }
 
 // TappedSecondary abre el menú de la fila, si lo tiene. No recoge el cajón: lo que se

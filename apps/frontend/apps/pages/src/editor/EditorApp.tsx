@@ -941,6 +941,7 @@ export function EditorApp({ siteId, locale, administra }: EditorAppProps): JSX.E
               <PanelPaginas
                 ir={ir}
                 paginaActivaId={paginaActivaId}
+                locale={locale}
                 onCambiarPagina={(id) => {
                   setPaginaActivaId(id);
                   setNodoSeleccionadoId(null);

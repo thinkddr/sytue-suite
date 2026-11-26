@@ -380,4 +380,9 @@ export const et: AppCatalog<typeof en> = {
   'gallery.encrypted.editHint':
     'Muutmine toimub selles seadmes ja salvestatakse krüpteeritult foto uue versioonina.',
   'gallery.encrypted.albumEmpty': 'Selles krüpteeritud albumis pole veel fotosid.',
+  'shortcuts.favorite': 'Märgi lemmikuks või eemalda',
+  'trash.restoreAll': 'Taasta kõik',
+  'trash.restoredAll': 'Tagasi su fotodes: {count}',
+  'album.download': 'Laadi album alla',
+  'viewer.openInDrive': 'Vaata originaali Sytue Drive’is',
 };

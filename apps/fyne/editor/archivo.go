@@ -120,6 +120,7 @@ func (b *BotonArchivo) Menu() *ui.Menu {
 			elems = append(elems, op)
 		}
 	}
+	elems = append(elems, b.descargasLocales(item)...)
 	// Ribbon.tsx añade estas dos descargas después de OFFICE_EXPORTS.
 	for _, formato := range []string{"ooxml", "odf"} {
 		clave := "file.downloadTemplateOoxml"
@@ -155,6 +156,24 @@ func (b *BotonArchivo) Menu() *ui.Menu {
 		m.Ancho = max(ui.MinAnchoMenu, min(m.Ancho, lienzo.Size().Width*0.9))
 	}
 	return m
+}
+
+// descargasLocales son las que se escriben en el dispositivo, que Ribbon.tsx pone tras
+// OFFICE_EXPORTS: el CSV de la hoja activa (Calcus), las notas del orador (Diapos) y el
+// texto sin formato (Docus). No se
+// apagan sin red: no la necesitan.
+func (b *BotonArchivo) descargasLocales(item func(string, bool, func(), ...i18n.Vars) *ui.ElementoMenu) []fyne.CanvasObject {
+	var out []fyne.CanvasObject
+	if b.ctx.DescargarCSV != nil {
+		out = append(out, item("file.downloadCsv", false, b.ctx.DescargarCSV))
+	}
+	if b.ctx.DescargarNotas != nil {
+		out = append(out, item("file.downloadNotes", false, b.ctx.DescargarNotas))
+	}
+	if b.ctx.DescargarTexto != nil {
+		out = append(out, item("file.downloadTxt", false, b.ctx.DescargarTexto))
+	}
+	return out
 }
 
 func (b *BotonArchivo) abrir() {

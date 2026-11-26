@@ -35,6 +35,7 @@ import { restaurarZoomDelViewport } from '@sytue/ui/browser/zoom';
 import type { Locale } from '@sytue/i18n';
 import { useT, type T } from '../i18n/index.js';
 import { formatBytes, parseAddresses, fullDate, toLocalInput, type ComposeDraft } from './utils.js';
+import { ROTULOS, opcionesDePosponer, type OpcionDePosponer } from './PosponerMenu.js';
 
 /**
  * Clave de catálogo que explica un rechazo del envío, o null si no hay nada mejor
@@ -281,6 +282,12 @@ interface Props {
    */
   onAnswered?:
     ((answers: string, outboundId: string | undefined, undoSeconds: number) => void) | undefined;
+  /**
+   * «Enviar y archivar» de una respuesta: tras salir, el padre archiva la conversación
+   * del correo contestado (`initial.answers`). Sin él, el botón no sale (no se está
+   * contestando, o la vista no tiene a dónde archivar).
+   */
+  onEnviarYArchivar?: ((answers: string) => void) | undefined;
 }
 
 /**
@@ -330,6 +337,7 @@ function Redactor({
   onSaved,
   onUndoSend,
   onAnswered,
+  onEnviarYArchivar,
 }: Props): JSX.Element | null {
   const t = useT(locale);
   const { sendEmail, saveDraft, deleteDraft } = usePrivateMailApi();
@@ -414,6 +422,16 @@ function Redactor({
   // Panel «Programar envío»: hora elegida (datetime-local, hora del navegador).
   const [showSchedule, setShowSchedule] = useState(false);
   const [scheduleAt, setScheduleAt] = useState('');
+  // Si el envío en curso es «Enviar y archivar»: sobrevive a la pregunta de «¿sin
+  // adjuntos?», que vuelve a llamar a `handleSend` por su cuenta.
+  const archivarTrasEnviar = useRef(false);
+  // Las fechas fijas de «Programar envío» (las de posponer: más tarde hoy, mañana, el
+  // fin de semana, la semana que viene). Se calculan al ABRIR el panel: el render no
+  // lee el reloj, y un redactor abierto desde la mañana no debe ofrecer «más tarde hoy»
+  // por la noche.
+  const [atajosProgramar, setAtajosProgramar] = useState<
+    { opcion: OpcionDePosponer; fecha: Date }[]
+  >([]);
   // Selector «Adjuntar desde Drive» abierto (modal sobre el compositor).
   const [drivePickerOpen, setDrivePickerOpen] = useState(false);
   // El icono de Contactos de cada fila abre la libreta y añade lo elegido a ESE
@@ -615,6 +633,8 @@ function Redactor({
   const enviarConTeclado = useRef<() => void>(() => undefined);
   enviarConTeclado.current = () => {
     if (sending || saving || drivePickerOpen) return;
+    // ⌘/Ctrl+Intro es «Enviar» a secas, aunque antes se probara «Enviar y archivar».
+    archivarTrasEnviar.current = false;
     void handleSend();
   };
   useEffect(() => {
@@ -968,6 +988,9 @@ function Redactor({
       } else {
         toast.notify({ tone: 'success', title: t('compose.sent') });
       }
+      // Después del envío y no antes: si no sale, la conversación se queda donde estaba.
+      // Archivar trae su propio «Deshacer» (el del triaje).
+      if (archivarTrasEnviar.current && initial?.answers) onEnviarYArchivar?.(initial.answers);
     } catch (error) {
       if (error instanceof TypeError) {
         await persistLocalDraft().catch(() => undefined);
@@ -1223,6 +1246,7 @@ function Redactor({
                   leadingIcon={<Glyph name="clock" size={16} />}
                   onClick={() => {
                     setShowSchedule((v) => !v);
+                    setAtajosProgramar(opcionesDePosponer(new Date()));
                     if (!scheduleAt) setScheduleAt(toLocalInput(new Date(Date.now() + 3_600_000)));
                   }}
                 />
@@ -1260,13 +1284,31 @@ function Redactor({
                   escribir. ⌘/Ctrl+Intro es el de Gmail, Outlook y Mail. */}
               {/* En el teléfono, «Enviar» se queda con el resto de la fila: es la
                   acción del diálogo, y el pie del Modal pone las suyas a todo el ancho. */}
+              {/* «Enviar y archivar» al contestar: lo que se hace después de responder
+                  casi siempre, en un clic. Secundario, para no competir con «Enviar». */}
+              {initial?.answers && onEnviarYArchivar && !cuentaDe ? (
+                <Button
+                  variant="secondary"
+                  class="max-md:flex-1"
+                  disabled={saving || sending}
+                  onClick={() => {
+                    archivarTrasEnviar.current = true;
+                    void handleSend();
+                  }}
+                >
+                  {t('compose.sendAndArchive')}
+                </Button>
+              ) : null}
               <Button
                 variant="primary"
                 class="max-md:flex-1"
                 loading={sending}
                 disabled={saving}
                 title={`${t('compose.send')} (${ATAJO_ENVIAR})`}
-                onClick={() => void handleSend()}
+                onClick={() => {
+                  archivarTrasEnviar.current = false;
+                  void handleSend();
+                }}
               >
                 {t('compose.send')}
               </Button>
@@ -1512,6 +1554,27 @@ function Redactor({
                que dice «Programar envío», y el campo de dentro ya se llama «Fecha
                y hora». Tres textos para una sola pregunta. */
             <div id="compose-schedule" class="border-border mt-4 border-t pt-4">
+              {/* Las fechas de siempre a un clic: rellenan el campo, que sigue mandando
+                  (se puede retocar la hora antes de programar). */}
+              {atajosProgramar.length ? (
+                <div
+                  class="mb-3 flex flex-wrap gap-2"
+                  role="group"
+                  aria-label={t('compose.scheduleDateTime')}
+                >
+                  {atajosProgramar.map(({ opcion, fecha }) => (
+                    <Button
+                      key={opcion}
+                      variant="secondary"
+                      size="sm"
+                      aria-pressed={scheduleAt === toLocalInput(fecha)}
+                      onClick={() => setScheduleAt(toLocalInput(fecha))}
+                    >
+                      {t(ROTULOS[opcion])}
+                    </Button>
+                  ))}
+                </div>
+              ) : null}
               <div class="flex flex-wrap items-end gap-3">
                 {/* `max-md:min-w-0`: los 240px de `min-w-[15rem]` son EXACTAMENTE el
                     hueco del diálogo a 320px, sin margen para el borde o la barra de

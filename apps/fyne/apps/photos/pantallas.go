@@ -197,7 +197,7 @@ func PantallaGaleria(v Vista, d Galeria) *fyne.Container {
 	if d.SoloFavoritas {
 		vacioTitulo, vacioTexto = "favorites.empty.title", "favorites.empty.description"
 	}
-	vacio := EstadoVacio(v, vacioTitulo, vacioTexto, botonAnyadir(v, d, true))
+	vacio := EstadoVacio(v, vacioTitulo, vacioTexto, botonAnyadir(v, d))
 	if v.Estado == Cargando {
 		// La primera carga: la cabecera de arriba y, debajo, el esqueleto de un mes con
 		// sus filas al alto de fila de la galería (`<EsqueletoFilas mes>`). La rueda del
@@ -317,9 +317,9 @@ func BarraDeAnyos(v Vista, anyos []api.TimelineYear, activo int, alElegir func(i
 	return deslizable(container.New(ui.Fila{Hueco: tema.Espacio(1)}, hijos...))
 }
 
-// accionesBarra son los mandos de la derecha de la fila de arriba, tras el buscador. UNA
-// acción rellena —«Añadir fotos»— y las demás de fantasma con su icono: «Seleccionar» era
-// otro botón relleno del mismo peso.
+// accionesBarra son los mandos de la derecha de la fila de arriba, tras el buscador, de
+// fantasma con su icono. «Añadir fotos», la acción rellena que cerraba la fila, es desde
+// el 2026-11-25 el «+» flotante de la app, en todos los anchos.
 func accionesBarra(v Vista, d Galeria, campo fyne.CanvasObject, hayFotos bool) []fyne.CanvasObject {
 	var derecha []fyne.CanvasObject
 	if campo != nil {
@@ -336,7 +336,7 @@ func accionesBarra(v Vista, d Galeria, campo fyne.CanvasObject, hayFotos bool) [
 	if d.AlCopia != nil {
 		derecha = append(derecha, botonCopia(v, d))
 	}
-	return append(derecha, botonAnyadir(v, d, false))
+	return derecha
 }
 
 // vacioDeBusqueda es el `EmptyState` de una búsqueda sin aciertos: la ilustración
@@ -362,16 +362,12 @@ func vacioDeBusqueda(v Vista, d Galeria) *ui.Vacio {
 	return e
 }
 
-// botonAnyadir es «Añadir fotos», LA acción principal de la galería: `primary` (talla
-// `md`, la del buscador de al lado) con el `plus` delante. En la barra, el rótulo solo
-// desde `sm:` («en móvil solo el icono: el rótulo mandaba el botón a una tercera
-// fila»); en la galería VACÍA va siempre, que ahí es lo único que se puede hacer.
-func botonAnyadir(v Vista, d Galeria, siempreConRotulo bool) *ui.Boton {
+// botonAnyadir es «Añadir fotos» en la galería VACÍA: `primary` (talla `md`) con el
+// `plus` delante y su rótulo, que ahí es lo único que se puede hacer y un «+» suelto en
+// mitad de la pantalla no dice qué añade. Con fotos, es el «+» flotante de la app.
+func botonAnyadir(v Vista, d Galeria) *ui.Boton {
 	b := ui.NuevoBoton(v.Traduce("gallery.add"), d.AlAnyadir).Con(ui.Primario, ui.TallaMD).ConIcono(iconos.Mas, 0)
 	b.Inerte = d.Subiendo
-	if !siempreConRotulo && v.Ventana < ui.CorteSM {
-		b.Rotulo, b.Texto = b.Texto, ""
-	}
 	return b
 }
 
@@ -925,8 +921,10 @@ type AlbumAbierto struct {
 	AlRenombrar func()
 	// AlCompartirConPersonas abre «Compartir con personas»; nil: no se ofrece.
 	AlCompartirConPersonas func()
-	AlAbrir                func(api.Photo)
-	AlIr                   func(Seccion)
+	// AlDescargar baja el álbum entero; nil (o sin fotos): no se ofrece.
+	AlDescargar func()
+	AlAbrir     func(api.Photo)
+	AlIr        func(Seccion)
 }
 
 // PantallaAlbum es un álbum: cabecera con la vuelta, el título, el recuento y los mandos
@@ -956,6 +954,9 @@ func PantallaAlbum(v Vista, d AlbumAbierto) *fyne.Container {
 	}
 	if d.AlRenombrar != nil {
 		mandos = append(mandos, ui.NuevoBoton(v.Traduce("album.rename"), d.AlRenombrar).Con(ui.Fantasma, ui.TallaSM).ConIcono(iconos.Lapiz, 0))
+	}
+	if d.AlDescargar != nil && len(d.Fotos) > 0 {
+		mandos = append(mandos, ui.NuevoBoton(v.Traduce("album.download"), d.AlDescargar).Con(ui.Fantasma, ui.TallaSM).ConIcono(iconos.Descargar, 0))
 	}
 	borrar := ui.NuevoBotonIcono(iconos.Papelera, v.Traduce("albums.delete"), d.AlBorrar)
 	borrar.Lado, borrar.TamIcono = ui.LadoIconoLG, IconoMando
@@ -1198,6 +1199,8 @@ type Papelera struct {
 	AlIr                  func(Seccion)
 	AlVaciar              func()
 	AlRestaurar, AlPurgar func(api.Photo)
+	// AlRestaurarTodo es «Restaurar todo»: sin pregunta, porque no destruye nada.
+	AlRestaurarTodo func()
 }
 
 // PantallaPapelera monta la papelera. Su rejilla es la ÚNICA de la suite que no es de
@@ -1205,11 +1208,15 @@ type Papelera struct {
 func PantallaPapelera(v Vista, d Papelera) *fyne.Container {
 	arriba := []fyne.CanvasObject{Nav(v, SecPapelera, d.AlIr)}
 	if len(d.Fotos) > 0 {
+		if d.AlRestaurarTodo != nil {
+			arriba = append(arriba,
+				ui.NuevoBoton(v.Traduce("trash.restoreAll"), d.AlRestaurarTodo).Con(ui.Secundario, ui.TallaSM).ConIcono(iconos.Deshacer, 0))
+		}
 		arriba = append(arriba,
 			ui.NuevoBoton(v.Traduce("trash.empty"), d.AlVaciar).Con(ui.Peligro, ui.TallaSM).ConIcono(iconos.Papelera, 0))
 	}
 	bloques := []ui.Bloque{
-		{Obj: container.New(ui.FilaAuto{Hueco: tema.Espacio(2), Derecha: 1, Partir: true, SaltoFila: SeparacionBloque + tema.Espacio(2)}, arriba...), Margen: SeparacionBloque},
+		{Obj: container.New(ui.FilaAuto{Hueco: tema.Espacio(2), Derecha: len(arriba) - 1, Partir: true, SaltoFila: SeparacionBloque + tema.Espacio(2)}, arriba...), Margen: SeparacionBloque},
 		// `min-h-5`: el aviso reserva su línea aunque esté vacío.
 		{Obj: ParrafoEn(d.Aviso, tema.TextoSM, ui.Normal, "text-muted", v.Variante), Alto: func(float32) float32 { return max(5*0.25*tema.Rem, tema.TextoSM.Linea) }},
 	}

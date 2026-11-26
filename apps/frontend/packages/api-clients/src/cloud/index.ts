@@ -174,7 +174,13 @@ export interface InstanceSizeCatalog {
   max_count: number;
 }
 
-export type DeploymentStatus = 'queued' | 'building' | 'deploying' | 'ready' | 'error' | 'canceled';
+/**
+ * `retired` es una producción que otra reemplazó (un despliegue nuevo, una
+ * preview publicada o un rollback). El control-plane lo emite desde siempre y no
+ * estaba en el tipo, así que quien lo pintaba lo trataba como desconocido.
+ */
+export type DeploymentStatus =
+  'queued' | 'building' | 'deploying' | 'ready' | 'error' | 'canceled' | 'retired';
 
 export type DeploymentEnv = 'production' | 'preview';
 

@@ -43,6 +43,8 @@ type Ajustes struct {
 	FinesDeSemana bool `json:"finesDeSemana"` //nolint:tagliatelle // el JSON es el de la web
 	// NumeroSemana pone el número de semana ISO en la cabecera de la semana.
 	NumeroSemana bool `json:"numeroSemana"` //nolint:tagliatelle // el JSON es el de la web
+	// Rechazados: con false, los eventos a los que he dicho que no salen de la vista.
+	Rechazados bool `json:"rechazados"`
 }
 
 // Duraciones y Recordatorios son lo que se ofrece, como `DURACIONES` y `RECORDATORIOS`.
@@ -52,9 +54,9 @@ var (
 )
 
 // AjustesPorDefecto son los de siempre: una hora, sin recordatorio, de 9 a 18, la
-// semana entera y sin número.
+// semana entera, sin número y con los rechazados a la vista.
 func AjustesPorDefecto() Ajustes {
-	return Ajustes{Duracion: 60, InicioLaboral: 9, FinLaboral: 18, FinesDeSemana: true}
+	return Ajustes{Duracion: 60, InicioLaboral: 9, FinLaboral: 18, FinesDeSemana: true, Rechazados: true}
 }
 
 // ajustesLeidos es lo leído antes de normalizar: los campos que falten se distinguen
@@ -66,6 +68,7 @@ type ajustesLeidos struct {
 	FinLaboral    *int  `json:"finLaboral"`    //nolint:tagliatelle // el JSON es el de la web
 	FinesDeSemana *bool `json:"finesDeSemana"` //nolint:tagliatelle // el JSON es el de la web
 	NumeroSemana  *bool `json:"numeroSemana"`  //nolint:tagliatelle // el JSON es el de la web
+	Rechazados    *bool `json:"rechazados"`
 }
 
 // LeerAjustes es `normalizarAjustes(JSON.parse(...))`: un campo roto vuelve al valor de
@@ -98,6 +101,9 @@ func LeerAjustes(texto string) Ajustes {
 	}
 	if l.NumeroSemana != nil {
 		a.NumeroSemana = *l.NumeroSemana
+	}
+	if l.Rechazados != nil {
+		a.Rechazados = *l.Rechazados
 	}
 	return a
 }
@@ -148,7 +154,7 @@ const AnchoPaginaAjustes float32 = 64 * tema.Rem
 // controlesAjustes son los controles de la página, para las pruebas.
 type controlesAjustes struct {
 	duracion, recordatorio, inicio, fin *ui.Selector
-	finde, numero                       *ui.Conmutador
+	finde, numero, rechazados           *ui.Conmutador
 	volver                              *ui.Boton
 }
 
@@ -223,6 +229,10 @@ func (p *Pantalla) paginaAjustes() fyne.CanvasObject {
 		poner(func(n *Ajustes) { n.NumeroSemana = si })
 	})
 	c.numero.Encendido = aj.NumeroSemana
+	c.rechazados = ui.NuevoConmutador(p.t("settings.declined", nil), func(si bool) {
+		poner(func(n *Ajustes) { n.Rechazados = si })
+	})
+	c.rechazados.Encendido = aj.Rechazados
 
 	c.volver = ui.NuevoBoton(p.t("settings.back", nil), func() {
 		if p.AlCerrarAjustes != nil {
@@ -257,7 +267,7 @@ func (p *Pantalla) paginaAjustes() fyne.CanvasObject {
 		seccion("settings.workTitle", "settings.workDescription",
 			container.New(columnas, campo("settings.workStart", c.inicio), campo("settings.workEnd", c.fin))),
 		seccion("settings.viewTitle", "settings.viewDescription",
-			ui.EnColumna(tema.Espacio(3), c.finde, c.numero)),
+			ui.EnColumna(tema.Espacio(3), c.finde, c.numero, c.rechazados)),
 	)
 	marco := container.New(&anchoAcotado{max: AnchoPaginaAjustes, canalon: tema.Espacio(6)}, pagina)
 	return container.NewStack(canvas.NewRectangle(tema.Color(ui.FondoHoja(), v)), container.NewVScroll(marco))

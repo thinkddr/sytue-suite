@@ -59,6 +59,8 @@ type calendarService interface {
 
 	DueReminders(ctx context.Context, ownerSub string, now time.Time, before *store.ReminderCursor, limit int) ([]store.DueReminder, error)
 	DismissReminder(ctx context.Context, ownerSub string, id uuid.UUID) error
+	SnoozeReminder(ctx context.Context, ownerSub string, id uuid.UUID, minutes int) (time.Time, error)
+	EventICS(ctx context.Context, ev domain.Event) (string, error)
 	AmendRecurrence(ctx context.Context, calendarID uuid.UUID, uid string, recurrenceID time.Time, mode string, expectETag uuid.UUID) (domain.CalendarObject, error)
 
 	PedirEdicion(ctx context.Context, calendarID uuid.UUID, p peticiones.Peticion, token string) (bool, error)
@@ -969,6 +971,81 @@ func (h *Handlers) DismissReminder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.NoContent(w)
+}
+
+// snoozeReq es el cuerpo de «posponer»: cuántos minutos desde ahora.
+type snoozeReq struct {
+	Minutes int `json:"minutes"`
+}
+
+// SnoozeReminder pospone un recordatorio in-app del usuario (POST, CSRF-safe):
+// sale de la campana y vuelve a sonar dentro de `minutes`. 404 si no es del usuario
+// o ya se descartó; 400 fuera de [1, 1440] minutos. Devuelve cuándo vuelve.
+func (h *Handlers) SnoozeReminder(w http.ResponseWriter, r *http.Request) {
+	sub, ok := subject(r)
+	if !ok {
+		httpx.Fail(w, r, httpx.ErrUnauthorized)
+		return
+	}
+	id, ok := parseUUID(r)
+	if !ok {
+		httpx.Fail(w, r, httpx.ErrBadRequest.WithMessage("Invalid reminder id."))
+		return
+	}
+	var req snoozeReq
+	if err := httpx.DecodeJSON(w, r, &req); err != nil {
+		httpx.Fail(w, r, httpx.ErrBadRequest.WithMessage("Invalid JSON body."))
+		return
+	}
+	if req.Minutes < service.MinPosponer || req.Minutes > service.MaxPosponer {
+		httpx.Fail(w, r, httpx.ErrBadRequest.WithMessage("A reminder can be snoozed for 1 to 1440 minutes."))
+		return
+	}
+	until, err := h.svc.SnoozeReminder(r.Context(), sub, id, req.Minutes)
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	httpx.JSON(w, r, http.StatusOK, map[string]any{"trigger_at": until})
+}
+
+// EventICS descarga un evento como .ics: el recurso iCalendar guardado, con su serie
+// y sus excepciones. Es lo que la web ya tiene a mano (lee por CalDAV) y la app
+// nativa no; la verja es la de leer el evento (GetEvent): sin acceso, 404.
+func (h *Handlers) EventICS(w http.ResponseWriter, r *http.Request) {
+	id, ok := parseUUID(r)
+	if !ok {
+		httpx.Fail(w, r, httpx.ErrBadRequest.WithMessage("Invalid event id."))
+		return
+	}
+	ev, err := h.svc.GetEvent(r.Context(), id)
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	ics, err := h.svc.EventICS(r.Context(), ev)
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	// El nombre del fichero es el título, como el de la web (`icsDescarga.ts`); con
+	// RFC 6266 para que un título con acentos no llegue truncado.
+	nombre := strings.TrimSpace(ev.Summary)
+	if nombre == "" {
+		nombre = "event"
+	}
+	nombre = strings.ReplaceAll(strings.Map(func(r rune) rune {
+		if r < 0x20 || r == '/' || r == '\\' {
+			return '-'
+		}
+		return r
+	}, nombre), `"`, "'") + ".ics"
+	w.Header().Set("Content-Type", "text/calendar; charset=utf-8")
+	w.Header().Set("Content-Disposition",
+		`attachment; filename="`+nombre+`"; filename*=UTF-8''`+url.PathEscape(nombre))
+	w.Header().Set("Cache-Control", "no-store")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte(ics))
 }
 
 // encodeReminderCursor serializa el punto keyset (trigger_at, id) en un cursor

@@ -382,4 +382,34 @@ export const nucleo = {
 
   'forms.empty': 'Engin svör enn',
   'forms.empty_help': 'Þegar einhver sendir inn eyðublað á vefsvæðinu þínu birtist það hér.',
+  'sites.search': 'Leita að vefjum',
+  'sites.search_empty': 'Enginn vefur passar við „{q}“.',
+  'sites.sort_label': 'Raða vefjum',
+  'sites.sort_recent': 'Nýlega breytt',
+  'sites.sort_name': 'Nafn (A–Ö)',
+  'sites.view_live': 'Skoða vef',
+  'sites.view_live_aria': 'Skoða birta útgáfu {nombre} (opnast í nýjum flipa)',
+  'seo.title': 'Það sem leitarvélar sjá',
+  'seo.intro':
+    'Yfirferð á drögunum: titlar, lýsingar og myndir sem leitarvélar og skjálesarar reiða sig á. Þetta eru viðvaranir; þær koma ekki í veg fyrir birtingu.',
+  'seo.open_editor': 'Opna ritilinn',
+  'seo.recheck': 'Athuga aftur',
+  'seo.error': 'Ekki tókst að hlaða yfirferðinni. Reyndu aftur.',
+  'seo.all_good': 'Allt í lagi: hver síða hefur titil og lýsingu og myndirnar hafa alt-texta.',
+  'seo.summary': 'Viðvaranir: {count}',
+  'seo.badge_warning': 'Bæta',
+  'seo.badge_info': 'Athugið',
+  'seo.on_page': 'Síða: {page}',
+  'seo.title_missing': 'Síðan hefur engan titil: leitarvélin býr til einn.',
+  'seo.title_long':
+    'Titillinn er {count} stafir; um 60 komast fyrir áður en leitarvélin styttir hann.',
+  'seo.title_duplicate': 'Önnur síða hefur sama titil: þær keppa hvor við aðra í niðurstöðum.',
+  'seo.description_missing': 'Síðan hefur enga lýsingu: leitarvélin sýnir einhvern textabút.',
+  'seo.description_long': 'Lýsingin er {count} stafir; um 160 eru sýndir.',
+  'seo.image_alt_missing':
+    'Myndir án alt-texta: {count}. Skjálesarar og leitarvélar vita ekki hvað þær sýna; merktu þær sem skraut ef þær sýna ekkert.',
+  'seo.page_noindex': 'Þessi síða er falin fyrir leitarvélum (noindex).',
+  'seo.site_noindex': 'Allur vefurinn er falinn fyrir leitarvélum (noindex).',
+  'seo.share_image_missing':
+    'Vefurinn hefur enga deilimynd: tenglar í skilaboðum og samfélagsmiðlum birtast án myndar.',
 };

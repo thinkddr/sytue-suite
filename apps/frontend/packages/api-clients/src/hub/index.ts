@@ -377,9 +377,28 @@ export class HubClient {
     });
   }
 
-  /** Marca TODAS como leidas de una vez. */
-  async markAllRead(): Promise<void> {
-    await this.http.request({ method: 'POST', path: '/notifications/read_all' });
+  /**
+   * Devuelve una notificacion a «sin leer»: el «Marcar como no leído» de la bandeja,
+   * para lo que se abrió sin tiempo de atenderlo.
+   */
+  async markUnread(id: string): Promise<void> {
+    await this.http.request({
+      method: 'POST',
+      path: `/notifications/${encodeURIComponent(id)}/unread`,
+    });
+  }
+
+  /**
+   * Marca TODAS como leidas de una vez. Con `source`, solo las de ese producto: lo que
+   * pide la bandeja con un filtro de producto puesto, para no llevarse por delante los
+   * avisos de otros productos que no estaban a la vista.
+   */
+  async markAllRead(source?: string): Promise<void> {
+    await this.http.request({
+      method: 'POST',
+      path: '/notifications/read_all',
+      ...(source ? { query: { source } } : {}),
+    });
   }
 
   /**

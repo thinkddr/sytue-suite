@@ -436,4 +436,9 @@ export const ga: AppCatalog<typeof en> = {
   'gallery.encrypted.editHint':
     'Déantar an eagarthóireacht ar an ngléas seo agus sábháiltear í criptithe mar leagan nua den ghrianghraf.',
   'gallery.encrypted.albumEmpty': 'Níl aon ghrianghraif san albam criptithe seo fós.',
+  'shortcuts.favorite': 'Marcáil nó bain mar cheanán',
+  'trash.restoreAll': 'Athchóirigh gach rud',
+  'trash.restoredAll': 'Ar ais i do ghrianghraif: {count}',
+  'album.download': 'Íoslódáil an t-albam',
+  'viewer.openInDrive': 'Féach an bunleagan in Sytue Drive',
 };

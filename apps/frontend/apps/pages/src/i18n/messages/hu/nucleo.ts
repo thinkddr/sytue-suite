@@ -380,4 +380,36 @@ export const nucleo = {
 
   'forms.empty': 'Még nincs válasz',
   'forms.empty_help': 'Amikor valaki beküld egy űrlapot a webhelyén, az itt fog megjelenni.',
+  'sites.search': 'Webhelyek keresése',
+  'sites.search_empty': 'Egy webhely sem felel meg ennek: „{q}”.',
+  'sites.sort_label': 'Webhelyek rendezése',
+  'sites.sort_recent': 'Nemrég szerkesztett',
+  'sites.sort_name': 'Név (A–Z)',
+  'sites.view_live': 'Webhely megtekintése',
+  'sites.view_live_aria': 'A közzétett {nombre} megtekintése (új lapon nyílik meg)',
+  'seo.title': 'Amit a keresőmotorok látnak',
+  'seo.intro':
+    'A piszkozat áttekintése: címek, leírások és képek, amelyeken a keresőmotorok és a képernyőolvasók múlnak. Ezek figyelmeztetések; a közzétételt nem akadályozzák.',
+  'seo.open_editor': 'Szerkesztő megnyitása',
+  'seo.recheck': 'Újraellenőrzés',
+  'seo.error': 'Az áttekintést nem sikerült betölteni. Próbálja újra.',
+  'seo.all_good':
+    'Minden rendben: minden oldalnak van címe és leírása, a képeknek pedig helyettesítő szövege.',
+  'seo.summary': 'Figyelmeztetések: {count}',
+  'seo.badge_warning': 'Javítandó',
+  'seo.badge_info': 'Megjegyzés',
+  'seo.on_page': 'Oldal: {page}',
+  'seo.title_missing': 'Az oldalnak nincs címe: a keresőmotor kitalál egyet.',
+  'seo.title_long': 'A cím {count} karakteres; nagyjából 60 fér ki, mielőtt a kereső levágja.',
+  'seo.title_duplicate':
+    'Egy másik oldalnak ugyanez a címe: versenyezni fognak egymással a találatokban.',
+  'seo.description_missing':
+    'Az oldalnak nincs leírása: a keresőmotor egy véletlen szövegrészt mutat.',
+  'seo.description_long': 'A leírás {count} karakteres; nagyjából 160 jelenik meg.',
+  'seo.image_alt_missing':
+    'Helyettesítő szöveg nélküli képek: {count}. A képernyőolvasók és a keresők nem tudják, mit ábrázolnak; jelölje díszítőként, ha nem ábrázolnak semmit.',
+  'seo.page_noindex': 'Ez az oldal rejtve van a keresők elől (noindex).',
+  'seo.site_noindex': 'Az egész webhely rejtve van a keresők elől (noindex).',
+  'seo.share_image_missing':
+    'A webhelynek nincs megosztási képe: az üzenetekben és közösségi oldalakon a hivatkozások kép nélkül jelennek meg.',
 };

@@ -102,6 +102,45 @@ func TestResponderMarcaElOriginalAlSalir(t *testing.T) {
 	}
 }
 
+// TestEnviarYArchivar: al contestar sale «Enviar y archivar»; envía y, ya enviado,
+// mueve a Archivo la conversación contestada. «Enviar» a secas no archiva, y sin
+// contestar a nadie el botón no está.
+func TestEnviarYArchivar(t *testing.T) {
+	s := servicioConTodas()
+	b, _, _ := buzonConVentana(t, s, fyne.NewSize(1280, 744))
+	c, ok := conversacionDe(b, "m2")
+	if !ok {
+		t.Fatal("m2 no está en la bandeja")
+	}
+	b.responder(c.Ultimo, Responder)
+	rd := b.redaccion
+	if rd == nil || rd.enviarArchivar == nil {
+		t.Fatal("contestando no sale «Enviar y archivar»")
+	}
+	rd.enviarArchivar.Tapped(nil)
+	if s.pidio("Send") != 1 {
+		t.Fatalf("no se envió: %v", s.llamadas)
+	}
+	if !slices.ContainsFunc(s.llamadas, func(l string) bool { return strings.HasPrefix(l, "MoveMany(ar,") }) {
+		t.Errorf("no se archivó la conversación contestada: %v", s.llamadas)
+	}
+
+	// «Enviar» a secas no archiva.
+	s2 := servicioConTodas()
+	b2, _, _ := buzonConVentana(t, s2, fyne.NewSize(1280, 744))
+	c2, _ := conversacionDe(b2, "m2")
+	b2.responder(c2.Ultimo, Responder)
+	b2.redaccion.enviar.Tapped(nil)
+	if s2.pidio("Send") != 1 || s2.pidio("MoveMany") != 0 {
+		t.Errorf("«Enviar» ha hecho %v", s2.llamadas)
+	}
+	// Un mensaje nuevo no contesta a nadie: sin el botón.
+	b2.Redactar()
+	if b2.redaccion == nil || b2.redaccion.enviarArchivar != nil {
+		t.Error("un mensaje nuevo ofrece «Enviar y archivar»")
+	}
+}
+
 func TestReenviarNoMarcaRespondido(t *testing.T) {
 	m := Mensaje{ID: "m2", Asunto: "Encuesta", De: []Direccion{{Correo: "m2@example.org"}}}
 	if br := BorradorDeRespuesta(traductor(t), "es", m, Reenviar, "", ""); br.Responde != "" {

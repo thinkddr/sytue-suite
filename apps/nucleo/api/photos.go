@@ -392,6 +392,30 @@ func (p *Photos) Restaurar(ctx context.Context, id string) error {
 	return resp.Body.Close()
 }
 
+// RestaurarTodo devuelve a la galería TODO lo que hay en la papelera y dice cuántas
+// (`POST /trash/restore`, una sentencia en el servicio). Con el almacén privado no hay
+// ruta de lote: se restauran una a una, que es lo que el almacén sabe hacer.
+func (p *Photos) RestaurarTodo(ctx context.Context) (int, error) {
+	if p.data != nil {
+		items, err := p.data.Papelera(ctx)
+		if err != nil {
+			return 0, err
+		}
+		n := 0
+		for _, f := range items {
+			if err := p.data.Restaurar(ctx, f.ID); err != nil {
+				return n, err
+			}
+			n++
+		}
+		return n, nil
+	}
+	r, err := JSON[struct {
+		Restored int `json:"restored"`
+	}](ctx, p.c, Request{Method: http.MethodPost, Path: "/trash/restore"})
+	return r.Restored, err
+}
+
 // Purgar borra para siempre. Con id vacío vacía la papelera entera. Devuelve cuántas se
 // han ido, que es lo que se le dice a la persona. El fichero sigue en Sytue Drive: aquí
 // se va el índice, y reindexar esa carpeta la traería de vuelta.

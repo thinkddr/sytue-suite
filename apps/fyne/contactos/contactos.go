@@ -123,15 +123,23 @@ type Pantalla struct {
 	AlCrearEtiqueta  func()
 	AlVerDestacados  func()
 	AlVerCumpleanos  func()
-	AlVerPapelera    func()
-	AlEditar         func(api.Contact)
+	// AlCopiarCorreos es «Copiar los correos» de la barra de selección; nil, no sale.
+	AlCopiarCorreos func([]api.Contact)
+	// PorApellido ordena y agrupa la libreta por el apellido (orden.go); AlCambiarOrden
+	// lo alterna. Nil: el menú no lo ofrece.
+	PorApellido    bool
+	AlCambiarOrden func()
+	AlVerPapelera  func()
+	AlEditar       func(api.Contact)
 	// AlEnviarCorreo abre Sytue Mail con ese destinatario.
 	AlEnviarCorreo func(correo string)
 	// Lo del menú «⋯» de la ficha: crear una reunión en Sytue Calendar, exportar la
 	// vCard y combinar con otro contacto.
-	AlReunion  func(c api.Contact, correo string)
-	AlExportar func(api.Contact)
-	AlCombinar func(api.Contact)
+	AlReunion func(c api.Contact, correo string)
+	// AlCompartir es «Compartir por correo»: el redactor de Mail con la ficha escrita.
+	AlCompartir func(c api.Contact)
+	AlExportar  func(api.Contact)
+	AlCombinar  func(api.Contact)
 	// AlCopiar deja un valor de la ficha en el portapapeles y avisa con la clave de lo
 	// copiado (`detail.emailCopied`, `detail.phoneCopied`, `detail.addressCopied`): el
 	// «Copiar el correo» del menú «⋯» y el botón de copiar de cada valor.
@@ -336,11 +344,17 @@ func (p *Pantalla) configurarArmazon(a *ui.Armazon) {
 	a.BarraMovil = p.barraMovil(a)
 }
 
-// capaFlotante es la capa del botón flotante de «Nuevo contacto».
+// capaFlotante es la capa del «+» flotante de «Nuevo contacto».
 func (p *Pantalla) capaFlotante() fyne.CanvasObject {
-	// «Nuevo contacto al alcance del pulgar: en móvil el menú lateral es un cajón
-	// cerrado» (MobileFab en ContactsApp.tsx).
-	fab := ui.NuevoBotonFlotante(p.t("nav.newContact", nil), iconos.Mas, p.AlCrearContacto)
+	// «Nuevo contacto» es el «+» flotante, abajo a la derecha y en todos los anchos
+	// (BotonFlotante en ContactsApp.tsx): al alcance del pulgar en el teléfono, donde el
+	// menú lateral es un cajón cerrado, y el mismo sitio en escritorio. Sin red no se
+	// ofrece; sin libreta, apagado, como lo estaba el botón del menú.
+	if p.SinConexion {
+		return container.New(ui.CapaFlotante{})
+	}
+	fab := ui.NuevoBotonFlotante(p.t("nav.newContact", nil), p.AlCrearContacto)
+	fab.Inerte = p.Activa == nil
 	capa := []fyne.CanvasObject{fab}
 	if p.CajonAbierto {
 		// En la web el velo del cajón (z 1020) va POR ENCIMA del botón (z 20): se ve
@@ -349,7 +363,7 @@ func (p *Pantalla) capaFlotante() fyne.CanvasObject {
 		fab.Inerte = true
 		v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 		velo := canvas.NewRectangle(ui.ColorVelo(v, 1))
-		velo.CornerRadius = tema.Forma("radius-control")
+		velo.CornerRadius = ui.LadoBotonFlotante / 2 // el círculo del «+»
 		velo.SetMinSize(fab.MinSize())
 		capa = append(capa, velo)
 	}
@@ -403,13 +417,10 @@ func (p *Pantalla) enMenu(f func()) func() {
 
 // ---- El menú ----
 
-// menu es el `<Sidebar>`: «Nuevo contacto» arriba y tres secciones — Vistas, Libretas
-// y Etiquetas (esta última solo con libreta activa, como en la web).
+// menu es el `<Sidebar>`: tres secciones — Vistas, Libretas y Etiquetas (esta última
+// solo con libreta activa, como en la web). «Nuevo contacto» ya no va arriba: es el «+»
+// flotante (`capaFlotante`), en todos los anchos.
 func (p *Pantalla) menu() fyne.CanvasObject {
-	crear := ui.NuevoBoton(p.t("nav.newContact", nil), p.enMenu(p.AlCrearContacto)).ConIcono(iconos.Mas, 0)
-	crear.Ancho = ui.AnchoUtilMenu
-	crear.Inerte = p.Activa == nil || p.SinConexion
-
 	bloques := []fyne.CanvasObject{p.seccionVistas(), p.seccionLibretas()}
 	if p.AlServiciosVinculados != nil {
 		bloques = append(bloques, ui.NuevaFilaLateral(p.t("linkedServices.connected", nil), iconos.Trazo(iconos.Globo, ui.GlifoMenu, "sidebar-fg", tema.De(fyne.CurrentApp().Settings().ThemeVariant())).Objeto(), p.enMenu(p.AlServiciosVinculados)))
@@ -417,9 +428,7 @@ func (p *Pantalla) menu() fyne.CanvasObject {
 	if p.Activa != nil {
 		bloques = append(bloques, p.seccionEtiquetas())
 	}
-	// ConCabecera y no `l.Cabecera = crear`: es quien lo marca «sobre cromo», y sin eso
-	// el botón primario sale tinta sobre la tinta del menú, sin contorno.
-	l := ui.NuevoLateral(p.t("nav.views", nil), ui.EnColumna(0, bloques...)).ConCabecera(crear)
+	l := ui.NuevoLateral(p.t("nav.views", nil), ui.EnColumna(0, bloques...))
 	// El pie es el de `footer={<ImportData domains={['contacts']} …/>}`, «Trae tus
 	// contactos»: solo sale si la organización ha conectado Google o Microsoft 365. Sin
 	// él no hay pie: ni franja ni filete (en la web, `empty:hidden` en Sidebar.tsx).

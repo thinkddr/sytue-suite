@@ -32,6 +32,9 @@ const PATHS = {
   formatPainter:
     'M5.5 4h11a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Z M17.5 6.5H20v5h-8v3.5 M11 15h2v5h-2Z',
   changeCase: 'M3.5 18 8 6l4.5 12 M5 14h6 M20 15.5a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0Z M20 13v5',
+  // Aumentar y reducir la letra: la «A» con un galón arriba o abajo, a su derecha.
+  fontGrow: 'M3.5 18 8 6l4.5 12 M5 14h6 M15.5 11.5l3-3.5 3 3.5',
+  fontShrink: 'M3.5 18 8 6l4.5 12 M5 14h6 M15.5 8l3 3.5 3-3.5',
   /* --- Párrafo --- */
   alignLeft: 'M4 6h16 M4 10h10 M4 14h16 M4 18h10',
   alignCenter: 'M4 6h16 M7 10h10 M4 14h16 M7 18h10',

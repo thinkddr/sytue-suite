@@ -305,6 +305,8 @@ func TestElMenuDeLaNotaEsElDeLaWeb(t *testing.T) {
 		tr("note.setIcon", nil),
 		tr("tags.apply", nil), tr("reminder.set", nil), tr("note.pin", nil), tr("note.rename", nil), tr("note.duplicate", nil),
 		tr("tree.newInside", nil), tr("note.moveTo", nil), tr("note.export", nil), tr("note.info", nil),
+		// «Copiar enlace» sale con la dirección de la web (AppURL), que esta pantalla no tiene.
+		tr("note.copyText", nil),
 		tr("backlinks.title", nil), tr("note.attach", nil), "---", tr("note.delete", nil),
 	}
 	if got := claves(p.menuNota(n, false)); strings.Join(got, "|") != strings.Join(quiero, "|") {
@@ -312,7 +314,7 @@ func TestElMenuDeLaNotaEsElDeLaWeb(t *testing.T) {
 	}
 	// El del árbol es el mismo con «Renombrar» en su clave y sin adjuntar (NoteTree.tsx).
 	quiero[4] = tr("tree.rename", nil)
-	quiero = slices.Delete(quiero, 11, 12)
+	quiero = slices.Delete(quiero, 12, 13)
 	if got := claves(p.menuNota(n, true)); strings.Join(got, "|") != strings.Join(quiero, "|") {
 		t.Errorf("el menú del árbol es\n%v\ny en la web\n%v", got, quiero)
 	}

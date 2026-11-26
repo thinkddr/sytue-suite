@@ -84,6 +84,8 @@ type NuevoDirecto struct {
 	Elegidas []Persona
 	// Ocupado es el envío en camino; Fallo, que no se pudo abrir.
 	Ocupado, Fallo bool
+	// FalloFuera: el fallo es la política de contacto con gente de fuera, con su texto.
+	FalloFuera bool
 	// Buscando y ErrorBuscar son los de «Buscar X en Sytue One».
 	Buscando    bool
 	ErrorBuscar string
@@ -154,7 +156,7 @@ func (d *NuevoDirecto) lleno() bool { return len(d.Elegidas) >= d.tope() }
 
 // Conmutar es `toggle`: quita a quien ya está, y añade si no se ha llegado al tope.
 func (d *NuevoDirecto) Conmutar(p Persona) {
-	d.Fallo = false
+	d.Fallo, d.FalloFuera = false, false
 	for i, x := range d.Elegidas {
 		if x.ID == p.ID {
 			d.Elegidas = append(d.Elegidas[:i:i], d.Elegidas[i+1:]...)
@@ -256,7 +258,7 @@ func (d *NuevoDirecto) construir(v tema.Variante) {
 		}
 	}
 	if d.Fallo {
-		hijos = append(hijos, ui.NuevoRotulo(t.T("dm.openFailed", nil), tema.TextoSM, ui.Normal, "danger-text"))
+		hijos = append(hijos, ui.NuevoRotulo(t.T(d.claveFallo(), nil), tema.TextoSM, ui.Normal, "danger-text"))
 	}
 	if d.lleno() {
 		hijos = append(hijos, ui.NuevoRotulo(t.T("dm.maxPeople", i18n.Vars{"count": d.tope()}), tema.TextoXS, ui.Normal, "text-muted"))
@@ -640,4 +642,14 @@ func (r *filaBuscarRenderer) Refresh() {
 	f.texto.Color = c
 	f.texto.Refresh()
 	r.Layout(f.Size())
+}
+
+// claveFallo es el texto de no haber podido abrir la conversación: el de la política de
+// contacto con gente de fuera si fue eso (la organización no deja hablar con esa
+// persona), como `NewDmModal.tsx`; si no, el genérico.
+func (d *NuevoDirecto) claveFallo() string {
+	if d.FalloFuera {
+		return "dm.externalClosed"
+	}
+	return "dm.openFailed"
 }

@@ -460,6 +460,9 @@ type buzonDoble struct {
 	reglas       []api.HubNotificationPref
 	leidos       []string
 	todas        int
+	todasDe      []string // los orígenes de «Marcar todas» con un producto elegido
+	desleidos    []string
+	falloDesleer error // si no es nil, MarkUnread falla
 	puestas      []api.HubNotificationPref
 	flujo        chan api.HubNotification
 	mas          []api.HubNotification // la página de detrás
@@ -511,6 +514,23 @@ func (b *buzonDoble) MarkAllRead(context.Context) error {
 	defer b.mu.Unlock()
 	b.todas++
 	return nil
+}
+
+func (b *buzonDoble) MarkAllReadDe(ctx context.Context, origen string) error {
+	if origen == "" {
+		return b.MarkAllRead(ctx)
+	}
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.todasDe = append(b.todasDe, origen)
+	return nil
+}
+
+func (b *buzonDoble) MarkUnread(_ context.Context, id string) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.desleidos = append(b.desleidos, id)
+	return b.falloDesleer
 }
 
 func (b *buzonDoble) NotificationPrefs(context.Context) ([]api.HubNotificationPref, error) {

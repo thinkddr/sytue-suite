@@ -75,6 +75,12 @@ func construirConsulta(campos []domain.Campo, cfg domain.ConfigVista) consulta {
 			where = append(where, col()+" IS NOT NULL")
 			continue
 		}
+		if c.Kind == domain.TipoFecha {
+			if w, ok := condicionRelativa(f, col, hoySQL(cfg.Today, add)); ok {
+				where = append(where, w)
+				continue
+			}
+		}
 		v, ok := valorFiltro(c, f)
 		if !ok {
 			continue
@@ -141,6 +147,44 @@ func construirConsulta(campos []domain.Campo, cfg domain.ConfigVista) consulta {
 	orden = append(orden, "r.created_at", "r.id")
 	q.order = strings.Join(orden, ", ")
 	return q
+}
+
+// hoySQL es la expresión del día de la lectura: el de quien mira si lo dijo (`?today=`,
+// ya validado como AAAA-MM-DD), o el del servidor. Va como parámetro, nunca pegado.
+func hoySQL(hoy string, add func(any) string) func() string {
+	return func() string {
+		if hoy == "" {
+			return "current_date"
+		}
+		return add(hoy) + "::date"
+	}
+}
+
+// condicionRelativa traduce un filtro de fecha relativo a hoy. Las fechas se guardan
+// como AAAA-MM-DD, así que se compara texto con texto (el orden de texto es el
+// cronológico) y la columna no se convierte: así no falla nunca por un valor raro.
+// `past_days` y `next_days` incluyen hoy: «últimos 7 días» son hoy y los seis de antes.
+func condicionRelativa(f domain.Filtro, col, hoy func() string) (string, bool) {
+	dia := func(expr string) string { return "to_char(" + expr + ", 'YYYY-MM-DD')" }
+	switch f.Op {
+	case domain.OpHoy:
+		return col() + " = " + dia(hoy()), true
+	case domain.OpEsteMes:
+		return "(" + col() + " >= " + dia("date_trunc('month', "+hoy()+")") +
+			" AND " + col() + " < " + dia("date_trunc('month', "+hoy()+") + interval '1 month'") + ")", true
+	case domain.OpUltimosDias, domain.OpProximosDia:
+		var n int
+		if json.Unmarshal(f.Value, &n) != nil || n < 1 || n > domain.MaxDiasRelativos {
+			return "false", true // un filtro roto no deja pasar todo
+		}
+		dias := strconv.Itoa(n - 1) // entero ya acotado: no viene texto del cliente
+		desde, hasta := dia(hoy()+" - "+dias), dia(hoy())
+		if f.Op == domain.OpProximosDia {
+			desde, hasta = dia(hoy()), dia(hoy()+" + "+dias)
+		}
+		return "(" + col() + " BETWEEN " + desde + " AND " + hasta + ")", true
+	}
+	return "", false
 }
 
 // condicionBusqueda: el registro contiene el texto (sin distinguir mayúsculas) en alguno

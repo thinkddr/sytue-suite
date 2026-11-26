@@ -155,7 +155,7 @@ func TestElAjusteInicialSigueAlAncho(t *testing.T) {
 
 // TestLaPestanaInsertarEsLaDeLaWeb: «Insertar» va entre «Inicio» y «Disposición», como
 // en la web, con Tabla, Imagen, Formas, Gráfico, SmartArt, Enlace, Elementos (regla, salto,
-// símbolo), Encabezado y pie, y Comentario; y
+// símbolo, fecha y hora), Encabezado y pie, y Comentario; y
 // con el cursor en una tabla, las herramientas de celda detrás de «Tabla».
 func TestLaPestanaInsertarEsLaDeLaWeb(t *testing.T) {
 	vis := registroDocus("es").Visibles(editor.Documento)
@@ -191,14 +191,14 @@ func TestLaPestanaInsertarEsLaDeLaWeb(t *testing.T) {
 	}
 	f := folioCon(t, `<p>x</p><table><tbody><tr><td>a</td></tr></tbody></table>`)
 	f.mover(punto{0, 0}, false)
-	quiero := "insert.table insert.image blocks.shapes blocks.chart smartart.insertOrEdit insert.link insert.horizontalRule insert.pageBreak insert.symbol " +
+	quiero := "insert.table insert.image blocks.shapes blocks.chart smartart.insertOrEdit insert.link insert.horizontalRule insert.pageBreak insert.symbol insert.dateTime " +
 		"insert.header insert.footer insert.pageNumber insert.differentFirstPage form.fill form.responses insert.comment"
 	if got := strings.Join(botones(f), " "); got != quiero {
 		t.Errorf("Insertar fuera de una tabla:\n  hay     %s\n  quería  %s", got, quiero)
 	}
 	f.mover(punto{1, 0}, false)
 	quiero = "insert.table table.rowAbove table.rowBelow table.colLeft table.colRight sheet.merge table.splitCell " +
-		"table.cellColor selector table.delete insert.image blocks.shapes blocks.chart smartart.insertOrEdit insert.link insert.horizontalRule insert.pageBreak insert.symbol " +
+		"table.cellColor selector table.delete insert.image blocks.shapes blocks.chart smartart.insertOrEdit insert.link insert.horizontalRule insert.pageBreak insert.symbol insert.dateTime " +
 		"insert.header insert.footer insert.pageNumber insert.differentFirstPage form.fill form.responses insert.comment"
 	if got := strings.Join(botones(f), " "); got != quiero {
 		t.Errorf("Insertar dentro de una tabla:\n  hay     %s\n  quería  %s", got, quiero)

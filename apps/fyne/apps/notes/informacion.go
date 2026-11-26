@@ -44,15 +44,29 @@ func (p *Pantalla) filasInformacion(n Nota, enlazan string) [][2]string {
 	if !n.Tocada.IsZero() {
 		editada = i18n.FormatDateTime(p.loc, n.Tocada.Local())
 	}
-	return [][2]string{
+	filas := [][2]string{
 		{t("noteInfo.words", nil), palabras},
 		{t("noteInfo.characters", nil), caracteres},
 		{t("noteInfo.reading", nil), lectura},
 		{t("noteInfo.created", nil), creada},
 		{t("noteInfo.edited", nil), editada},
 		{t("noteInfo.notebook", nil), p.nombreCuaderno(n.Cuaderno)},
-		{t("noteInfo.backlinks", nil), enlazan},
 	}
+	// Una tarea dice en qué está, como NoteInfo.tsx.
+	if n.Tipo == "todo" {
+		estado := "noteInfo.task.open"
+		switch {
+		case n.Cancelada:
+			estado = "noteInfo.task.cancelled"
+		case n.Marcada:
+			estado = "noteInfo.task.done"
+		}
+		filas = append(filas, [2]string{t("noteInfo.task", nil), t(estado, nil)})
+	}
+	return append(filas,
+		// Lo que sale de la nota hacia otras notas y ficheros, junto a lo que entra.
+		[2]string{t("noteInfo.links", nil), i18n.FormatNumber(p.loc, float64(len(n.Enlaces)))},
+		[2]string{t("noteInfo.backlinks", nil), enlazan})
 }
 
 // nombreCuaderno es el título del cuaderno de la nota, que casi siempre es el abierto.

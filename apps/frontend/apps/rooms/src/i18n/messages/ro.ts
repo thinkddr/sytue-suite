@@ -1067,4 +1067,11 @@ export const ro: AppCatalog<typeof en> = {
   'nativeResource.description':
     'Conectează această aplicație la contul tău din {tenant}. Permisiunile tale actuale de acces se păstrează.',
   'nativeResource.approve': 'Conectează',
+  'channel.markRead': 'Marchează ca citit',
+  'channel.copyLink': 'Copiază linkul',
+  'channel.linkCopied': 'Link copiat',
+  'channel.download': 'Descarcă conversația',
+  'channel.downloaded': 'Conversație salvată în',
+  'channel.downloadFailed': 'Conversația nu a putut fi salvată',
+  'status.nothingUnread': 'Totul era deja citit',
 };

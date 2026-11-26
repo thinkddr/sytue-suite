@@ -225,13 +225,36 @@ func (c *cuentaBarra) pintar() {
 		c.boton.avatar.Nombre = nombre
 		c.boton.avatar.Foto = foto
 		c.boton.avatar.Presencia = puntoDe(presencia)
-		c.boton.Nombre = c.t.T("account.menuFor", i18n.Vars{"name": nombre})
+		// La entrada a la suite del teléfono tiene su propio nombre, que pone la barra.
+		if !c.boton.entrada {
+			c.boton.Nombre = rotuloCuenta(c.t, nombre)
+		}
 		c.boton.Refresh()
 		if c.menu.Abierto() {
 			c.menu.Elementos = c.contenido()
 			c.menu.Refresh()
 		}
 	})
+}
+
+// rotulo es el nombre del botón de la cuenta, y el de su pista.
+func (c *cuentaBarra) rotulo() string {
+	c.mu.Lock()
+	nombre := c.nombreSinCerrojo()
+	c.mu.Unlock()
+	return rotuloCuenta(c.t, nombre)
+}
+
+// rotuloCuenta es «Cuenta de Ana García», el `account.menuFor` de AccountMenu.tsx: el
+// nombre del botón dice de quién es la sesión. Hasta el 2026-11-25 la barra lo pisaba
+// con «Cuenta» a secas en cada colocación —el lector de pantalla oía uno u otro según
+// quién hubiera pintado el último— y sin ficha todavía salía «Cuenta de » con el hueco.
+// Sin nombre que poner, «Cuenta».
+func rotuloCuenta(t *i18n.Translator, nombre string) string {
+	if nombre == "" {
+		return t.T("account.menu", nil)
+	}
+	return t.T("account.menuFor", i18n.Vars{"name": nombre})
 }
 
 // nombreSinCerrojo es con qué se nombra a quien ha entrado: su nombre, y si no se sabe

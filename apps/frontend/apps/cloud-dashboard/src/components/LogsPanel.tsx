@@ -28,6 +28,7 @@ import type { LogLevel, LogLine, UsageMetric } from '../lib/types.js';
 import type { T } from '../i18n/index.js';
 import { useT } from '../i18n/index.js';
 import { appendCapped, runtimeLine, takeLines } from '../lib/logstream.js';
+import { r } from '../lib/rutas.js';
 import DemoBanner from './DemoBanner.js';
 import { contiene, rangos } from '@sytue/i18n';
 
@@ -346,6 +347,7 @@ export default function LogsPanel({
   live,
   error,
   deployment,
+  build,
   locale,
 }: {
   /** Slug del proyecto — para pedir la búsqueda server-side al BFF. */
@@ -357,6 +359,11 @@ export default function LogsPanel({
   error?: { status: number; code: string } | undefined;
   /** Despliegue cuyo runtime se sigue en vivo; ausente si el proyecto no tiene ninguno. */
   deployment?: { id: string; label: string } | undefined;
+  /**
+   * Compilación concreta cuyo log se está viendo (llegada desde una fila del
+   * historial de despliegues). Ausente = los registros de siempre.
+   */
+  build?: { id: string; label: string } | undefined;
   /** Idioma ya negociado en el servidor (llega por props, nunca se detecta aquí). */
   locale: Locale;
 }) {
@@ -386,7 +393,12 @@ export default function LogsPanel({
       // de compilación, así que preguntar por un error de producción devolvía el log de
       // cuando se construyó — dos cosas que se parecen lo justo para no notarlo.
       const params = new URLSearchParams({ project, q: trimmed });
-      if (source === 'build') params.set('source', 'build');
+      // Con una compilación fijada, la búsqueda es sobre SU log y no sobre el
+      // último: es el que se está leyendo.
+      if (build) {
+        params.set('source', 'build');
+        params.set('build', build.id);
+      } else if (source === 'build') params.set('source', 'build');
       fetch(`/api/logs?${params.toString()}`)
         .then((res) => (res.ok ? res.json() : Promise.reject(new Error('http'))))
         .then((body: { logs: LogLine[] }) => {
@@ -404,7 +416,7 @@ export default function LogsPanel({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [trimmed, project, source]);
+  }, [trimmed, project, source, build]);
 
   // Resultado del servidor que corresponde a la query actual (null si la caja está
   // vacía o la búsqueda aún no ha llegado: entonces se filtra en cliente).
@@ -548,7 +560,22 @@ export default function LogsPanel({
               label: t('logs.tab.build'),
               content: (
                 <>
-                  <p class="text-text-muted mb-3 text-sm">{t('logs.build.desc')}</p>
+                  {build ? (
+                    <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+                      <p class="text-text-muted text-sm">
+                        {t('logs.buildOf', { build: build.label })}
+                      </p>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        href={r(`/projects/${encodeURIComponent(project)}/logs`)}
+                      >
+                        {t('logs.buildOf.back')}
+                      </Button>
+                    </div>
+                  ) : (
+                    <p class="text-text-muted mb-3 text-sm">{t('logs.build.desc')}</p>
+                  )}
                   {buildTab}
                 </>
               ),

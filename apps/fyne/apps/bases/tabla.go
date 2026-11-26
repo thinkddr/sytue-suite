@@ -49,6 +49,7 @@ func (p *Pantalla) elegirTabla(id string) {
 		p.dejarALaVista(pos, tam)
 		p.alEnfocarCelda(b)
 	}
+	b.rejilla.AlAyuda = p.verAtajos
 	// `overflow-auto`: la rejilla se desplaza de lado y la rueda sigue bajando la página.
 	b.lado = ui.NuevoDesplazaLado(b.rejilla, 0, func() fyne.Scrollable {
 		if p.scroll == nil {
@@ -221,6 +222,9 @@ func (p *Pantalla) recibirPagina(hacia string, v ventanas, pag api.BasesRecordPa
 	}
 	p.ponerRejilla()
 	p.Repintar()
+	if hacia == "inicio" {
+		p.pedirResumen()
+	}
 	if hacia == "inicio" && b.irA.registro != "" && b.irA.tabla == b.Activa {
 		p.irAlRegistro(b.irA.registro)
 		b.irA.tabla, b.irA.registro = "", ""
@@ -365,7 +369,8 @@ func (p *Pantalla) trasCambiar(r api.BasesRecord, pisado bool, err error) {
 	if err != nil {
 		b.Fallo = p.mensajeDeError(err)
 	}
-	p.Repintar() // el tablero se pinta con lo que hay: una tarjeta movida cambia de columna
+	p.pedirResumen() // una celda editada mueve la suma
+	p.Repintar()     // el tablero se pinta con lo que hay: una tarjeta movida cambia de columna
 }
 
 func (p *Pantalla) nuevoRegistro() { p.crearRegistro(nil) }
@@ -388,9 +393,65 @@ func (p *Pantalla) crearRegistro(datos map[string]any) {
 		b.vent.anadir(r)
 		b.Estado = p.t("grid.added")
 		p.ponerRejilla()
+		p.pedirResumen()
 		p.Repintar()
 		// Añadir es rellenar: la ficha del registro nuevo se abre sola.
 		p.abrirRegistro(r, true)
+	})
+}
+
+// duplicarRegistro copia un registro en uno nuevo de su tabla (valores y enlaces; los
+// adjuntos no) y abre su ficha: casi siempre se duplica para cambiar algo.
+func (p *Pantalla) duplicarRegistro(r api.BasesRecord) {
+	b := p.abierta
+	tabla := b.Activa
+	var copia api.BasesRecord
+	p.hacer(func() (err error) {
+		ctx, cancelar := p.ctx()
+		defer cancelar()
+		copia, err = p.svc.DuplicateRecord(ctx, r.ID)
+		return err
+	}, func() {
+		if b.Activa != tabla {
+			return
+		}
+		b.vent.anadir(copia)
+		b.Estado = p.t("record.duplicated")
+		p.ponerRejilla()
+		p.Repintar()
+		p.abrirRegistro(copia, false)
+	})
+}
+
+// duplicarVista crea una vista con la configuración de la que se mira y «(copia)» en el
+// nombre: «Pendientes de Ana» a partir de «Pendientes» sin volver a montar filtro, orden y
+// agrupación. Los enlaces públicos de un formulario no se copian: son de la vista.
+func (p *Pantalla) duplicarVista() {
+	b := p.abierta
+	v := b.vista()
+	if v == nil {
+		return
+	}
+	tabla, original := b.Activa, *v
+	nombre := p.t("view.copyName", i18n.Vars{"name": original.Name})
+	if r := []rune(nombre); len(r) > 120 {
+		nombre = string(r[:120])
+	}
+	var creada api.BasesView
+	var vistas []api.BasesView
+	p.hacer(func() (err error) {
+		ctx, cancelar := p.ctx()
+		defer cancelar()
+		if creada, err = p.svc.CreateView(ctx, tabla, nombre, original.Kind, original.Config); err != nil {
+			return err
+		}
+		vistas, err = p.svc.ListViews(ctx, tabla)
+		return err
+	}, func() {
+		if p.abierta == b && b.Activa == tabla {
+			b.Vistas = vistas
+			p.elegirVista(creada.ID)
+		}
 	})
 }
 
@@ -522,7 +583,9 @@ func (p *Pantalla) accionesDeTabla() []fyne.CanvasObject {
 	if puedeEditar {
 		acciones = append(acciones, ui.NuevoElementoMenu(p.t("view.add"), iconos.Mas, p.dialogoVista))
 		if b.vista() != nil {
-			acciones = append(acciones, ui.NuevoElementoMenu(p.t("view.edit"), iconos.Ajustes, p.editarVista))
+			acciones = append(acciones,
+				ui.NuevoElementoMenu(p.t("view.edit"), iconos.Ajustes, p.editarVista),
+				ui.NuevoElementoMenu(p.t("view.duplicate"), iconos.Copias, p.duplicarVista))
 		}
 	}
 	if p.Guardar != nil {
@@ -530,6 +593,14 @@ func (p *Pantalla) accionesDeTabla() []fyne.CanvasObject {
 			ui.NuevoElementoMenu(p.t("export.csv"), iconos.Descargar, func() { p.exportar("csv") }),
 			ui.NuevoElementoMenu(p.t("export.json"), iconos.Descargar, func() { p.exportar("json") }))
 	}
+	if b.enRejilla() {
+		rotulo := p.t("summary.show")
+		if p.conPie {
+			rotulo = p.t("summary.hide")
+		}
+		acciones = append(acciones, ui.NuevoElementoMenu(rotulo, iconos.Grafico, p.alternarPie))
+	}
+	acciones = append(acciones, ui.NuevoElementoMenu(p.t("shortcuts.title"), iconos.Teclado, p.verAtajos))
 	if puedeEditar && b.vista() != nil {
 		x := ui.NuevoElementoMenu(p.t("view.delete"), iconos.Papelera, p.borrarVista)
 		x.Peligro = true
@@ -667,6 +738,9 @@ func (p *Pantalla) objetoRejilla(puedeEditar bool) fyne.CanvasObject {
 			botonSM(p.t("grid.loadPrevious"), ui.Fantasma, func() { p.cargarRegistros("antes") })))
 	}
 	hijos = append(hijos, b.lado)
+	if pie := p.lineaResumen(tema.De(fyne.CurrentApp().Settings().ThemeVariant())); pie != nil {
+		hijos = append(hijos, pie)
+	}
 	// Sin filas, el estado vacío dice si la tabla está vacía o si nada pasa el recorte
 	// (una búsqueda o una vista con filtros), y ofrece el paso siguiente.
 	recorte := esRecorte(b.lectura, b.vista())

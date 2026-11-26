@@ -36,6 +36,12 @@ export function exportExt(kind: DocKind, format: ExportFormat, plantilla = false
   }
 }
 
+/** El título saneado para usarlo de nombre de fichero, sin extensión: lo comparten las
+ *  descargas del servicio y las que se generan en el dispositivo (el CSV de una hoja). */
+export function baseDescarga(title: string): string {
+  return (title.trim() || 'documento').replace(/[\\/:*?"<>|]+/g, '_').slice(0, 120);
+}
+
 /** Nombre de descarga: título saneado + extensión del formato. */
 export function exportFilename(
   title: string,
@@ -43,8 +49,7 @@ export function exportFilename(
   format: ExportFormat,
   plantilla = false,
 ): string {
-  const base = (title.trim() || 'documento').replace(/[\\/:*?"<>|]+/g, '_').slice(0, 120);
-  return `${base}.${exportExt(kind, format, plantilla)}`;
+  return `${baseDescarga(title)}.${exportExt(kind, format, plantilla)}`;
 }
 
 const CLAVE_PDF_ACCESIBLE = 'sytue.docs.pdfAccesible';

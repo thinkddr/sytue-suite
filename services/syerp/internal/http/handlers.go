@@ -746,7 +746,13 @@ func (h *Handlers) Estadisticas(w http.ResponseWriter, r *http.Request) {
 	if m == nil {
 		return
 	}
-	stats, err := h.store.Estadisticas(r.Context(), m)
+	// Lo mismo que la lista: la búsqueda y el estado que se miran (`filtroDe` valida el
+	// estado contra el modelo).
+	f, ok := filtroDe(w, r, m)
+	if !ok {
+		return
+	}
+	stats, err := h.store.EstadisticasDe(r.Context(), m, f)
 	if err != nil {
 		httpx.Fail(w, r, err)
 		return

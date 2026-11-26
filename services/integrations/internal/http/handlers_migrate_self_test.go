@@ -29,12 +29,13 @@ func TestSelfNoCaeEnLaRutaDeAdministracion(t *testing.T) {
 	for _, c := range []struct{ metodo, ruta string }{
 		{http.MethodPost, "/api/v1/migrations/self"},
 		{http.MethodGet, "/api/v1/migrations/self"},
+		{http.MethodGet, "/api/v1/migrations/self/origins"},
 	} {
 		rctx := chi.NewRouteContext()
 		if !routes.Match(rctx, c.metodo, c.ruta) {
 			t.Fatalf("%s %s no casa con ninguna ruta", c.metodo, c.ruta)
 		}
-		if got := rctx.RoutePattern(); !strings.HasSuffix(got, "/migrations/self") {
+		if got := rctx.RoutePattern(); !strings.HasSuffix(got, strings.TrimPrefix(c.ruta, "/api/v1")) {
 			t.Fatalf("%s %s resolvió a %q: la ruta de administración se la quedó", c.metodo, c.ruta, got)
 		}
 	}

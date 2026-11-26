@@ -38,6 +38,15 @@ func (p *Pantalla) Atajos(c fyne.Canvas) {
 		c.AddShortcut(&desktop.CustomShortcut{KeyName: k, Modifier: fyne.KeyModifierShortcutDefault}, func(fyne.Shortcut) { f() })
 	}
 	atajo(fyne.KeyF, func() { p.abrirPanel(PanelBuscar) })
+	// Ctrl+G pide la página, y Ctrl+Inicio y Ctrl+Fin van a la primera y la última, como
+	// en cualquier visor (`atajos.ts`).
+	atajo(fyne.KeyG, p.pedirPagina)
+	atajo(fyne.KeyHome, func() { p.IrA(1) })
+	atajo(fyne.KeyEnd, func() {
+		if p.Contenido != nil {
+			p.IrA(p.Contenido.Total)
+		}
+	})
 	atajo(fyne.KeyP, p.imprimir)
 	for _, k := range []fyne.KeyName{fyne.KeyPlus, fyne.KeyEqual} {
 		atajo(k, func() { p.zoomConTeclado(pasoZoom) })
@@ -101,7 +110,8 @@ var gruposDelVisor = []struct {
 	{"pdf.shortcuts.group.move", []filaDeAtajo{
 		{nombres("slides.present.key.pageDown"), "pdf.shortcuts.nextPage", nil},
 		{nombres("slides.present.key.pageUp"), "pdf.shortcuts.prevPage", nil},
-		{nombres("slides.present.key.home", "slides.present.key.end"), "pdf.shortcuts.ends", nil},
+		{nombres("slides.present.key.home", "slides.present.key.end"), "pdf.shortcuts.ends", []fyne.KeyName{fyne.KeyHome, fyne.KeyEnd}},
+		{conCtrl(ui.AtajoDelSistema("Ctrl+G")), "pdf.shortcuts.goTo", []fyne.KeyName{fyne.KeyG}},
 		{func(func(string) string) []string { return []string{"↑", "↓", "←", "→"} }, "pdf.shortcuts.scroll", nil},
 		{nombres("slides.present.key.space"), "pdf.shortcuts.screen", nil},
 	}},

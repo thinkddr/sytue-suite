@@ -27,7 +27,10 @@ func (p *Panel) proveedorDisponible(key string) bool {
 
 func (p *Panel) cuerpoCuentas() []fyne.CanvasObject {
 	var cuerpo []fyne.CanvasObject
-	for _, c := range p.cuentas.Items {
+	// Una fila por cuenta del proveedor: la misma dirección conectada para Mail y para
+	// este servicio (o dos veces, de antes de que la pasarela lo impidiera) es una
+	// cuenta, no dos filas. Como `accountsFor` en la web.
+	for _, c := range api.AccountsFor(p.cuentas.Items, p.servicio, cmp.Or(p.esperadaID, p.cuenta.InstanceID)) {
 		if c.Provider != "gmail" && c.Provider != "microsoft" && c.Provider != "yahoo" {
 			continue
 		}

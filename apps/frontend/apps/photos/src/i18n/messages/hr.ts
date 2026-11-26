@@ -401,4 +401,9 @@ export const hr: AppCatalog<typeof en> = {
   'gallery.encrypted.editHint':
     'Uređivanje se obavlja na ovom uređaju i sprema se šifrirano kao nova verzija fotografije.',
   'gallery.encrypted.albumEmpty': 'Ovaj šifrirani album još nema fotografija.',
+  'shortcuts.favorite': 'Označi ili ukloni iz omiljenih',
+  'trash.restoreAll': 'Vrati sve',
+  'trash.restoredAll': 'Vraćeno u vaše fotografije: {count}',
+  'album.download': 'Preuzmi album',
+  'viewer.openInDrive': 'Pogledaj izvornik u Sytue Driveu',
 };

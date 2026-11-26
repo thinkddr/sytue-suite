@@ -42,6 +42,20 @@ func LeerModoMayusculas(v string) (ModoMayusculas, bool) {
 	return "", false
 }
 
+// SiguienteModoMayusculas es Mayús+F3 de Word (`siguienteModoMayusculas`): el modo
+// siguiente para el texto elegido en el ciclo minúsculas → MAYÚSCULAS → Cada Palabra →
+// minúsculas. Lo que ya está todo en minúscula pasa a mayúsculas; todo en mayúscula, a
+// cada palabra; lo demás, a minúsculas. Se mide con las mismas transformaciones.
+func SiguienteModoMayusculas(texto string) ModoMayusculas {
+	if NuevoCambioMayusculas(Minusculas).Tramo(texto) == texto {
+		return Mayusculas
+	}
+	if NuevoCambioMayusculas(Mayusculas).Tramo(texto) == texto {
+		return CadaPalabra
+	}
+	return Minusculas
+}
+
 // CambioMayusculas transforma los trozos de un párrafo seguidos: el estado (¿empieza
 // frase?, ¿estamos dentro de una palabra?) cruza los trozos y se reinicia con [Parrafo].
 type CambioMayusculas struct {

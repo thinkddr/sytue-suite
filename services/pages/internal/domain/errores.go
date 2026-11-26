@@ -54,4 +54,10 @@ var (
 	// ErrDemasiadosPendientes: ese comprador ya tiene sus pedidos sin pagar; uno solo
 	// no llena los huecos de la tienda (WEB-06).
 	ErrDemasiadosPendientes = errors.New("pages: too_many_pending_orders")
+	// ErrEntradaInvalida: la petición no tiene sentido tal cual (p. ej. devolver a «sin
+	// leer» todas las respuestas sin decir cuáles). 400, no un 500.
+	ErrEntradaInvalida = errors.New("pages: entrada no válida")
+	// ErrEstadoPedido: el pedido no está en el estado del que parte el cambio pedido
+	// (servir un pedido sin pagar, o deshacer el servido de uno que no lo está).
+	ErrEstadoPedido = errors.New("pages: el pedido no admite ese cambio de estado")
 )

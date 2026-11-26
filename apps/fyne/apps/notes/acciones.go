@@ -786,6 +786,15 @@ func (p *Pantalla) menuNota(n Nota, enArbol bool) *ui.Menu {
 		entrada("share.toRoom", func() { p.compartirEnSala(n) })
 	}
 	entrada("note.info", func() { p.dialogoInformacion(n) })
+	// Copiar sin abrir nada, tras «Información» como en NoteCard.tsx: el ENLACE a la
+	// nota (solo ids, el de la búsqueda de la suite) y su TEXTO, para pegarlo fuera. El
+	// texto, solo con la nota legible.
+	if enlace := p.enlaceANota(p.activo.ID, n.ID); enlace != "" {
+		entrada("note.copyLink", func() { p.copiarNota(enlace, "note.linkCopied") })
+	}
+	if !p.bloqueado {
+		entrada("note.copyText", func() { p.copiarNota(TextoParaCopiar(n), "note.textCopied") })
+	}
 	entrada("backlinks.title", func() { p.dialogoRetroenlaces(n) })
 	if !enArbol {
 		entrada("note.attach", func() { p.adjuntar(n) })

@@ -832,4 +832,17 @@ export const de: AppCatalog<typeof en> = {
   'search.loadMoreFailed': 'Weitere Ergebnisse konnten nicht geladen werden. Versuche es erneut.',
   'privacy.notice':
     'Wir verkaufen Ihre Daten nicht und geben sie nicht an Dritte weiter. Wir nutzen sie weder für Profilbildung noch für Werbung, noch um unsere Dienste oder die anderer zu trainieren oder zu verbessern. Sie sind bei der Übertragung und im Ruhezustand verschlüsselt und verlassen unsere europäische Infrastruktur nur, soweit es für die Abrechnung unbedingt nötig ist, und in den Integrationen, die Sie aktivieren – dort bittet Sie der Drittanbieter um Zustimmung zu den verwendeten Daten.',
+  'inbox.markAllOf': '{app} als gelesen markieren',
+  'inbox.markUnread': 'Als ungelesen markieren',
+  'inbox.muteLikeThis': 'Benachrichtigungen wie diese stummschalten',
+  'inbox.mutedLikeThis':
+    'Du bekommst keine Benachrichtigungen dieser Art mehr. Ändern kannst du das unten unter „Was du erhalten möchtest“.',
+  'inbox.muteFailed': 'Stummschalten nicht möglich. Bitte erneut versuchen.',
+  'inbox.actionsOf': 'Aktionen für „{title}“',
+  'downloads.checksum': 'Download prüfen',
+  'downloads.checksumHelp':
+    'Sein SHA-256-Fingerabdruck. Berechne den der heruntergeladenen Datei und prüfe, ob sie übereinstimmen.',
+  'downloads.checksumLabel': 'SHA-256-Fingerabdruck',
+  'downloads.copyChecksum': 'Fingerabdruck kopieren',
+  'downloads.checksumCopied': 'Fingerabdruck kopiert',
 };

@@ -134,6 +134,19 @@ describe('atajos de Drive', () => {
     );
   });
 
+  test('la hoja del Drive de la bóveda enseña solo lo que atiende', () => {
+    const t = useT('es');
+    const grupos = gruposDeAtajos(t, false, ['search', 'upload', 'newFolder', 'help']);
+    expect(grupos.map((g) => g.titulo)).toEqual(['Acciones', 'Vista']);
+    expect(grupos.flatMap((g) => g.atajos.flatMap((a) => a.teclas))).toEqual(['u', 'n', '/', '?']);
+    const fuente = readFileSync(
+      new URL('../components/PrivateFileBrowser.tsx', import.meta.url),
+      'utf8',
+    );
+    expect(fuente).toContain('accionDeEvento(e, { offline: false })');
+    expect(fuente).toContain('gruposDeAtajos(t, undefined, ACCIONES_BOVEDA)');
+  });
+
   test('FileBrowser escucha la tabla y pinta la hoja (y no queda el oyente suelto de «u»/«n»)', () => {
     const fuente = readFileSync(new URL('../components/FileBrowser.tsx', import.meta.url), 'utf8');
     expect(fuente).toContain('accionDeEvento(e, { offline })');

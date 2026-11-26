@@ -36,11 +36,28 @@ if (!projectSourced) return new Response(t('common.notFound'), { status: 404 });
 const project = projectSourced.data;
 // Los despliegues se cargan aquí para saber QUÉ contenedor sigue el stream en
 // vivo: la pestaña «En vivo» necesita un deployment id real, no el slug.
+// `?build=<id>`: el log de LA compilación de un despliegue del historial (el botón
+// «Log de compilación» de cada fila). Sin él, los registros de siempre. El id se
+// valida aquí solo por forma; que sea de esta organización lo comprueba el
+// control-plane, que contesta 404 a uno ajeno.
+const buildParam = Astro.url.searchParams.get('build') ?? '';
+const buildId = /^[0-9a-f-]{36}$/i.test(buildParam) ? buildParam : undefined;
 const [{ data: usage }, logsSourced, { data: deployments }] = await Promise.all([
   loadUsage(session, locale, project.slug),
-  loadLogs(session, project.slug),
+  buildId
+    ? loadLogs(session, project.slug, undefined, { source: 'build', buildId })
+    : loadLogs(session, project.slug),
   loadDeployments(session, project.slug),
 ]);
+const deEsaCompilacion = buildId ? deployments.find((d) => d.buildId === buildId) : undefined;
+const build = buildId
+  ? {
+      id: buildId,
+      label: deEsaCompilacion?.commitSha
+        ? `commit ${deEsaCompilacion.commitSha}`
+        : (deEsaCompilacion?.branch ?? buildId.slice(0, 8)),
+    }
+  : undefined;
 const runtime = pickRuntimeDeployment(deployments);
 const deployment = runtime
   ? {
@@ -64,6 +81,7 @@ const deployment = runtime
     live={logsSourced.live}
     error={logsSourced.error}
     deployment={deployment}
+    build={build}
     locale={locale}
   />
 </DashboardLayout>

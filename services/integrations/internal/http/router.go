@@ -223,6 +223,9 @@ func NewRouter(d Deps) http.Handler {
 		// origen la sigue autorizando un admin: sin instancia activa no se migra nada.
 		api.Post("/migrations/self", h.CreateSelfMigration)
 		api.Get("/migrations/self", h.ListSelfMigrations)
+		// De qué cuentas puede traérselos: una vez por cuenta aunque la organización la
+		// haya conectado varias veces (import_origins.go).
+		api.Get("/migrations/self/origins", h.ListImportOrigins)
 
 		// Escrituras: admin/owner de la org.
 		api.Group(func(wr chi.Router) {

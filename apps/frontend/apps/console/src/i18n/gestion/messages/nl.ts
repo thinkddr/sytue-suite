@@ -1,0 +1,87 @@
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: (c) 2026 Daniel Delgado Ramos
+ *
+ * Las herramientas de gestión de personas de Sytue Admin (acceso efectivo,
+ * sesiones, bajas recuperables, lotes, export del directorio, dispositivos,
+ * auditoría y roles): traducción del inglés (`en.ts`), que es la fuente de verdad.
+ */
+import type { AppCatalog } from '@sytue/i18n';
+import type { en } from './en.js';
+
+export const nl: AppCatalog<typeof en> = {
+  'gestion.acceso.titulo': 'Wat iemand mag doen, en waarom',
+  'gestion.acceso.ver': 'Tonen',
+  'gestion.acceso.error': 'De effectieve toegang kon niet worden geladen.',
+  'gestion.acceso.ayuda':
+    'Berekend door Sytue ID met dezelfde regel waarmee het autoriseert. Elke bevoegdheid toont waar die vandaan komt; haal je die bron weg, controleer dan de andere die hier staan.',
+  'gestion.acceso.sinPermisos': 'Geen beheerbevoegdheden.',
+  'gestion.acceso.fuente.integrado': 'Ingebouwde rol: {role}',
+  'gestion.acceso.fuente.rol': 'Rol: {name}',
+  'gestion.acceso.fuente.elevacion': 'Verhoogd naar {name} tot {when}',
+  'gestion.acceso.pendientes': 'Verhogingen die op goedkeuring wachten',
+  'gestion.acceso.pendiente': '{role}, aangevraagd op {when}',
+  'gestion.acceso.grupos': 'Groepen',
+  'gestion.acceso.sinGrupos': 'Zit in geen enkele groep.',
+  'gestion.acceso.calculado': 'Berekend op {when}',
+  'gestion.sesiones.titulo': 'Open sessies',
+  'gestion.sesiones.ver': 'Tonen',
+  'gestion.sesiones.error': 'De sessies konden niet worden geladen.',
+  'gestion.sesiones.vacia': 'Geen open sessies.',
+  'gestion.sesiones.inicio': 'aangemeld op {when}',
+  'gestion.sesiones.caduca': 'verloopt op {when}',
+  'gestion.sesiones.mfa': 'Tweede factor',
+  'gestion.sesiones.sinMfa': 'Alleen wachtwoord',
+  'gestion.sesiones.total': 'Open sessies: {count}',
+  'gestion.bajas.titulo': 'Gesloten accounts die je nog kunt herstellen',
+  'gestion.bajas.ayuda':
+    'Een gesloten account bewaart zijn gegevens {days} dagen. Herstellen brengt het geschorst terug: activeer het opnieuw in de directory om toegang terug te geven.',
+  'gestion.bajas.cerrada': 'gesloten op {when}',
+  'gestion.bajas.motivo': 'reden: {reason}',
+  'gestion.bajas.quedan': 'Resterende dagen: {count}',
+  'gestion.bajas.restaurar': 'Herstellen',
+  'gestion.bajas.confirmarTitulo': '{name} herstellen?',
+  'gestion.bajas.confirmar':
+    'Het account komt geschorst terug, met zijn gegevens. Niemand kan ermee inloggen totdat je het opnieuw activeert.',
+  'gestion.bajas.restaurada': '{name} hersteld',
+  'gestion.bajas.reactivar':
+    'Het is geschorst: activeer het in de directory om toegang terug te geven.',
+  'gestion.bajas.fallo': 'Het account kon niet worden hersteld',
+  'gestion.directorio.exportar': 'CSV exporteren',
+  'gestion.dispositivos.buscar': 'Zoek persoon, apparaat of IP',
+  'gestion.dispositivos.confianza': 'Filteren op vertrouwen',
+  'gestion.dispositivos.todos': 'Alle apparaten',
+  'gestion.dispositivos.recuento': '{count} van {total} getoond',
+  'gestion.dispositivos.sinResultados': 'Geen apparaat komt overeen.',
+  'gestion.auditoria.rango': 'Snelle periode',
+  'gestion.auditoria.hoy': 'Vandaag',
+  'gestion.auditoria.7d': '7 dagen',
+  'gestion.auditoria.30d': '30 dagen',
+  'gestion.roles.duplicar': 'Dupliceren',
+  'gestion.roles.copia': '{name} (kopie)',
+  'gestion.lotes.titulo': 'Recente bulkacties',
+  'gestion.lotes.ayuda': 'Wat op meerdere mensen tegelijk is toegepast, en bij wie dat niet lukte.',
+  'gestion.lotes.ver': 'Tonen',
+  'gestion.lotes.error': 'De bulkacties konden niet worden geladen.',
+  'gestion.lotes.vacio': 'Nog geen bulkacties.',
+  'gestion.lotes.progreso': '{done} van {total}',
+  'gestion.lotes.accion.setRole': 'Rol wijzigen',
+  'gestion.lotes.estado.ejecutando': 'Bezig',
+  'gestion.lotes.estado.terminado': 'Voltooid',
+  'gestion.lotes.estado.cancelado': 'Geannuleerd',
+  'gestion.lotes.estado.interrumpido': 'Onderbroken',
+  'gestion.lotes.detalle': 'Details',
+  'gestion.lotes.todosBien': 'Op iedereen toegepast.',
+  'gestion.lote.fallos': 'Niet toegepast op',
+  'gestion.lote.cerrar': 'Sluiten',
+  'gestion.lote.codigo.not_found': 'zit niet in deze organisatie',
+  'gestion.lote.codigo.self': 'dat ben jij',
+  'gestion.lote.codigo.forbidden': 'alleen een eigenaar kan een eigenaar wijzigen',
+  'gestion.lote.codigo.deleted': 'het account is gesloten',
+  'gestion.lote.codigo.last_owner': 'laatste eigenaar van de organisatie',
+  'gestion.lote.codigo.last_admin': 'laatste beheerder van de organisatie',
+  'gestion.lote.codigo.error': 'onverwachte fout; probeer het opnieuw',
+  'gestion.lote.seleccionarVisibles': 'Alle zichtbare selecteren ({count})',
+  'gestion.lote.recortado':
+    'Een bulkactie omvat hoogstens {max} mensen: de eerste {max} zichtbare zijn geselecteerd.',
+};

@@ -44,6 +44,7 @@ const FRASES: Record<string, ClaveAccion> = {
   'field.delete': 'activity.do.fieldDelete',
   'field.options': 'activity.do.fieldChange',
   'field.formula': 'activity.do.fieldChange',
+  'field.default': 'activity.do.fieldChange',
   'field.reorder': 'activity.do.fieldReorder',
   'record.create': 'activity.do.recordCreate',
   'record.create.form': 'activity.do.recordForm',

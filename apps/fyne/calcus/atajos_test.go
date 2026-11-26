@@ -181,10 +181,10 @@ func TestLaHojaDeAtajosEsLaDeLaWeb(t *testing.T) {
 	if !slices.Equal(titulos, []string{"Moverse", "Seleccionar", "Editar"}) {
 		t.Errorf("grupos %v", titulos)
 	}
-	if filas != 28 {
-		t.Errorf("la hoja tiene %d filas y la de la web 28", filas)
+	if filas != 31 {
+		t.Errorf("la hoja tiene %d filas y la de la web 31", filas)
 	}
-	for _, k := range []string{"Mayús+Espacio", "Ctrl+Mayús+V", "Ctrl+D", "Ctrl+;", "Supr", "Mayús+Tab", "Mayús+F10"} {
+	for _, k := range []string{"Mayús+Espacio", "Ctrl+Mayús+V", "Ctrl+D", "Ctrl+;", "Supr", "Mayús+Tab", "Mayús+F10", "Alt+=", "Ctrl+Mayús+5"} {
 		if !slices.Contains(teclas, k) {
 			t.Errorf("falta la tecla %q en %v", k, teclas)
 		}

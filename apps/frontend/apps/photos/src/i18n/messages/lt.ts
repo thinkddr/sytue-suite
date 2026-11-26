@@ -416,4 +416,9 @@ export const lt: AppCatalog<typeof en> = {
   'gallery.encrypted.editHint':
     'Redagavimas atliekamas šiame įrenginyje ir išsaugomas šifruotas kaip nauja nuotraukos versija.',
   'gallery.encrypted.albumEmpty': 'Šiame šifruotame albume dar nėra nuotraukų.',
+  'shortcuts.favorite': 'Pažymėti arba atžymėti kaip mėgstamą',
+  'trash.restoreAll': 'Atkurti viską',
+  'trash.restoredAll': 'Grąžinta į nuotraukas: {count}',
+  'album.download': 'Atsisiųsti albumą',
+  'viewer.openInDrive': 'Peržiūrėti originalą Sytue Drive',
 };

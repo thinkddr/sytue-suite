@@ -12,7 +12,7 @@ import type { JSX } from 'preact';
 import { Modal, Table, type TableColumn } from '@sytue/ui';
 import { intlTag, type Locale } from '@sytue/i18n';
 import type { DocsKey, DocsT } from '../../i18n';
-import type { CifrasTexto } from '../recuento';
+import { minutosDeLectura, type CifrasTexto } from '../recuento';
 
 export interface RecuentoDocumento extends CifrasTexto {
   paginas: number;
@@ -55,6 +55,13 @@ export function RecuentoDialog({
       sel: seleccion?.caracteresSinEspacios ?? null,
     },
     { clave: 'wordcount.paragraphs', doc: documento.parrafos, sel: seleccion?.parrafos ?? null },
+    // Lo que se tarda en leer: lo que se pregunta antes de mandar un texto o de leerlo en voz
+    // alta, y que con las palabras a la vista había que calcular a mano.
+    {
+      clave: 'wordcount.readingTime',
+      doc: minutosDeLectura(documento.palabras),
+      sel: seleccion ? minutosDeLectura(seleccion.palabras) : null,
+    },
   ];
   const cifra = (n: number | null): string => (n === null ? '' : numero.format(n));
   const columnas: TableColumn<Fila>[] = [

@@ -969,4 +969,14 @@ export const is: AppCatalog<typeof en> = {
     'Fyrra póstkerfið er ekki lengur tiltækt. Þangað til þú færir póstinn þinn í hvelfinguna færðu engan nýjan póst: það sem er sent til þín á meðan bíður á netþjóninum sem það var sent frá, og hann reynir aftur í nokkra daga. Ef þú flytur í tæka tíð berst það þér á eftir; annars er það endursent sem óafhendanlegt. Það sem þegar er dulkóðað með fyrra kerfinu, eins og pósturinn sem þú áttir fyrir, er ekki hægt að lesa: því er ekki eytt, en enginn getur opnað það. Eftir flutninginn berst pósturinn aftur og opnast með Sytue ID-innskráningunni þinni, eins og hin forritin.',
   'privateMail.vaultMoveCheckFailed':
     'Ekki tókst að athuga stöðu póstsins þíns. Reyndu aftur eftir smástund.',
+  'shortcuts.goInbox': 'Fara í Innhólf',
+  'shortcuts.goSent': 'Fara í Sent',
+  'shortcuts.goDrafts': 'Fara í Drög',
+  'shortcuts.goArchive': 'Fara í Safn',
+  'compose.sendAndArchive': 'Senda og setja í safn',
+  'reader.copyAddress': 'Afrita netfang',
+  'reader.addressCopied': 'Netfang afritað',
+  'reader.copyAddressFailed': 'Ekki tókst að afrita netfangið',
+  'reader.viewPlain': 'Sýna sem hreinan texta',
+  'reader.viewFormatted': 'Sýna með sniði',
 };

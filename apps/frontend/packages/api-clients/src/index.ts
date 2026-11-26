@@ -33,8 +33,23 @@ export type { XmlParser } from './core/xml.js';
 // Asistente de importacion: traerse uno sus propios datos de Google / Microsoft 365.
 // Lo consume el BFF de cada producto (Mail, Drive, Calendar, Contacts); el token de
 // sesion no sale del servidor.
-export { listImportOrigins, startImport, listMyImports } from './core/importData.js';
-export type { ImportDomain, ImportSource, ImportOrigin, ImportJob } from './core/importData.js';
+export {
+  importEndpoint,
+  latestImports,
+  listImportOrigins,
+  listMyImports,
+  startImport,
+  unifyOrigins,
+} from './core/importData.js';
+export type {
+  ImportDomain,
+  ImportErrorCode,
+  ImportJob,
+  ImportOrigin,
+  ImportOriginState,
+  ImportSource,
+  StartImportResult,
+} from './core/importData.js';
 export {
   STORAGE_PROVIDERS,
   isStorageOAuthKind,
@@ -329,6 +344,7 @@ export {
   mailProviderName,
   pendingMailConsent,
   servesMail,
+  accountsFor,
 } from './core/externalMail.js';
 export { LinkedServicesClient } from './core/linkedServices.js';
 export type {

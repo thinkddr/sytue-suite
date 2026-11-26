@@ -393,10 +393,14 @@ export const cs: Catalog = {
   'import.fromGoogle': 'Přenést z Googlu',
   'import.fromMicrosoft': 'Přenést z Microsoft 365',
   'import.running': 'Kopírování dat… zatím {count} položek.',
-  'import.done': 'Přeneseno {count} položek, {skipped} vynecháno.',
+  'import.done': '{what}: přeneseno {count} položek, {skipped} vynecháno. Dokončeno {date}.',
   'import.someFailed':
     'Část vašich dat se nepodařilo zkopírovat. Správa organizace může zjistit proč.',
   'import.failed': 'Import se nepodařilo spustit. Zkuste to za chvíli znovu.',
+  'import.unavailable':
+    'Připojení k {source} teď nelze číst: vypršelo, bylo odvoláno nebo nikdy nebylo autorizováno. Požádejte správu organizace, aby je znovu připojila.',
+  'import.needsAdmin':
+    'Připojení k {source} zatím nemůže kopírovat data jednotlivých lidí. Požádejte správu organizace, aby dokončila nastavení.',
   'dataflow.label': 'Co se děje s daty',
   'dataflow.in.title': 'Přichází jen do Sytue One',
   'dataflow.in.body':

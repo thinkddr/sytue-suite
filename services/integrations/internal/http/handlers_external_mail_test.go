@@ -157,7 +157,7 @@ func TestOAuthFinishTellsMissingScopeAndExistingAccountApart(t *testing.T) {
 		code, existing string
 	}{
 		{err, "scope", ""},
-		{fmt.Errorf("canje: %w", &errMailAccountExists{instance: "la-de-antes"}), "exists", "la-de-antes"},
+		{fmt.Errorf("canje: %w", &errAccountExists{instance: "la-de-antes"}), "exists", "la-de-antes"},
 		{mailbox.ErrAuth, "exchange", ""},
 		{errors.New("el proveedor rechazó el canje con 400"), "exchange", ""},
 	} {

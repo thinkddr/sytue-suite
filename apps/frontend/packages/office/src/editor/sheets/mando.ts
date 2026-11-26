@@ -56,6 +56,8 @@ export type SheetCommand =
   | 'filtersort' // value: JSON.stringify({ col, dir }) — ordena el cuerpo del autofiltro
   | 'dedupe' // quita filas duplicadas del rango seleccionado
   | 'text2cols' // value: delimitador — reparte el texto de la columna en varias
+  | 'cleantext' // value: 'trim' | 'sentence' | 'lower' | 'upper' | 'title' — el texto de los literales de la selección (textoCeldas.ts)
+  | 'autosum' // value: 'SUM' | 'AVERAGE' | 'COUNT' | 'MAX' | 'MIN' — la fórmula al pie de los números (autosuma.ts)
   | 'insrow' // value: 'above' | 'below'
   | 'inscol' // value: 'left' | 'right'
   | 'delrow'
@@ -126,6 +128,7 @@ export const lienzoDeHoja: {
   sheetGridReader: ((range: string) => string[][] | null) | null;
   sheetValueReader: ((range: string, sheet?: string) => CellValue[][] | null) | null;
   sheetNameReader: (() => string | null) | null;
+  sheetCsvReader: (() => { hoja: string; filas: string[][] } | null) | null;
   sheetCellAnchorReader: (() => AnclaCelda | null) | null;
   sheetCellRevealer: ((a: AnclaCelda) => boolean) | null;
   sheetCellRefReader: ((a: AnclaCelda) => string | null) | null;
@@ -141,6 +144,7 @@ export const lienzoDeHoja: {
   sheetGridReader: null,
   sheetValueReader: null,
   sheetNameReader: null,
+  sheetCsvReader: null,
   sheetCellAnchorReader: null,
   sheetCellRevealer: null,
   sheetCellRefReader: null,
@@ -276,6 +280,12 @@ export function readSheetValues(range: string, sheet?: string): CellValue[][] | 
 /** Nombre de la hoja activa; null sin lienzo. Lo usan los scripts para acotar por ámbito. */
 export function readSheetName(): string | null {
   return lienzoDeHoja.sheetNameReader ? lienzoDeHoja.sheetNameReader() : null;
+}
+
+/** La hoja activa tal y como se VE, desde A1 hasta lo último con algo: lo que escribe
+ *  «Descargar la hoja como CSV» (csv.ts). null sin lienzo de hoja. */
+export function readSheetForCsv(): { hoja: string; filas: string[][] } | null {
+  return lienzoDeHoja.sheetCsvReader ? lienzoDeHoja.sheetCsvReader() : null;
 }
 
 /** El ancla de la celda activa (anclaCelda.ts), para colgarle un comentario: «Nuevo

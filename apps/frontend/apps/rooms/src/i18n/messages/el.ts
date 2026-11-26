@@ -1011,4 +1011,11 @@ export const el: AppCatalog<typeof en> = {
   'nativeResource.description':
     'Σύνδεσε αυτή την εφαρμογή με τον λογαριασμό σου στο {tenant}. Τα υπάρχοντα δικαιώματα πρόσβασής σου διατηρούνται.',
   'nativeResource.approve': 'Σύνδεση',
+  'channel.markRead': 'Σήμανση ως αναγνωσμένου',
+  'channel.copyLink': 'Αντιγραφή συνδέσμου',
+  'channel.linkCopied': 'Ο σύνδεσμος αντιγράφηκε',
+  'channel.download': 'Λήψη της συνομιλίας',
+  'channel.downloaded': 'Η συνομιλία αποθηκεύτηκε στο',
+  'channel.downloadFailed': 'Δεν ήταν δυνατή η αποθήκευση της συνομιλίας',
+  'status.nothingUnread': 'Όλα ήταν ήδη αναγνωσμένα',
 };

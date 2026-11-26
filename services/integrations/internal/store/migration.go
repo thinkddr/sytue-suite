@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 
@@ -95,11 +96,7 @@ func (s *Store) CreateMigrationJob(ctx context.Context, in NewMigrationJob) (dom
 		).Scan(&job.ID, &job.CreatedAt); err != nil {
 			return err
 		}
-		ev, err := events.NewEvent(SyncChannel, MigrationRequestedType, t.Slug, MigrationJobRef{JobID: job.ID})
-		if err != nil {
-			return fmt.Errorf("construir evento de migración: %w", err)
-		}
-		return events.Publish(ctx, tx, ev)
+		return publishMigration(ctx, tx, t.Slug, job.ID)
 	})
 	if err != nil {
 		if errors.Is(err, domain.ErrNotFound) || errors.Is(err, domain.ErrConflict) || errors.Is(err, ErrDemasiadasMigraciones) {
@@ -166,6 +163,145 @@ func (s *Store) LaunchSelfOutboundJob(ctx context.Context, in NewMigrationJob) (
 		return domain.MigrationJob{}, fmt.Errorf("store: lanzar salida propia: %w", err)
 	}
 	return job, nil
+}
+
+// SelfInbound es lo que identifica la importación de UNA persona: quién es en Sytue
+// (sub y correo, porque los trabajos que lanza un administrador la nombran por correo),
+// de qué cuenta del origen se lee y con qué conexiones se puede leer esa cuenta.
+type SelfInbound struct {
+	// Job son los datos del trabajo nuevo, si hay que crearlo. InstanceID es la
+	// conexión con la que se lanza; TargetUser, el sub de quien llama.
+	Job NewMigrationJob
+	// Email es el correo de quien llama, en minúsculas: el destino de los trabajos que
+	// lanzó un administrador y el usuario de origen de los que lanzó la persona.
+	Email string
+	// SameAccount son TODAS las conexiones de la misma cuenta del origen, InstanceID
+	// incluida. Un trabajo lanzado antes con cualquiera de ellas es ESTE trabajo.
+	SameAccount []string
+}
+
+// LaunchSelfInboundJob deja en marcha la importación de un tipo de contenido de UNA
+// persona desde UNA cuenta del origen, sin duplicar nunca lo ya traído.
+//
+// Antes cada «Traerlo de Google» creaba un trabajo nuevo, y el mapa de lo ya copiado
+// (migration_map) es POR TRABAJO: pulsarlo dos veces, o una en cada una de dos
+// conexiones de la misma cuenta, copiaba el buzón entero dos veces. Ahora se busca el
+// último trabajo de esa persona, ese contenido y esa cuenta —con cualquiera de sus
+// conexiones, y también el que lanzó un administrador para ella— y:
+//
+//   - si está en cola o corriendo, se devuelve tal cual (lanzar es idempotente);
+//   - si terminó, falló o se canceló, se vuelve a encolar CON SU MAPA: un fallo sigue
+//     donde se quedó y reintenta lo que no entró; uno terminado recorre el origen otra
+//     vez y solo trae lo nuevo. Pasa a la conexión elegida, que es la que tiene el
+//     token vivo;
+//   - si no hay ninguno, se crea.
+//
+// Todo en una transacción, con un cerrojo por (organización, persona, contenido): dos
+// clics seguidos, o la web y la app nativa a la vez, no pueden crear dos trabajos.
+func (s *Store) LaunchSelfInboundJob(ctx context.Context, in SelfInbound) (domain.MigrationJob, error) {
+	t, err := tenancy.From(ctx)
+	if err != nil {
+		return domain.MigrationJob{}, err
+	}
+	j := in.Job
+	same := append([]string{j.InstanceID}, in.SameAccount...)
+	targets := []string{j.TargetUser}
+	if in.Email != "" {
+		targets = append(targets, in.Email)
+	}
+	var job domain.MigrationJob
+	err = s.tenantTx(ctx, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended('integrations:self-in|' || $1 || '|' || $2 || '|' || $3, 0))`,
+			t.Slug, j.TargetUser, string(j.Domain)); err != nil {
+			return err
+		}
+		var exists bool
+		if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM app_instances WHERE org_id = current_setting('app.tenant', true) AND id = $1)`, j.InstanceID).Scan(&exists); err != nil {
+			return err
+		}
+		if !exists {
+			return domain.ErrNotFound
+		}
+		// El origen es la cuenta de quien llama: la que lee una importación propia
+		// (source_user = su correo) o, en las que lanzó un administrador con el
+		// consentimiento de esa misma persona, la de quien autorizó (source_user vacío).
+		err := scanMigrationJob(tx.QueryRow(ctx, `
+			SELECT `+migrationJobCols+` FROM migration_jobs
+			 WHERE org_id = current_setting('app.tenant', true)
+			   AND target_user = ANY($1::text[]) AND domain = $2 AND direction = 'in'
+			   AND (lower(source_user) = $3 OR source_user = '')
+			   AND instance_id = ANY($4::uuid[])
+			 ORDER BY created_at DESC, id DESC LIMIT 1 FOR UPDATE`,
+			targets, string(j.Domain), strings.ToLower(j.SourceUser), same), &job)
+		switch {
+		case err == nil:
+			if job.Status == domain.MigrationQueued || job.Status == domain.MigrationRunning {
+				return nil
+			}
+			if err := underLiveCap(ctx, tx, t.Slug); err != nil {
+				return err
+			}
+			// Terminado: el cursor ya está agotado, pero se vacía igual para que la
+			// pasada empiece por la raíz sea cual sea el dominio; el mapa evita repetir.
+			// Fallido o cancelado: el cursor se conserva y sigue donde se quedó.
+			if _, err := tx.Exec(ctx, `
+				UPDATE migration_jobs
+				   SET status = 'queued', last_error = '', finished_at = NULL, instance_id = $2,
+				       cursor = CASE WHEN status = 'done' THEN '' ELSE cursor END
+				 WHERE org_id = current_setting('app.tenant', true) AND id = $1`, job.ID, j.InstanceID); err != nil {
+				return err
+			}
+			job.Status, job.LastError, job.FinishedAt, job.InstanceID = domain.MigrationQueued, "", nil, j.InstanceID
+			return publishMigration(ctx, tx, t.Slug, job.ID)
+		case !isNoRows(err):
+			return err
+		}
+		if err := underLiveCap(ctx, tx, t.Slug); err != nil {
+			return err
+		}
+		job = domain.MigrationJob{
+			OrgID: t.Slug, InstanceID: j.InstanceID, TargetUser: j.TargetUser, SourceUser: j.SourceUser,
+			Source: j.Source, Domain: j.Domain, Direction: domain.DirectionIn, Status: domain.MigrationQueued,
+		}
+		if err := tx.QueryRow(ctx, `
+			INSERT INTO migration_jobs (org_id, instance_id, target_user, source_user, source, domain, direction)
+			VALUES ($1, $2, $3, $4, $5, $6, 'in')
+			RETURNING id, created_at`,
+			t.Slug, j.InstanceID, j.TargetUser, j.SourceUser, string(j.Source), string(j.Domain),
+		).Scan(&job.ID, &job.CreatedAt); err != nil {
+			return err
+		}
+		return publishMigration(ctx, tx, t.Slug, job.ID)
+	})
+	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) || errors.Is(err, ErrDemasiadasMigraciones) {
+			return domain.MigrationJob{}, err
+		}
+		return domain.MigrationJob{}, fmt.Errorf("store: lanzar importación propia: %w", err)
+	}
+	return job, nil
+}
+
+// underLiveCap aplica el tope de trabajos vivos por organización (NEG-20).
+func underLiveCap(ctx context.Context, tx pgx.Tx, org string) error {
+	var vivos int
+	if err := tx.QueryRow(ctx, `SELECT count(*) FROM migration_jobs WHERE org_id = $1 AND status IN ('queued', 'running')`, org).Scan(&vivos); err != nil {
+		return err
+	}
+	if vivos >= MaxMigracionesVivas {
+		return ErrDemasiadasMigraciones
+	}
+	return nil
+}
+
+// publishMigration encola el evento que ejecuta el trabajo, en la misma transacción
+// que lo da de alta: o quedan los dos, o ninguno.
+func publishMigration(ctx context.Context, tx pgx.Tx, org, jobID string) error {
+	ev, err := events.NewEvent(SyncChannel, MigrationRequestedType, org, MigrationJobRef{JobID: jobID})
+	if err != nil {
+		return fmt.Errorf("construir evento de migración: %w", err)
+	}
+	return events.Publish(ctx, tx, ev)
 }
 
 // migrationJobCols es la proyección compartida por las lecturas de trabajos.
@@ -300,17 +436,19 @@ func (s *Store) ListMigrationJobs(ctx context.Context, limit int) ([]domain.Migr
 // de UNA persona.
 //
 // Filtra por destino y no por quien los creó: cuando un administrador migra la
-// organización entera, cada persona necesita ver la suya. La verja no está en este
-// filtro sino en el llamante, que solo pasa el sub de quien pregunta.
-func (s *Store) ListMigrationJobsForTarget(ctx context.Context, targetUser string, limit int) ([]domain.MigrationJob, error) {
+// organización entera, cada persona necesita ver la suya. Por eso admite varios
+// nombres de la misma persona: los trabajos propios la nombran por su `sub` y los del
+// asistente automático, por su correo de Sytue. La verja no está en este filtro sino en
+// el llamante, que solo pasa los de quien pregunta.
+func (s *Store) ListMigrationJobsForTarget(ctx context.Context, targetUsers []string, limit int) ([]domain.MigrationJob, error) {
 	if limit <= 0 || limit > 200 {
 		limit = 50
 	}
 	out := make([]domain.MigrationJob, 0, limit)
 	err := s.tenantTx(ctx, func(tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `SELECT `+migrationJobCols+`
-			  FROM migration_jobs WHERE org_id = current_setting('app.tenant', true) AND target_user = $1
-			  ORDER BY created_at DESC, id DESC LIMIT $2`, targetUser, limit)
+			  FROM migration_jobs WHERE org_id = current_setting('app.tenant', true) AND target_user = ANY($1::text[])
+			  ORDER BY created_at DESC, id DESC LIMIT $2`, targetUsers, limit)
 		if err != nil {
 			return err
 		}

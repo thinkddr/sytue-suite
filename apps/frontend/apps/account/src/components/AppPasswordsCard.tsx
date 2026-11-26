@@ -13,7 +13,17 @@
  */
 import type { JSX } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
-import { Button, Card, DataFlow, EmptyState, FieldGroup, Input, useConfirm } from '@sytue/ui';
+import {
+  Button,
+  Card,
+  DataFlow,
+  EmptyState,
+  FieldGroup,
+  Icon,
+  Input,
+  copiarAlPortapapeles,
+  useConfirm,
+} from '@sytue/ui';
 import type { T } from '../i18n/index.js';
 import { primeraLectura } from '../lib/primeraLectura.js';
 import { FilasCargando } from './FilasCargando.js';
@@ -34,6 +44,10 @@ export function AppPasswordsCard({ t, locale }: { t: T; locale: string }): JSX.E
   // «no se ha podido cargar», y antes lo decían así.
   const [falloAccion, setFalloAccion] = useState(false);
   const [enviando, setEnviando] = useState(false);
+  // «Copiar» de la recién creada: es lo que se hace con ella SIEMPRE (pegarla en el
+  // cliente de correo), y seleccionar a mano dieciséis caracteres sin espacios es
+  // donde se cuela uno de menos.
+  const [copia, setCopia] = useState<'nada' | 'hecha' | 'fallo'>('nada');
   const { confirmar, dialogo } = useConfirm();
 
   // `inicial`: la del montaje se comparte con la revisión de seguridad.
@@ -69,6 +83,7 @@ export function AppPasswordsCard({ t, locale }: { t: T; locale: string }): JSX.E
       if (!res.ok) throw new Error(String(res.status));
       const d = (await res.json()) as { label: string; password: string };
       setCreada({ label: d.label, password: d.password });
+      setCopia('nada');
       setEtiqueta('');
       await cargar();
     } catch {
@@ -137,11 +152,34 @@ export function AppPasswordsCard({ t, locale }: { t: T; locale: string }): JSX.E
             <code class="bg-surface-raised rounded px-2 py-1 font-mono text-base break-all">
               {creada.password}
             </code>
-            <div>
+            <div class="flex flex-wrap items-center gap-2">
+              <Button
+                variant="secondary"
+                leadingIcon={<Icon name="copies" size={16} />}
+                onClick={() =>
+                  void copiarAlPortapapeles(creada.password).then((ok) =>
+                    setCopia(ok ? 'hecha' : 'fallo'),
+                  )
+                }
+              >
+                {t('common.copy')}
+              </Button>
               <Button variant="ghost" onClick={() => setCreada(null)}>
                 {t('app_passwords.saved')}
               </Button>
             </div>
+            {/* Siempre montada mientras se enseña: una región `status` que nace con
+                el texto dentro no la anuncian todos los lectores. */}
+            <p
+              role="status"
+              class={copia === 'fallo' ? 'text-danger-text text-xs' : 'text-success-text text-xs'}
+            >
+              {copia === 'hecha'
+                ? t('common.copied')
+                : copia === 'fallo'
+                  ? t('common.copy_failed')
+                  : ''}
+            </p>
           </div>
         )}
 

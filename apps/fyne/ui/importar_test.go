@@ -28,8 +28,8 @@ func TestImportarCancelaLecturasYNoPublicaOtraCuenta(t *testing.T) {
 	leidas, cambiar := 0, true
 	cliente := &http.Client{Transport: transporteFunc(func(r *http.Request) (*http.Response, error) {
 		leidas++
-		body := `{"instances":[{"id":"anterior","template_key":"google","status":"active"}]}`
-		if strings.Contains(r.URL.Path, "migrations") {
+		body := `{"origins":[{"instance_id":"anterior","source":"google","state":"ready"}]}`
+		if r.URL.Path == "/api/v1/migrations/self" {
 			body = `{"migrations":[]}`
 			if cambiar {
 				cambiar = false
@@ -56,7 +56,7 @@ func TestImportarCancelaLecturasYNoPublicaOtraCuenta(t *testing.T) {
 }
 
 func TestImportarNoReenviaUnaOrdenTrasCambiarSesion(t *testing.T) {
-	g := &pasarelaDoble{instancias: `{"instances":[{"id":"g","template_key":"google","status":"active"}]}`, migraciones: `{"migrations":[]}`}
+	g := &pasarelaDoble{origenes: `{"origins":[{"instance_id":"g","source":"google","state":"ready"}]}`, migraciones: `{"migrations":[]}`}
 	srv := g.servidor(t)
 	d := NuevoImportarDatos(traductorPrueba(t), api.NewIntegraciones(srv.URL, nil, nil), "drive")
 	d.Sondeo = 0
@@ -79,7 +79,7 @@ func TestImportarNoReenviaUnaOrdenTrasCambiarSesion(t *testing.T) {
 }
 
 func TestImportarMantieneUnSoloSondeoYLoDetiene(t *testing.T) {
-	g := &pasarelaDoble{instancias: `{"instances":[]}`, migraciones: `{"migrations":[{"id":"n","domain":"drive","status":"running"}]}`}
+	g := &pasarelaDoble{origenes: `{"origins":[]}`, migraciones: `{"migrations":[{"id":"n","domain":"drive","status":"running"}]}`}
 	srv := g.servidor(t)
 	d := NuevoImportarDatos(traductorPrueba(t), api.NewIntegraciones(srv.URL, nil, nil), "drive")
 	d.aparte = func(f func()) { f() }
@@ -108,17 +108,19 @@ func TestImportarMantieneUnSoloSondeoYLoDetiene(t *testing.T) {
 // pasarelaDoble hace de pasarela de integraciones con los orígenes y trabajos que se le
 // pongan, y cuenta cuántas veces se le ha preguntado.
 type pasarelaDoble struct {
-	mu                      sync.Mutex
-	instancias, migraciones string
-	lanzadas                int
+	mu                    sync.Mutex
+	origenes, migraciones string
+	lanzadas              int
+	// lanzar es lo que contesta al lanzar; vacío, un trabajo nuevo en cola.
+	lanzar string
 }
 
 // poner cambia lo que contesta, con el cerrojo del servidor.
-func (g *pasarelaDoble) poner(instancias, migraciones string) {
+func (g *pasarelaDoble) poner(origenes, migraciones string) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	if instancias != "" {
-		g.instancias = instancias
+	if origenes != "" {
+		g.origenes = origenes
 	}
 	if migraciones != "" {
 		g.migraciones = migraciones
@@ -137,13 +139,20 @@ func (g *pasarelaDoble) servidor(t *testing.T) *httptest.Server {
 		g.mu.Lock()
 		defer g.mu.Unlock()
 		switch r.Method + " " + r.URL.Path {
-		case "GET /api/v1/instances":
-			_, _ = io.WriteString(w, g.instancias)
+		case "GET /api/v1/migrations/self/origins":
+			_, _ = io.WriteString(w, g.origenes)
 		case "GET /api/v1/migrations/self":
 			_, _ = io.WriteString(w, g.migraciones)
 		case "POST /api/v1/migrations/self":
 			g.lanzadas++
+			if g.lanzar != "" {
+				w.WriteHeader(http.StatusConflict)
+				_, _ = io.WriteString(w, g.lanzar)
+				return
+			}
 			_, _ = io.WriteString(w, `{"migrations":[{"id":"n","domain":"drive","status":"queued"}]}`)
+		default:
+			http.NotFound(w, r)
 		}
 	}))
 	t.Cleanup(srv.Close)
@@ -184,7 +193,7 @@ func TestTraerMisDatosSoloConOrigenes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	g := &pasarelaDoble{instancias: `{"instances":[]}`, migraciones: `{"migrations":[]}`}
+	g := &pasarelaDoble{origenes: `{"origins":[]}`, migraciones: `{"migrations":[]}`}
 	srv := g.servidor(t)
 	d := NuevoImportarDatos(tr, api.NewIntegraciones(srv.URL, nil, nil), "drive")
 	d.aparte = func(f func()) { f() }
@@ -197,7 +206,7 @@ func TestTraerMisDatosSoloConOrigenes(t *testing.T) {
 		t.Error("sin orígenes se pinta el bloque")
 	}
 
-	g.poner(`{"instances":[{"id":"g","name":"G","template_key":"google","status":"active"}]}`, "")
+	g.poner(`{"origins":[{"instance_id":"g","name":"G","source":"google","state":"ready"}]}`, "")
 	d.Cargar()
 	o := d.Objeto(231, tema.Claro)
 	if o == nil || !strings.Contains(textosDeArbol(o), strings.Fields(tr.T("import.fromGoogle", nil))[0]) {
@@ -256,7 +265,7 @@ func TestImportarSePliegaYLoRecuerda(t *testing.T) {
 	prefs := fyne.CurrentApp().Preferences()
 	prefs.SetBool(PreferenciaPlegado, false)
 	t.Cleanup(func() { prefs.RemoveValue(PreferenciaPlegado) })
-	g := &pasarelaDoble{instancias: `{"instances":[{"id":"g","name":"G","template_key":"google","status":"active"}]}`, migraciones: `{"migrations":[]}`}
+	g := &pasarelaDoble{origenes: `{"origins":[{"instance_id":"g","name":"G","source":"google","state":"ready"}]}`, migraciones: `{"migrations":[]}`}
 	srv := g.servidor(t)
 	nuevo := func() *ImportarDatos {
 		d := NuevoImportarDatos(tr, api.NewIntegraciones(srv.URL, nil, nil), "drive")

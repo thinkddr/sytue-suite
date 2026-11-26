@@ -396,4 +396,35 @@ export const nucleo = {
 
   'forms.empty': 'Nie ma jeszcze odpowiedzi',
   'forms.empty_help': 'Gdy ktoś wyśle formularz na Twojej stronie, zobaczysz go tutaj.',
+  'sites.search': 'Szukaj witryn',
+  'sites.search_empty': 'Żadna witryna nie pasuje do „{q}”.',
+  'sites.sort_label': 'Sortuj witryny',
+  'sites.sort_recent': 'Ostatnio edytowane',
+  'sites.sort_name': 'Nazwa (A–Ż)',
+  'sites.view_live': 'Zobacz witrynę',
+  'sites.view_live_aria': 'Zobacz opublikowaną witrynę {nombre} (otwiera się w nowej karcie)',
+  'seo.title': 'Co zobaczą wyszukiwarki',
+  'seo.intro':
+    'Przegląd szkicu: tytuły, opisy i obrazy, od których zależą wyszukiwarki i czytniki ekranu. To ostrzeżenia; nie blokują publikacji.',
+  'seo.open_editor': 'Otwórz edytor',
+  'seo.recheck': 'Sprawdź ponownie',
+  'seo.error': 'Nie udało się wczytać przeglądu. Spróbuj ponownie.',
+  'seo.all_good':
+    'Wszystko w porządku: każda strona ma tytuł i opis, a obrazy mają tekst alternatywny.',
+  'seo.summary': 'Ostrzeżenia: {count}',
+  'seo.badge_warning': 'Do poprawy',
+  'seo.badge_info': 'Uwaga',
+  'seo.on_page': 'Strona: {page}',
+  'seo.title_missing': 'Strona nie ma tytułu: wyszukiwarka wymyśli go sama.',
+  'seo.title_long': 'Tytuł ma {count} znaków; mieści się około 60, zanim wyszukiwarka go utnie.',
+  'seo.title_duplicate': 'Inna strona ma ten sam tytuł: będą ze sobą konkurować w wynikach.',
+  'seo.description_missing':
+    'Strona nie ma opisu: wyszukiwarka pokaże przypadkowy fragment tekstu.',
+  'seo.description_long': 'Opis ma {count} znaków; wyświetla się około 160.',
+  'seo.image_alt_missing':
+    'Obrazy bez tekstu alternatywnego: {count}. Czytniki ekranu i wyszukiwarki nie wiedzą, co przedstawiają; jeśli nic nie przedstawiają, oznacz je jako dekoracyjne.',
+  'seo.page_noindex': 'Ta strona jest ukryta przed wyszukiwarkami (noindex).',
+  'seo.site_noindex': 'Cała witryna jest ukryta przed wyszukiwarkami (noindex).',
+  'seo.share_image_missing':
+    'Witryna nie ma obrazu do udostępniania: linki w wiadomościach i mediach społecznościowych pojawią się bez obrazka.',
 };

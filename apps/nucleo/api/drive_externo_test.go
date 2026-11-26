@@ -63,24 +63,30 @@ func TestAlmacenExterno(t *testing.T) {
 	}
 }
 
-// TestImportaciones: solo se ofrecen las conexiones ACTIVAS de Google o Microsoft, por la
-// clave de su plantilla, y solo se enseñan los trabajos del contenido de esta app.
+// TestImportaciones: los orígenes salen de la pasarela una vez por cuenta, los trabajos
+// se reducen al vigente de cada cuenta y contenido de esta app, y lanzar manda la
+// conexión elegida.
 func TestImportaciones(t *testing.T) {
 	var lanzada string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method + " " + r.URL.Path {
-		case "GET /api/v1/instances":
-			_, _ = io.WriteString(w, `{"instances":[
-				{"id":"g","name":"Google de ventas","template_key":"google-workspace-eu","status":"active"},
-				{"id":"m","name":"M365","template_key":"microsoft365","status":"active"},
-				{"id":"p","name":"Pausada","template_key":"google","status":"paused"},
-				{"id":"j","name":"Jira","template_key":"jira","status":"active"}]}`)
+		case "GET /api/v1/migrations/self/origins":
+			// Una pasarela con un fallo que repitiera la cuenta no la enseña dos veces.
+			_, _ = io.WriteString(w, `{"origins":[
+				{"instance_id":"g","instance_ids":["g","g2"],"name":"Google de ventas","source":"google","account_key":"google:acme.com","account_label":"acme.com","state":"ready"},
+				{"instance_id":"g2","name":"Google otra vez","source":"google","account_key":"Google:Acme.com","state":"ready"},
+				{"instance_id":"m","name":"M365","source":"m365","state":"unavailable"}]}`)
 		case "GET /api/v1/migrations/self":
-			_, _ = io.WriteString(w, `{"migrations":[{"id":"1","domain":"drive","status":"running","counts":{"migrated":3}},{"id":"2","domain":"mail","status":"done"}]}`)
+			_, _ = io.WriteString(w, `{"migrations":[
+				{"id":"1","instance_id":"g","domain":"drive","status":"running","account_key":"google:acme.com","counts":{"migrated":3},"created_at":"2026-11-02T10:00:00Z"},
+				{"id":"0","instance_id":"g2","domain":"drive","status":"done","account_key":"google:acme.com","counts":{"migrated":3},"created_at":"2026-11-01T10:00:00Z"},
+				{"id":"2","domain":"mail","status":"done"}]}`)
 		case "POST /api/v1/migrations/self":
 			b, _ := io.ReadAll(r.Body)
 			lanzada = string(b)
 			_, _ = io.WriteString(w, `{"migrations":[{"id":"3","domain":"drive","status":"queued"}]}`)
+		default:
+			http.NotFound(w, r)
 		}
 	}))
 	defer srv.Close()
@@ -90,17 +96,49 @@ func TestImportaciones(t *testing.T) {
 	origenes, err := i.OrigenesImportacion(ctx)
 	ids := make([]string, 0, len(origenes))
 	for _, o := range origenes {
-		ids = append(ids, o.InstanceID+":"+o.Source)
+		ids = append(ids, o.InstanceID+":"+o.Source+":"+strings.Join(o.InstanceIDs, ","))
 	}
-	if err != nil || !slices.Equal(ids, []string{"g:google", "m:m365"}) {
+	if err != nil || !slices.Equal(ids, []string{"g:google:g,g2", "m:m365:m"}) {
 		t.Fatalf("orígenes = %q, %v", ids, err)
 	}
+	if !origenes[0].Disponible() || origenes[1].Disponible() || origenes[0].AccountLabel != "acme.com" {
+		t.Fatalf("orígenes = %+v", origenes)
+	}
 	ms, err := i.MisImportaciones(ctx, []string{"drive"})
-	if err != nil || len(ms) != 1 || !ms[0].EnCurso() || ms[0].Counts.Migrated != 3 {
-		t.Errorf("importaciones = %+v, %v", ms, err)
+	if err != nil || len(ms) != 1 || ms[0].ID != "1" || !ms[0].EnCurso() || ms[0].Counts.Migrated != 3 {
+		t.Errorf("importaciones = %+v, %v; quiero solo la vigente de la cuenta", ms, err)
 	}
 	nuevas, err := i.Importar(ctx, origenes[0], []string{"drive"})
 	if err != nil || len(nuevas) != 1 || lanzada != `{"domains":["drive"],"instance_id":"g","source":"google"}` {
 		t.Errorf("importar = %+v %v; cuerpo %s", nuevas, err, lanzada)
+	}
+}
+
+// TestImportacionesConPasarelaAnterior: sin `/migrations/self/origins` se deducen de las
+// conexiones, y SOLO de las plantillas que migran. La misma cuenta conectada para Drive,
+// Meet o el correo de Outlook salía antes como otro «Traerlo de…».
+func TestImportacionesConPasarelaAnterior(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/instances" {
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = io.WriteString(w, `{"instances":[
+			{"id":"d","template_key":"google-drive","status":"active"},
+			{"id":"mt","template_key":"google-meet","status":"active"},
+			{"id":"o","template_key":"microsoft-mail","status":"active"},
+			{"id":"b","template_key":"google-workspace","status":"draft"},
+			{"id":"g1","name":"Google","template_key":"google-workspace","status":"active","has_secrets":true,"config":{"domain":"Acme.com"}},
+			{"id":"g2","name":"Google 2","template_key":"google-workspace","status":"active"},
+			{"id":"m","name":"M365","template_key":"microsoft365","status":"error"}]}`)
+	}))
+	defer srv.Close()
+	origenes, err := NewIntegraciones(srv.URL, &sesionFalsa{tokens: []string{"tok"}}, nil).OrigenesImportacion(context.Background())
+	got := make([]string, 0, len(origenes))
+	for _, o := range origenes {
+		got = append(got, strings.Join(o.InstanceIDs, ",")+"|"+o.AccountLabel+"|"+o.State)
+	}
+	if err != nil || !slices.Equal(got, []string{"g1,g2|acme.com|ready", "m||unavailable"}) {
+		t.Fatalf("orígenes = %q, %v", got, err)
 	}
 }

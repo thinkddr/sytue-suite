@@ -88,6 +88,12 @@ export const ATAJOS_DE_DOCUS: readonly FilaDeAyuda[] = [
   { keys: 'Ctrl+Shift+C', labelKey: 'wordcount.title' },
 ];
 
+/** Los del texto del folio que no son del registro porque no llevan Ctrl: Mayús+F3 alterna
+ *  las mayúsculas de lo elegido (`canvas/atajos.ts`). En la hoja de Docus, tras los suyos. */
+export const ATAJOS_DEL_TEXTO: readonly FilaDeAyuda[] = [
+  { keys: 'Shift+F3', labelKey: 'shortcut.cycleCase' },
+];
+
 /**
  * Los atajos del registro que existen en ese tipo de documento, agrupados como la cinta:
  * las pestañas en su orden y, dentro, los grupos y los comandos en el del registro. Van
@@ -131,7 +137,10 @@ export function gruposDeAtajos(
   return [
     {
       titulo: t('shortcut.group.editor'),
-      atajos: [...ATAJOS_DEL_MARCO, ...(kind === 'document' ? ATAJOS_DE_DOCUS : [])].map(fila),
+      atajos: [
+        ...ATAJOS_DEL_MARCO,
+        ...(kind === 'document' ? [...ATAJOS_DE_DOCUS, ...ATAJOS_DEL_TEXTO] : []),
+      ].map(fila),
     },
     ...atajosDelRegistro(kind).map((g) => ({
       titulo: `${rotuloPestana.get(g.tab) ?? g.tab} › ${t(g.group)}`,

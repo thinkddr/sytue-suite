@@ -151,6 +151,11 @@ type Pantalla struct {
 	recEnCajon            bool
 	recCargando, recFallo bool
 	saltarRec, descartRec func(api.Reminder)
+	// posponerRec pospone un recordatorio esos minutos y alternarRec abre o cierra sus
+	// opciones de «Posponer»; recPosponiendo es el que las tiene abiertas («» ninguno).
+	posponerRec    func(api.Reminder, int)
+	alternarRec    func(api.Reminder)
+	recPosponiendo string
 
 	// Los avisos hacia fuera. Todos pueden ser nil.
 	AlIrHoy   func()
@@ -190,6 +195,8 @@ type Pantalla struct {
 	AlCambiarAjustes func(Ajustes)
 	AlAbrirAjustes   func()
 	AlCerrarAjustes  func()
+	// AlCompartirDisponibilidad abre «Compartir mi disponibilidad»; nil, la fila no sale.
+	AlCompartirDisponibilidad func()
 	// AlRehacer pide reconstruir la pantalla FUERA del Layout: la ventana cruzó el corte
 	// del mes del teléfono.
 	AlRehacer func()

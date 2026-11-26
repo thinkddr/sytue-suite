@@ -58,6 +58,9 @@ type avisosBarra struct {
 	menu   *Menu
 	// carril: la barra entera es de color (ver enCarril).
 	carril bool
+	// apartada: el buscador del teléfono ocupa la fila y la campana se aparta con su
+	// punto (ver `apartar`).
+	apartada bool
 
 	mu    sync.Mutex
 	items []api.HubNotification
@@ -159,6 +162,21 @@ func (a *avisosBarra) colocar(p fyne.Position, lado float32) {
 	a.anillo.CornerRadius = (LadoPuntoAviso + 2*aro) / 2
 }
 
+// apartar esconde la campana con su punto mientras el buscador del teléfono ocupa la
+// fila (`BarraSuite`, cara de la suite), y los devuelve. Que se vea la campana lo decide
+// la barra: aquí solo se esconde, y el punto vuelve si hay avisos sin leer.
+func (a *avisosBarra) apartar(si bool) {
+	a.mu.Lock()
+	sinLeer := a.sinLeer
+	a.mu.Unlock()
+	a.apartada = si
+	ver(a.punto, sinLeer > 0 && !si)
+	ver(a.anillo, sinLeer > 0 && !si)
+	if si {
+		a.boton.Hide()
+	}
+}
+
 // enCarril pone la campana sobre la barra de color —la barra estrecha, que es carril
 // entera— o la devuelve a la clara: la tinta, los velos y el foco de cada sitio.
 func (a *avisosBarra) enCarril(si bool) {
@@ -178,8 +196,8 @@ func (a *avisosBarra) repintar(v tema.Variante) {
 	sinLeer := a.sinLeer
 	a.mu.Unlock()
 	a.punto.FillColor, a.anillo.FillColor = colorPuntoAviso(v, a.carril)
-	ver(a.punto, sinLeer > 0)
-	ver(a.anillo, sinLeer > 0)
+	ver(a.punto, sinLeer > 0 && !a.apartada)
+	ver(a.anillo, sinLeer > 0 && !a.apartada)
 	rotulo := a.t.T("notifications.title", nil)
 	if sinLeer > 0 {
 		rotulo = a.t.T("notifications.buttonLabel", i18n.Vars{"count": sinLeer})

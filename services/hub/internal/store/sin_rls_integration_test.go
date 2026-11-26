@@ -67,7 +67,7 @@ func TestSinRLSLosAvisosSonDeLaOrganizacionODeLaPersona(t *testing.T) {
 		if err := st.MarkRead(delegado, aviso.ID, bea); !errors.Is(err, domain.ErrNotFound) {
 			t.Errorf("marca como leído un aviso de acme (err=%v)", err)
 		}
-		if n, _ := st.MarkAllRead(delegado, bea); n != 0 {
+		if n, _ := st.MarkAllRead(delegado, bea, ""); n != 0 {
 			t.Errorf("marca %d avisos de acme", n)
 		}
 	})
@@ -100,7 +100,7 @@ func TestSinRLSLosAvisosSonDeLaOrganizacionODeLaPersona(t *testing.T) {
 		if err := st.MarkRead(suya, aviso.ID, bea); err != nil {
 			t.Fatalf("bea no puede marcar su aviso: %v", err)
 		}
-		if n, _ := st.MarkAllRead(suya, bea); n != 1 {
+		if n, _ := st.MarkAllRead(suya, bea, ""); n != 1 {
 			t.Fatalf("bea marca %d de una vez, quiero 1", n)
 		}
 		// El de su correo de entrar sigue sin leer, y se lee desde acme.

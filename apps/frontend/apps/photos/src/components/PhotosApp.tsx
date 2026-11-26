@@ -17,6 +17,7 @@ import {
 import {
   Button,
   DURACION_DESHACER,
+  BotonFlotante,
   Dropdown,
   EmptyState,
   FILA_UNICA_EN_MOVIL,
@@ -43,6 +44,7 @@ import {
   marcarAppLista,
 } from '@sytue/ui';
 import { formatDateTime, translate, type Locale } from '@sytue/i18n';
+import { driveFileUrl } from '@sytue/config';
 import {
   alaPapelera,
   albumesParaAnyadir,
@@ -252,6 +254,15 @@ function Galeria({ locale, user, hubBaseUrl, soloFavoritas = false }: Props): JS
         e.preventDefault();
         selector.current?.click();
         return;
+      // «/» al buscador. Sin el `preventDefault` la barra se escribiría dentro.
+      case 'buscar': {
+        const campo = document.getElementById(ID_BUSCADOR) as HTMLInputElement | null;
+        if (!campo) return;
+        e.preventDefault();
+        campo.focus();
+        campo.select();
+        return;
+      }
       // «?» abre la hoja, que es donde se aprenden los demás. Shift incluido: en un
       // teclado español el signo lo pide, y no es un modificador de sistema.
       case 'ayuda':
@@ -665,23 +676,29 @@ function Galeria({ locale, user, hubBaseUrl, soloFavoritas = false }: Props): JS
     />
   );
   /**
-   * «Añadir fotos» es LA acción principal de la galería y la única rellena de su
-   * barra: lo demás (seleccionar, las parecidas) va de fantasma, que es como se
-   * lee cuál es cuál sin pararse a mirarlo.
-   *
-   * En la barra, en móvil solo el icono: el rótulo mandaba el botón a una tercera
-   * fila. En la galería VACÍA el rótulo va siempre: ahí es la única cosa que se
-   * puede hacer, y un «+» suelto en mitad de la pantalla no dice qué añade.
+   * «Añadir fotos» es LA acción principal de la galería: el «+» flotante, abajo a la
+   * derecha y en todos los anchos, como «Redactar» en Mail (producto, 2026-11-25). Era
+   * el botón relleno de la barra, y en el teléfono solo su icono.
    */
-  const botonAnyadir = (siempreConRotulo: boolean) => (
+  const flotante = (
+    <BotonFlotante
+      label={t('gallery.add')}
+      disabled={subida !== null}
+      onClick={() => selector.current?.click()}
+    />
+  );
+  /**
+   * En la galería VACÍA va además con su rótulo en el estado vacío: ahí es la única cosa
+   * que se puede hacer, y un «+» suelto no dice qué añade.
+   */
+  const botonAnyadir = (
     <Button
       variant="primary"
       leadingIcon={<Icon name="plus" />}
       disabled={subida !== null}
       onClick={() => selector.current?.click()}
-      title={t('gallery.add')}
     >
-      <span class={cx(!siempreConRotulo && 'sr-only sm:not-sr-only')}>{t('gallery.add')}</span>
+      {t('gallery.add')}
     </Button>
   );
   const estadoSubida =
@@ -910,7 +927,13 @@ function Galeria({ locale, user, hubBaseUrl, soloFavoritas = false }: Props): JS
 
   if (!cargando && !pendiente && elementos.length === 0 && !error && !texto) {
     return (
-      <Marco user={user} hubBaseUrl={hubBaseUrl} locale={locale} title={t('app.title')}>
+      <Marco
+        user={user}
+        hubBaseUrl={hubBaseUrl}
+        locale={locale}
+        title={t('app.title')}
+        flotante={flotante}
+      >
         <div
           class="mx-auto flex h-full w-full max-w-screen-2xl flex-col px-4 py-6 lg:px-8"
           {...zona}
@@ -926,7 +949,7 @@ function Galeria({ locale, user, hubBaseUrl, soloFavoritas = false }: Props): JS
               soloFavoritas ? 'favorites.empty.description' : 'gallery.empty.description',
             )}
             spot="emptyPhotos"
-            action={botonAnyadir(true)}
+            action={botonAnyadir}
           />
         </div>
       </Marco>
@@ -934,7 +957,13 @@ function Galeria({ locale, user, hubBaseUrl, soloFavoritas = false }: Props): JS
   }
 
   return (
-    <Marco user={user} hubBaseUrl={hubBaseUrl} locale={locale} title={t('app.title')}>
+    <Marco
+      user={user}
+      hubBaseUrl={hubBaseUrl}
+      locale={locale}
+      title={t('app.title')}
+      flotante={flotante}
+    >
       <div class="mx-auto w-full max-w-screen-2xl px-4 py-6 lg:px-8" {...zona}>
         <div class="flex flex-wrap items-center gap-2">
           <Nav t={t} locale={locale} activa={soloFavoritas ? 'favorites' : 'photos'} />
@@ -986,7 +1015,6 @@ function Galeria({ locale, user, hubBaseUrl, soloFavoritas = false }: Props): JS
               </Button>
             </span>
           ) : null}
-          <span class="mb-4">{botonAnyadir(false)}</span>
           {selectorDeFicheros}
         </div>
         {/* Solo mirando la línea entera: con una búsqueda o una selección en
@@ -1503,7 +1531,7 @@ function irAlAncla(img: HTMLElement | null, c: HTMLElement | null): void {
 }
 
 /** Descarga por un enlace efímero: la URL lleva `Content-Disposition: attachment`. */
-function descargar(url: string): void {
+export function descargar(url: string): void {
   const a = document.createElement('a');
   a.href = url;
   a.download = '';
@@ -1707,7 +1735,11 @@ export function Visor({
   // nodo ya montado, y el primer pintado aún no lo tiene.
   const [dialogo, setDialogo] = useState<HTMLDialogElement | null>(null);
   useLayoutEffect(() => setDialogo(ref.current), []);
-  const opcionesHoja = { saltos: Boolean(posicion && onIr), papelera: Boolean(onDelete) };
+  const opcionesHoja = {
+    saltos: Boolean(posicion && onIr),
+    papelera: Boolean(onDelete),
+    favorita: Boolean(onFavorite),
+  };
   const cargarAlbumes = () => {
     if (lista === null)
       void albumesParaAnyadir()
@@ -1835,6 +1867,14 @@ export function Visor({
           case 'tamanyoReal':
             alternarReal();
             return;
+          // Sin pregunta, como el corazón de la barra: se deshace pulsando otra vez.
+          case 'favorita':
+            if (onFavorite && !e.repeat) onFavorite(foto, !foto.favorite);
+            return;
+          // El mismo destino que el botón «Editar» de la barra.
+          case 'editar':
+            if (!e.repeat) window.location.href = `${RUTA}edit?id=${encodeURIComponent(foto.id)}`;
+            return;
           // Sin pregunta: la papelera se deshace desde el aviso (design §5.4).
           case 'papelera':
             if (onDelete && !e.repeat) onDelete(foto);
@@ -1944,6 +1984,17 @@ export function Visor({
                   {t(formato === 'png' ? 'viewer.downloadPng' : 'viewer.downloadJpeg')}
                 </MenuItem>
               ))}
+              {/* La foto ES un fichero de Drive, y desde aquí no había forma de llegar
+                  a él: su carpeta, compartirlo, sus versiones. El original, no la
+                  exportación con la receta. */}
+              {foto.driveFileId ? (
+                <>
+                  <MenuSeparator />
+                  <MenuItem href={driveFileUrl(foto.driveFileId)}>
+                    {t('viewer.openInDrive')}
+                  </MenuItem>
+                </>
+              ) : null}
             </Dropdown>
             {/* Un enlace de verdad (`href` renderiza un <a>): se abre en otra pestaña
               y el lector de pantalla lo anuncia como enlace. */}

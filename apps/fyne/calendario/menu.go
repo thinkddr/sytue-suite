@@ -93,8 +93,9 @@ func (p *Pantalla) menuConservado() fyne.CanvasObject {
 	return l
 }
 
-// El menú de Sytue Calendar: «Crear evento» arriba, el mini-mes, «Mis calendarios» y,
-// si los hay, los compartidos conmigo.
+// El menú de Sytue Calendar: el mini-mes, «Mis calendarios» y, si los hay, los
+// compartidos conmigo. «Crear evento» ya no va arriba: es el «+» flotante de la ventana
+// (`capaFlotante`), en todos los anchos (producto, 2026-11-25).
 //
 // El carril, su ancho y su canalón son `ui.Lateral` —la misma pieza que montan las
 // otras cinco apps—; lo de dentro es de Calendar.
@@ -102,11 +103,6 @@ func (p *Pantalla) menu() fyne.CanvasObject { return p.lateral() }
 
 // lateral es el menú (ver menu), con su tipo.
 func (p *Pantalla) lateral() *ui.Lateral {
-	crear := ui.NuevoBoton(p.t("nav.createEvent", nil), func() { p.cajonAbierto = false; p.crearHoy() }).
-		ConIcono(iconos.Mas, 0)
-	crear.Ancho = ui.AnchoUtilMenu // `fullWidth`
-	crear.Inerte = p.SinConexion
-
 	mini := NuevoMiniMes(p.locale(), p.Cursor)
 	mini.Zona = p.zona()
 	mini.RotuloAnterior = p.t("nav.prevMonth", nil)
@@ -133,6 +129,13 @@ func (p *Pantalla) lateral() *ui.Lateral {
 	if len(p.Compartidos) > 0 {
 		bloques = append(bloques, p.seccionCompartidos())
 	}
+	// «Compartir mi disponibilidad», encima de los ajustes como en la web: es leer la
+	// agenda, así que vale también sin red de escritura.
+	if p.AlCompartirDisponibilidad != nil {
+		bloques = append(bloques, ui.NuevaFilaLateral(p.t("availability.open", nil),
+			iconos.Trazo(iconos.Reloj, ui.GlifoMenu, "sidebar-fg", tema.De(fyne.CurrentApp().Settings().ThemeVariant())).Objeto(),
+			func() { p.cajonAbierto = false; p.AlCompartirDisponibilidad() }))
+	}
 	// Una sola puerta a la página de ajustes, como en Mail.
 	if p.AlAbrirAjustes != nil {
 		f := ui.NuevaFilaLateral(p.t("nav.settings", nil), iconos.Trazo(iconos.Ajustes, ui.GlifoMenu, "sidebar-fg", tema.De(fyne.CurrentApp().Settings().ThemeVariant())).Objeto(), func() { p.cajonAbierto = false; p.AlAbrirAjustes() })
@@ -145,7 +148,7 @@ func (p *Pantalla) lateral() *ui.Lateral {
 	// Aquí cabe: mini-mes (177,25) y dos secciones cortas dentro de 744 − cabecera.
 	cuerpo := ui.EnColumna(0, bloques...)
 
-	l := ui.NuevoLateral(p.t("nav.myCalendars", nil), cuerpo).ConCabecera(crear)
+	l := ui.NuevoLateral(p.t("nav.myCalendars", nil), cuerpo)
 	l.Pie = p.pieMenu()
 	return l
 }

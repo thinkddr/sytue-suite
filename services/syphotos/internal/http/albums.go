@@ -274,6 +274,17 @@ func (h *Handlers) Restaurar(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// POST /api/v1/trash/restore — «Restaurar todo»: devuelve a la galería todo lo que
+// hay en la papelera de quien llama, en una sola petición. Contesta cuántas.
+func (h *Handlers) RestaurarTodo(w http.ResponseWriter, r *http.Request) {
+	n, err := h.store.RestaurarTodo(r.Context(), sub(r))
+	if err != nil {
+		httpx.Fail(w, r, traducir(err))
+		return
+	}
+	httpx.JSON(w, r, http.StatusOK, map[string]int64{"restored": n})
+}
+
 // DELETE /api/v1/trash        vacía la papelera entera
 // DELETE /api/v1/trash/{id}   borra una foto de la papelera, para siempre
 //

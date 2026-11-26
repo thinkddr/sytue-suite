@@ -220,6 +220,16 @@ function Inner({ locale, catalog, instances, live, productChoices }: AppsPanelPr
       });
       const newUrl = window.location.pathname;
       window.history.replaceState({}, '', newUrl);
+    } else if (oauthError === 'exists') {
+      // La cuenta ya estaba conectada: se descartó la nueva y se queda la que había,
+      // que es la que hay que volver a conectar si dejó de funcionar.
+      const existente = instId ? (items.find((x) => x.id === instId)?.name ?? '') : '';
+      toast.notify({
+        tone: 'warning',
+        title: t('apps.toast.oauthExists'),
+        ...(existente ? { description: t('apps.toast.oauthExistsHint', { name: existente }) } : {}),
+      });
+      window.history.replaceState({}, '', window.location.pathname);
     } else if (oauthError) {
       toast.notify({
         tone: 'danger',

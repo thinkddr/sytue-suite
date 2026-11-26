@@ -52,6 +52,12 @@ export interface Instalador {
   bytes: number;
   /** Ruta del BFF que redirige. NUNCA la URL firmada, que caduca. */
   href: string;
+  /**
+   * Su huella SHA-256 en hexadecimal, del `SHA256SUMS` que se publica con ellos
+   * (`traer-instaladores.sh`). Vacía si el fichero no viene en la lista: no se calcula
+   * aquí, que sería bajarse cada instalador entero para pintar una página.
+   */
+  sha256: string;
 }
 
 export interface Catalogo {
@@ -312,8 +318,14 @@ export async function cargarCatalogo(): Promise<Catalogo> {
         // `corporate.sytue.eu/api/descargas/X` → 404, y `…/one/api/descargas/X`
         // → 401, que es la ruta buena pidiendo sesión.
         href: hrefDe(nombre),
+        sha256: '',
       });
     }
+    // Las huellas, del SHA256SUMS de la misma tanda. Es lo que deja comprobar que el
+    // fichero que acaba en el equipo es el que se publicó (un espejo, un proxy o una
+    // descarga cortada no dan la misma). Sin la lista, la página sale igual sin ellas.
+    const sumas = await sumasDe(a);
+    for (const i of instaladores) i.sha256 = sumas.get(i.fichero) ?? '';
     // Por producto y, dentro, por plataforma: quien entra busca SU app, no su
     // sistema operativo — de eso ya se encarga la sección destacada de arriba.
     instaladores.sort(
@@ -326,6 +338,39 @@ export async function cargarCatalogo(): Promise<Catalogo> {
     };
   } catch {
     return { version: '', instaladores: [], motivo: 'sin-release' };
+  }
+}
+
+/**
+ * Lee `SHA256SUMS` (el formato de `sha256sum`: «huella  nombre», con un `*` delante del
+ * nombre si se calculó en modo binario) y devuelve nombre → huella. Las líneas que no
+ * encajan se ignoran: una huella mal formada no se enseña como si fuera buena.
+ */
+export function leerSumas(texto: string): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const linea of texto.split(/\r?\n/)) {
+    const m = /^([0-9a-fA-F]{64}) [ *](.+)$/.exec(linea.trim());
+    if (!m) continue;
+    const nombre = m[2]!.slice(m[2]!.lastIndexOf('/') + 1);
+    out.set(nombre, m[1]!.toLowerCase());
+  }
+  return out;
+}
+
+/** `SHA256SUMS` del almacén, ya leído; vacío si no está o no responde a tiempo. */
+async function sumasDe(a: {
+  cliente: Bun.S3Client;
+  prefijo: string;
+}): Promise<Map<string, string>> {
+  try {
+    const url = a.cliente.presign(`${a.prefijo}SHA256SUMS`, { method: 'GET', expiresIn: 60 });
+    const r = await fetch(url, { signal: AbortSignal.timeout(3000) });
+    if (!r.ok) return new Map();
+    // Unas líneas de texto: más de 64 KiB no es un SHA256SUMS.
+    const texto = (await r.text()).slice(0, 64 * 1024);
+    return leerSumas(texto);
+  } catch {
+    return new Map();
   }
 }
 

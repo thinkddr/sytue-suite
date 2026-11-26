@@ -84,30 +84,37 @@ func (h *Handlers) CreateSelfMigration(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if h.store != nil {
-		inst, err := h.store.GetInstance(r.Context(), req.InstanceID)
-		if err != nil {
-			httpx.Fail(w, r, toAPIError(err))
-			return
-		}
-		if tplSrc, ok := sourceForTemplate(inst.TemplateKey); !ok || tplSrc != src {
-			httpx.Fail(w, r, httpx.ErrBadRequest.WithMessage("The instance template does not match the requested migration source."))
-			return
-		}
+	// La conexión que manda el cliente solo dice DE QUÉ CUENTA traer: se lanza con la
+	// mejor conexión de esa cuenta y se reutiliza el trabajo que ya hubiera con
+	// cualquiera de ellas (import_origins.go). Así un botón repetido, una pestaña vieja o
+	// la app nativa a la vez no copian lo mismo dos veces.
+	instances, err := h.store.ListInstances(r.Context())
+	if err != nil {
+		httpx.Fail(w, r, toAPIError(err))
+		return
+	}
+	origin, err := selfImportOrigin(importOrigins(instances), req.InstanceID, src)
+	if err != nil {
+		httpx.Fail(w, r, err)
+		return
 	}
 
 	jobs := make([]domain.MigrationJob, 0, len(doms))
 	for _, dom := range doms {
-		job, err := h.store.CreateMigrationJob(r.Context(), store.NewMigrationJob{
-			InstanceID: req.InstanceID,
-			// Destino y origen SIEMPRE quien llama: es lo que acota la puerta.
-			TargetUser: sub,
-			SourceUser: email,
-			Source:     src,
-			Domain:     dom,
-			// Solo traer. Llevarse el contenido fuera de Sytue mueve datos de la
-			// organización a un tercero, y eso lo decide quien la administra.
-			Direction: domain.DirectionIn,
+		job, err := h.store.LaunchSelfInboundJob(r.Context(), store.SelfInbound{
+			Job: store.NewMigrationJob{
+				InstanceID: origin.InstanceID,
+				// Destino y origen SIEMPRE quien llama: es lo que acota la puerta.
+				TargetUser: sub,
+				SourceUser: email,
+				Source:     src,
+				Domain:     dom,
+				// Solo traer. Llevarse el contenido fuera de Sytue mueve datos de la
+				// organización a un tercero, y eso lo decide quien la administra.
+				Direction: domain.DirectionIn,
+			},
+			Email:       email,
+			SameAccount: origin.InstanceIDs,
 		})
 		if err != nil {
 			httpx.Fail(w, r, toAPIError(err))
@@ -115,7 +122,31 @@ func (h *Handlers) CreateSelfMigration(w http.ResponseWriter, r *http.Request) {
 		}
 		jobs = append(jobs, job)
 	}
-	httpx.JSON(w, r, http.StatusAccepted, map[string]any{"migrations": jobs})
+	httpx.JSON(w, r, http.StatusAccepted, map[string]any{"migrations": selfJobs(jobs, []importOrigin{origin})})
+}
+
+// selfImportOrigin resuelve la conexión pedida a su origen y comprueba que se puede
+// lanzar. Los dos rechazos llevan código propio porque la interfaz los cuenta distinto:
+// una conexión que no es origen es un cliente desfasado; una que no puede leer es algo
+// que solo arregla quien administra, y decir «inténtalo luego» sería mentir.
+//
+// Devuelve `error` y no `*httpx.Error`: un puntero nulo de tipo concreto guardado en una
+// variable `error` ya existente no es nil, y la comprobación del llamante fallaría SIEMPRE.
+func selfImportOrigin(origins []importOrigin, instanceID string, src domain.MigrationSource) (importOrigin, error) {
+	origin, ok := importOriginOf(origins, instanceID)
+	if !ok {
+		return importOrigin{}, httpx.ErrNotFound.WithCode("import_origin_not_found").
+			WithMessage("That connection is not a source you can bring your data from.")
+	}
+	if origin.Source != src {
+		return importOrigin{}, httpx.ErrBadRequest.WithMessage("The instance template does not match the requested migration source.")
+	}
+	if origin.State != importOriginReady {
+		return importOrigin{}, httpx.ErrConflict.WithCode("import_connection_unavailable").
+			WithMessage("The connection with {source} cannot be read right now: it expired, was revoked or was never authorised. Ask whoever administers Sytue to connect it again.").
+			WithParams(map[string]any{"source": string(src)})
+	}
+	return origin, nil
 }
 
 // ListSelfMigrations — GET /api/v1/migrations/self: los trabajos de quien llama.
@@ -125,20 +156,30 @@ func (h *Handlers) CreateSelfMigration(w http.ResponseWriter, r *http.Request) {
 // recibir en forma de correo nuevo, y saber en qué punto va evita que la pida por otro
 // canal.
 func (h *Handlers) ListSelfMigrations(w http.ResponseWriter, r *http.Request) {
-	sub, _ := selfCaller(r)
+	sub, email := selfCaller(r)
 	if sub == "" {
 		httpx.Fail(w, r, httpx.ErrUnauthorized.WithCode("missing_identity"))
 		return
 	}
-	jobs, err := h.store.ListMigrationJobsForTarget(r.Context(), sub, 50)
+	// Por su `sub` y por su correo: los trabajos que lanza un administrador con el
+	// asistente automático la nombran por correo, y también son suyos.
+	targets := []string{sub}
+	if email != "" {
+		targets = append(targets, email)
+	}
+	jobs, err := h.store.ListMigrationJobsForTarget(r.Context(), targets, 50)
 	if err != nil {
 		httpx.Fail(w, r, toAPIError(err))
 		return
 	}
-	if jobs == nil {
-		jobs = []domain.MigrationJob{}
+	// La cuenta de cada trabajo sale de las conexiones: dos trabajos de dos conexiones
+	// de la misma cuenta son la misma importación y el cliente los cuenta una vez.
+	instances, err := h.store.ListInstances(r.Context())
+	if err != nil {
+		httpx.Fail(w, r, toAPIError(err))
+		return
 	}
-	httpx.JSON(w, r, http.StatusOK, map[string]any{"migrations": jobs})
+	httpx.JSON(w, r, http.StatusOK, map[string]any{"migrations": selfJobs(jobs, importOrigins(instances))})
 }
 
 // selfCaller devuelve el sub y el correo de quien llama.

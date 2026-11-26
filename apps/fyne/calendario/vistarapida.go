@@ -76,6 +76,9 @@ type AccionesVistaRapida struct {
 	Responder func(estado string)
 	// Unirse abre la videollamada. Lo pone la app porque abrir un enlace es del sistema.
 	Unirse func()
+	// DescargarICS guarda el evento como .ics en Descargas (`popover.downloadIcs`). Nil:
+	// sin servicio que lo dé.
+	DescargarICS func()
 	// Notas pide a Notepads las notas que cuelgan del evento; con error, la sección no
 	// sale. AbrirNotas abre una ruta de Notepads y Crecer avisa de que el panel ha
 	// cambiado de alto. Nil: sin Notepads.
@@ -110,6 +113,10 @@ func (p *Pantalla) nuevaVistaRapida(o Ocurrencia, respuesta string, a AccionesVi
 	var detalle []fyne.CanvasObject
 	if cuando := p.cuandoDe(o); cuando != "" {
 		detalle = append(detalle, textoXS(cuando, "text-muted", util-SangriaDetalle, 1))
+	}
+	if Disponible(o) {
+		// «Disponible» se dice en el detalle: en la rejilla se ve como cualquier otro.
+		detalle = append(detalle, textoXS(p.t("popover.showsAsFree", nil), "text-muted", util-SangriaDetalle, 1))
 	}
 	if o.Event.Location != "" {
 		detalle = append(detalle, textoXS(o.Event.Location, "text-muted", util-SangriaDetalle, 1))
@@ -158,11 +165,17 @@ func (p *Pantalla) nuevaVistaRapida(o Ocurrencia, respuesta string, a AccionesVi
 		if a.Duplicar != nil {
 			botones = append(botones, ui.NuevoBoton(p.t("popover.copyToMine", nil), a.Duplicar).Con(ui.Secundario, ui.TallaSM))
 		}
+		if a.DescargarICS != nil {
+			botones = append(botones, botonICS(p.t("popover.downloadIcs", nil), a.DescargarICS))
+		}
 		hijos = append(hijos, seccionRapida(util, botones, true))
 	} else {
 		botones := []fyne.CanvasObject{ui.NuevoBoton(p.t("common.edit", nil), a.Editar).Con(ui.Primario, ui.TallaSM)}
 		if a.Duplicar != nil {
 			botones = append(botones, ui.NuevoBoton(p.t("popover.duplicate", nil), a.Duplicar).Con(ui.Secundario, ui.TallaSM))
+		}
+		if a.DescargarICS != nil {
+			botones = append(botones, botonICS(p.t("popover.downloadIcs", nil), a.DescargarICS))
 		}
 		botones = append(botones, ui.NuevoBoton(p.t("common.delete", nil), a.Eliminar).Con(ui.Peligro, ui.TallaSM))
 		hijos = append(hijos, seccionRapida(util, botones, false))
@@ -171,6 +184,12 @@ func (p *Pantalla) nuevaVistaRapida(o Ocurrencia, respuesta string, a AccionesVi
 	// ponytail: el `aria-label` del diálogo («Detalles de …», `popover.details`) no se
 	// anuncia: la capa del emergente no es un objeto accesible con nombre.
 	return container.New(&anchoFijo{Ancho: util}, container.New(ui.Columna{}, hijos...))
+}
+
+// botonICS es «Descargar .ics» de EventPopover: fantasma, con su flecha, para que no
+// compita con «Editar».
+func botonICS(rotulo string, alPulsar func()) *ui.Boton {
+	return ui.NuevoBoton(rotulo, alPulsar).Con(ui.Fantasma, ui.TallaSM).ConIcono(iconos.Descargar, iconos.TallaSM)
 }
 
 // botonesRespuesta son los tres botones de «¿Vas a ir?» (Sí, Quizá, No), como

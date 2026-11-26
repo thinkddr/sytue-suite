@@ -64,6 +64,13 @@ var AtajosDeDocus = []FilaAyuda{
 	{Keys: "Ctrl+Shift+C", LabelKey: "wordcount.title"},
 }
 
+// AtajosDelTexto son los del texto del folio que no son del registro porque no llevan
+// Ctrl: Mayús+F3 alterna las mayúsculas de lo elegido (`docus/escribir.go`).
+// `ATAJOS_DEL_TEXTO` de la web: en la hoja de Docus, tras los suyos.
+var AtajosDelTexto = []FilaAyuda{
+	{Keys: "Shift+F3", LabelKey: "shortcut.cycleCase"},
+}
+
 // AtajosDelFolio son los que en Fyne solo atiende el folio de Docus con el foco
 // (`docus/escribir.go`, `Folio.atajo`): guardar ya y abrir el panel Buscar. En la web son
 // del marco y valen en los tres; aquí Calcus y Diapos no los tienen, así que la hoja solo
@@ -124,7 +131,7 @@ func (c *Contexto) gruposDeAtajos(texto func(string, func(string) string) string
 	marco := ui.GrupoDeAtajos{Titulo: tr("shortcut.group.editor")}
 	delMarco := AtajosDelMarco
 	if c.Tipo == Documento {
-		delMarco = append(append(slices.Clone(AtajosDelFolio), AtajosDelMarco...), AtajosDeDocus...)
+		delMarco = append(append(append(slices.Clone(AtajosDelFolio), AtajosDelMarco...), AtajosDeDocus...), AtajosDelTexto...)
 	}
 	for _, f := range delMarco {
 		marco.Atajos = append(marco.Atajos, fila(f))

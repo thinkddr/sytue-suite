@@ -383,9 +383,13 @@ export const sv: Catalog = {
   'import.fromGoogle': 'Hämta från Google',
   'import.fromMicrosoft': 'Hämta från Microsoft 365',
   'import.running': 'Kopierar dina data… {count} objekt hittills.',
-  'import.done': '{count} objekt överförda, {skipped} utelämnade.',
+  'import.done': '{what}: {count} objekt överförda, {skipped} utelämnade. Klart {date}.',
   'import.someFailed': 'En del av dina data kunde inte kopieras. Din administratör kan se varför.',
   'import.failed': 'Importen kunde inte startas. Försök igen om en stund.',
+  'import.unavailable':
+    'Anslutningen till {source} kan inte läsas just nu: den har gått ut, återkallats eller aldrig godkänts. Be din administratör att ansluta den igen.',
+  'import.needsAdmin':
+    'Anslutningen till {source} kan ännu inte kopiera varje persons data. Be din administratör att slutföra inställningen.',
   'dataflow.label': 'Vad som händer med uppgifterna',
   'dataflow.in.title': 'Kommer bara in i Sytue One',
   'dataflow.in.body':

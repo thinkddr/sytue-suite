@@ -126,6 +126,10 @@ export function AppShell({
         'sytue-frame bg-bg text-text flex h-[100dvh] min-w-0 flex-col overflow-hidden',
         cls,
       )}
+      // El detalle a la vista (la ficha, el lector): en el teléfono el «+» flotante no se
+      // pinta encima (BotonFlotante.tsx), como `detalleALaVista` en Fyne. Lo dice la shell,
+      // que es quien sabe si el detalle ocupa la pantalla; el botón va fuera de ella.
+      data-sytue-detalle={secondaryPanel && detailOpen ? '' : undefined}
     >
       {topbar}
       <div class="sytue-safe-workspace flex min-h-0 min-w-0 flex-1">

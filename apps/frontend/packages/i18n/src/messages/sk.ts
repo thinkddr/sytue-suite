@@ -396,10 +396,14 @@ export const sk: Catalog = {
   'import.fromGoogle': 'Preniesť z Googlu',
   'import.fromMicrosoft': 'Preniesť z Microsoft 365',
   'import.running': 'Kopírujú sa vaše údaje… zatiaľ {count} položiek.',
-  'import.done': 'Prenesených {count} položiek, {skipped} vynechaných.',
+  'import.done': '{what}: prenesených {count} položiek, {skipped} vynechaných. Dokončené {date}.',
   'import.someFailed':
     'Časť vašich údajov sa nepodarilo skopírovať. Správa organizácie môže zistiť prečo.',
   'import.failed': 'Import sa nepodarilo spustiť. Skúste to o chvíľu znova.',
+  'import.unavailable':
+    'Pripojenie k {source} teraz nemožno čítať: vypršalo, bolo odvolané alebo nikdy nebolo autorizované. Požiadajte správu organizácie, aby ho znova pripojila.',
+  'import.needsAdmin':
+    'Pripojenie k {source} zatiaľ nemôže kopírovať údaje jednotlivých ľudí. Požiadajte správu organizácie, aby dokončila nastavenie.',
   'dataflow.label': 'Čo sa deje s údajmi',
   'dataflow.in.title': 'Prichádza iba do Sytue One',
   'dataflow.in.body':

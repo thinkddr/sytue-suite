@@ -36,6 +36,71 @@ import {
 // definición para toda la suite, en vez de la copia que cada fichero perdía a su manera.
 const FOCUS_RING = 'sytue-focus-ring';
 
+/* ---------- Ordenar párrafos (exec 'sortParagraphs') ---------- */
+
+const ORDEN_PARRAFOS: { value: 'asc' | 'desc'; labelKey: DocsKey; icon: 'sortAsc' | 'sortDesc' }[] =
+  [
+    { value: 'asc', labelKey: 'data.sortAsc', icon: 'sortAsc' },
+    { value: 'desc', labelKey: 'data.sortDesc', icon: 'sortDesc' },
+  ];
+
+/** «Ordenar párrafos» de Word: de la A a la Z o al revés, los párrafos elegidos. */
+function OrdenarParrafosMenu({ ctx }: { ctx: EditorContext }): JSX.Element {
+  const t = useT();
+  const bloqueado = useBloqueado('sortParagraphs');
+  const { open, setOpen, rootRef } = usePopover();
+  return (
+    <div ref={rootRef} class="relative">
+      <button
+        type="button"
+        class={
+          'disabled:pointer-events-none disabled:opacity-40 ' +
+          'text-text-muted inline-flex h-7 w-7 items-center justify-center rounded-sm ' +
+          'hover:bg-bg-subtle hover:text-text aria-expanded:bg-selected aria-expanded:text-text ' +
+          FOCUS_RING
+        }
+        aria-label={t('paragraph.sort')}
+        title={t('paragraph.sort')}
+        aria-haspopup="true"
+        aria-expanded={open}
+        disabled={bloqueado}
+        // Sin robar el foco al folio: la selección es lo que se ordena.
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => setOpen(!open)}
+      >
+        <EditorIcon name="sortAsc" />
+      </button>
+      {open && (
+        <div
+          role="group"
+          aria-label={t('paragraph.sort')}
+          class={`${POPOVER_SHELL} left-0 w-48 p-1`}
+        >
+          {ORDEN_PARRAFOS.map((o) => (
+            <button
+              key={o.value}
+              type="button"
+              class={
+                'text-text hover:bg-bg-subtle flex h-8 w-full items-center gap-2 rounded-sm px-2 text-left text-sm ' +
+                'pointer-coarse:h-auto pointer-coarse:min-h-[max(44px,2.75rem)] ' +
+                FOCUS_RING
+              }
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                setOpen(false);
+                ctx.exec('sortParagraphs', o.value);
+              }}
+            >
+              <EditorIcon name={o.icon} />
+              {t(o.labelKey)}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ---------- Opciones de los selects ---------- */
 
 /** Familias ofrecidas (las 6 de §6.3, en su orden; «Times» se declara como
@@ -303,6 +368,18 @@ export function InicioTab({ ctx }: { ctx: EditorContext }): JSX.Element {
           onAction={() => exec('superscript')}
         />
         <RibbonButton commandId="subscript" icon="subscript" onAction={() => exec('subscript')} />
+        {/* Un peldaño más o menos de letra (Ctrl+Mayús+. y Ctrl+Mayús+,), como la «A▲»
+            y la «A▼» de Word: con siete tallas, el selector obliga a mirar cuál sigue. */}
+        {ctx.kind === 'document' && (
+          <>
+            <RibbonButton commandId="fontGrow" icon="fontGrow" onAction={() => exec('fontGrow')} />
+            <RibbonButton
+              commandId="fontShrink"
+              icon="fontShrink"
+              onAction={() => exec('fontShrink')}
+            />
+          </>
+        )}
         <RibbonColorSwatch
           commandId="color"
           icon="textColor"
@@ -386,6 +463,7 @@ export function InicioTab({ ctx }: { ctx: EditorContext }): JSX.Element {
         )}
         <RibbonButton commandId="outdent" icon="outdent" onAction={() => exec('outdent')} />
         <RibbonButton commandId="indent" icon="indent" onAction={() => exec('indent')} />
+        {ctx.kind === 'document' && <OrdenarParrafosMenu ctx={ctx} />}
         <RibbonSelect
           commandId="lineHeight"
           value={lineHeight}

@@ -343,6 +343,20 @@ paths:
       security: [{ bearerAuth: [] }]
       responses: { "200": { description: Lista de sesiones (id, ip, user_agent, amr, auth_time, expires_at, current) } }
 
+  /api/v1/me/activity:
+    get:
+      tags: [Identity]
+      summary: Actividad reciente de la propia cuenta (inicios de sesión y cambios de seguridad)
+      description: >
+        Los sucesos de los últimos 90 días cuyo actor es quien llama, del más reciente
+        al más antiguo y como mucho 50. `kind` es una clase pública y estable (signin,
+        signin_locked, password_changed, mfa_enabled, mfa_disabled, recovery_codes,
+        passkey_added, passkey_removed, passkey_renamed, app_password_created,
+        app_password_revoked, sessions_closed, device_trusted, device_removed,
+        recovery_changed, username_changed), no el nombre interno del log.
+      security: [{ bearerAuth: [] }]
+      responses: { "200": { description: "{ events: [{ id, kind, at, ip }], days }" } }
+
   /api/v1/me/password:
     post:
       tags: [Identity]
@@ -877,6 +891,27 @@ paths:
       summary: Finalizar registro de passkey (verificación de attestation)
       security: [{ bearerAuth: [] }]
       responses: { "201": { description: Passkey registrada } }
+
+  /api/v1/webauthn/credentials/{id}:
+    patch:
+      tags: [WebAuthn]
+      summary: Cambiar el nombre visible de una passkey propia
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, minLength: 1, maxLength: 60 }
+      responses:
+        "200": { description: "Passkey renombrada ({ id, name })" }
+        "400": { description: Nombre vacío o de más de 60 caracteres }
+        "404": { description: No hay una passkey con ese id en la cuenta }
 
 components:
   schemas:

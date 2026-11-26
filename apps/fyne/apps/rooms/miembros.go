@@ -80,8 +80,13 @@ func Anadibles(l i18n.Locale, equipo, roster []Miembro, q string) []Miembro {
 	return out
 }
 
-// ClaveErrorMiembros es `actionMessage`: 403, 409 y 404 tienen su texto.
+// ClaveErrorMiembros es `actionMessage`: 403, 409 y 404 tienen su texto, y la política
+// de contacto con gente de fuera (`rooms_external_closed`) el suyo, como en la web:
+// «no tienes permiso» a secas no decía que la puerta la cierra la organización.
 func ClaveErrorMiembros(err error) string {
+	if CerradoAFuera(err) {
+		return "dm.externalClosed"
+	}
 	var e *api.Error
 	if errors.As(err, &e) {
 		switch e.Status {
@@ -94,6 +99,13 @@ func ClaveErrorMiembros(err error) string {
 		}
 	}
 	return "members.errorGeneric"
+}
+
+// CerradoAFuera dice si el servicio rechazó por la política de contacto con personas de
+// otra organización (ADR 0040): el `rooms_external_closed` de la web.
+func CerradoAFuera(err error) bool {
+	var e *api.Error
+	return errors.As(err, &e) && e.Code() == "rooms_external_closed"
 }
 
 // PanelRoster es el panel de «Miembros» (PanelMiembros es su clave).

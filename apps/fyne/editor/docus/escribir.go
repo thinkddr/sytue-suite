@@ -448,7 +448,9 @@ func (f *Folio) Mandar(c editor.Comando, valor string) {
 	case editor.ListaPuntos, editor.ListaNumero:
 		f.listas(a, b, c == editor.ListaNumero)
 	default:
-		f.otraOrden(c, valor)
+		if !f.herramienta(c, valor, a, b) {
+			f.otraOrden(c, valor)
+		}
 	}
 }
 
@@ -1162,6 +1164,12 @@ func (p *pagina) TypedKey(e *fyne.KeyEvent) {
 		f.retroceso()
 	case fyne.KeyDelete:
 		f.suprimir()
+	case fyne.KeyF3:
+		// Mayús+F3 alterna las mayúsculas de lo elegido, como en Word (`canvas/atajos.ts`).
+		if !ext || !f.haySeleccion() || !f.editable() {
+			return
+		}
+		f.cambiarMayusculas(string(rico.SiguienteModoMayusculas(f.textoSeleccionado())))
 	case fyne.KeyReturn, fyne.KeyEnter:
 		f.intro()
 	case fyne.KeyLeft:

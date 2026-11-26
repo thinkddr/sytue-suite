@@ -136,8 +136,9 @@ type Moderador struct {
 
 	p      *Presentacion
 	idioma i18n.Locale
-	inicio time.Time
-	ahora  func() time.Time
+	// crono es el cronómetro, con su pausa (`Cronometro` de herramientas.go).
+	crono Cronometro
+	ahora func() time.Time
 	// tamNotas es el índice en `tamNotas` del tamaño de las notas.
 	tamNotas int
 	// AlVolver, si no es nil, es tocar la diapositiva actual: en un teléfono, donde la
@@ -175,7 +176,7 @@ func NuevoModerador(p *Presentacion, idioma i18n.Locale) *Moderador {
 			}
 		}
 	}
-	m.inicio = m.ahora()
+	m.crono = Cronometro{Inicio: m.ahora()}
 	m.ExtendBaseWidget(m)
 	return m
 }
@@ -213,10 +214,37 @@ func sign(d int) int {
 	}
 }
 
-// Reiniciar pone el cronómetro a cero (el botón «Reiniciar»).
+// Reiniciar pone el cronómetro a cero (el botón «Reiniciar»); si estaba en pausa,
+// sigue en pausa, ya en cero.
 func (m *Moderador) Reiniciar() {
-	m.inicio = m.ahora()
+	ahora := m.ahora()
+	c := Cronometro{Inicio: ahora}
+	if !m.crono.Pausa.IsZero() {
+		c.Pausa = ahora
+	}
+	m.crono = c
 	m.Refresh()
+}
+
+// Pausar para el cronómetro o lo reanuda (el botón «Pausar»/«Reanudar»): una pregunta
+// del público no tiene por qué contar como tiempo de la charla.
+func (m *Moderador) Pausar() {
+	m.crono = m.crono.Alternar(m.ahora())
+	if m.r != nil {
+		m.r.pausa.texto = m.textoPausa()
+		m.r.pausa.Refresh()
+	}
+	m.Refresh()
+}
+
+// EnPausa dice si el cronómetro está parado.
+func (m *Moderador) EnPausa() bool { return !m.crono.Pausa.IsZero() }
+
+func (m *Moderador) textoPausa() string {
+	if m.EnPausa() {
+		return m.p.t("slides.presenter.resume", nil)
+	}
+	return m.p.t("slides.presenter.pause", nil)
 }
 
 // hora es el reloj de la cabecera: `toLocaleTimeString(lang, { hour: '2-digit',
@@ -252,6 +280,7 @@ func (m *Moderador) CreateRenderer() fyne.WidgetRenderer {
 		sombraA:  ui.NuevaSombraCon(editor.CapasSombraPagina, radioVistaPrevia),
 		sombraS:  ui.NuevaSombraCon(editor.CapasSombraPagina, radioVistaPrevia),
 		diapo:    -1,
+		pausa:    nuevoBotonModerador(m.textoPausa(), true, m.Pausar),
 		reinicia: nuevoBotonModerador(p.t("slides.presenter.reset", nil), true, m.Reiniciar),
 		anterior: nuevoBotonModerador("← "+p.t("nav.previous", nil), false, func() { p.Avanzar(-1) }),
 		siguien:  nuevoBotonModerador(p.t("nav.nextItem", nil)+" →", false, func() { p.Avanzar(1) }),
@@ -278,23 +307,24 @@ func (m *Moderador) CreateRenderer() fyne.WidgetRenderer {
 }
 
 type moderadorRenderer struct {
-	m                           *Moderador
-	fondo                       *canvas.Rectangle
-	rayas                       [3]*canvas.Rectangle
-	reloj, posicion             *canvas.Text
-	tiempo                      *ui.TextoTabular
-	tiempoObjeto                fyne.CanvasObject
-	tiempoTexto                 string
-	pista, fin                  *canvas.Text
-	rotActual, rotSiguiente     *ui.Versal
-	rotNotas                    *ui.Versal
-	actual, siguiente           *Lienzo
-	sombraA, sombraS            *ui.Sombra
-	marcoFin                    fyne.CanvasObject
-	tamFin                      fyne.Size
-	notas                       []*canvas.Text
-	reinicia, anterior, siguien *botonModerador
-	terminar, menos, mas        *botonModerador
+	m                       *Moderador
+	fondo                   *canvas.Rectangle
+	rayas                   [3]*canvas.Rectangle
+	reloj, posicion         *canvas.Text
+	tiempo                  *ui.TextoTabular
+	tiempoObjeto            fyne.CanvasObject
+	tiempoTexto             string
+	pista, fin              *canvas.Text
+	rotActual, rotSiguiente *ui.Versal
+	rotNotas                *ui.Versal
+	actual, siguiente       *Lienzo
+	sombraA, sombraS        *ui.Sombra
+	marcoFin                fyne.CanvasObject
+	tamFin                  fyne.Size
+	notas                   []*canvas.Text
+	pausa, reinicia         *botonModerador
+	anterior, siguien       *botonModerador
+	terminar, menos, mas    *botonModerador
 	// desplaza es la franja de notas que se desplaza, con las líneas dentro. Las
 	// líneas solo se rehacen si cambia lo que dicen (diapositiva, tamaño o ancho): el
 	// reloj repinta la vista cada segundo y rehacerlas movería lo que se está leyendo.
@@ -311,7 +341,7 @@ func (r *moderadorRenderer) Destroy()           {}
 
 func (r *moderadorRenderer) Objects() []fyne.CanvasObject {
 	objs := []fyne.CanvasObject{
-		r.fondo, r.rayas[0], r.rayas[1], r.rayas[2], r.tiempoObjeto, r.reinicia,
+		r.fondo, r.rayas[0], r.rayas[1], r.rayas[2], r.tiempoObjeto, r.pausa, r.reinicia,
 		r.reloj, r.posicion, r.sombraA.Objeto(), r.actual,
 	}
 	objs = append(objs, r.rotActual.Objetos()...)
@@ -331,7 +361,7 @@ func (r *moderadorRenderer) Objects() []fyne.CanvasObject {
 // pasada sería el grueso del trabajo de la ventana.
 func (r *moderadorRenderer) Refresh() {
 	m, p := r.m, r.m.p
-	transcurrido := Transcurrido(int(m.ahora().Sub(m.inicio) / time.Second))
+	transcurrido := Transcurrido(int(m.crono.Transcurrido(m.ahora()) / time.Second))
 	if r.tiempo == nil || transcurrido != r.tiempoTexto {
 		r.tiempoTexto = transcurrido
 		r.tiempo = ui.NuevoTextoTabular(transcurrido, escTiempo, ui.Negrita, blancoModerador).
@@ -379,6 +409,9 @@ func (r *moderadorRenderer) Layout(t fyne.Size) {
 	r.tiempoObjeto.Move(fyne.NewPos(x0, arribaCabecera+base-baseTiempo))
 	r.tiempoObjeto.Resize(fyne.NewSize(r.tiempo.Ancho(), escTiempo.Linea))
 	x := x0 + r.tiempo.Ancho() + huecoCabecera
+	r.pausa.Move(fyne.NewPos(x, arribaCabecera+base-baseBoton))
+	r.pausa.Resize(r.pausa.MinSize())
+	x += r.pausa.MinSize().Width + huecoCabecera
 	r.reinicia.Move(fyne.NewPos(x, arribaCabecera+base-baseBoton))
 	r.reinicia.Resize(r.reinicia.MinSize())
 	x += r.reinicia.MinSize().Width + huecoCabecera

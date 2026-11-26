@@ -330,4 +330,10 @@ export const bg: AppCatalog<typeof en> = {
   'relation.coworker': 'Колега',
   'relation.emergency': 'Спешен контакт',
   'relation.other': 'Друга',
+  'batch.copyEmails': 'Копиране на имейл адресите',
+  'batch.emailsCopied': 'Имейл адресите са копирани',
+  'birthdays.anniversary': 'Годишнина',
+  'list.sortByLastName': 'Подреждане по фамилия',
+  'list.sortByFirstName': 'Подреждане по име',
+  'detail.shareByEmail': 'Споделяне по имейл',
 };

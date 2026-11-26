@@ -1004,4 +1004,11 @@ export const nl: AppCatalog<typeof en> = {
   'nativeResource.description':
     'Verbind deze app met je account in {tenant}. Je bestaande toegangsrechten blijven behouden.',
   'nativeResource.approve': 'Verbinden',
+  'channel.markRead': 'Markeren als gelezen',
+  'channel.copyLink': 'Link kopiëren',
+  'channel.linkCopied': 'Link gekopieerd',
+  'channel.download': 'Gesprek downloaden',
+  'channel.downloaded': 'Gesprek opgeslagen in',
+  'channel.downloadFailed': 'Het gesprek kon niet worden opgeslagen',
+  'status.nothingUnread': 'Alles was al gelezen',
 };

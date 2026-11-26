@@ -184,6 +184,16 @@ func NewRouter(d Deps) http.Handler {
 				Post("/projects/{id}/preview-protection", h.ProtectPreviews)
 			api.With(h.requireRole("admin", "owner")).
 				Delete("/projects/{id}/preview-protection", h.UnprotectPreviews)
+			// Congelar la producción: leerla, cualquier miembro (quien despliega
+			// necesita saberlo ANTES de pulsar); ponerla y quitarla, admin/owner y
+			// solo humanos —es una decisión sobre lo que ve el público, como cerrar
+			// las previews, y un token de CI no debe poder descongelar lo que una
+			// persona congeló—.
+			api.Get("/projects/{id}/deploy-freeze", h.GetDeployFreeze)
+			api.With(h.requireRole("admin", "owner")).
+				Put("/projects/{id}/deploy-freeze", h.FreezeDeploys)
+			api.With(h.requireRole("admin", "owner")).
+				Delete("/projects/{id}/deploy-freeze", h.UnfreezeDeploys)
 
 			// GitHub App: conectar/desconectar la instalación del repo (admin/owner).
 			// Habilita clone de repo privado sin deploy-key + comentario de preview en PR.

@@ -780,4 +780,17 @@ export const pt: AppCatalog<typeof en> = {
   'search.loadMoreFailed': 'Não foi possível carregar mais resultados. Tente novamente.',
   'privacy.notice':
     'Não vendemos os seus dados nem os partilhamos com terceiros. Não os usamos para definir perfis, para publicidade, nem para treinar ou melhorar os nossos serviços ou os de outros. São cifrados em trânsito e em repouso, e só saem da nossa infraestrutura europeia quando é estritamente necessário para faturar e nas integrações que ativar, em que o terceiro pedirá a sua autorização para os dados que vai usar.',
+  'inbox.markAllOf': 'Marcar as de {app} como lidas',
+  'inbox.markUnread': 'Marcar como não lida',
+  'inbox.muteLikeThis': 'Silenciar avisos como este',
+  'inbox.mutedLikeThis':
+    'Deixará de receber avisos como esse. Pode mudar isso abaixo, em «O que quer receber».',
+  'inbox.muteFailed': 'Não foi possível silenciar. Tente outra vez.',
+  'inbox.actionsOf': 'Ações de «{title}»',
+  'downloads.checksum': 'Verificar a transferência',
+  'downloads.checksumHelp':
+    'A sua impressão digital SHA-256. Calcule a do ficheiro transferido e verifique se coincidem.',
+  'downloads.checksumLabel': 'Impressão digital SHA-256',
+  'downloads.copyChecksum': 'Copiar a impressão digital',
+  'downloads.checksumCopied': 'Impressão digital copiada',
 };

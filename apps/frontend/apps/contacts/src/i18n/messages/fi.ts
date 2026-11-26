@@ -334,4 +334,10 @@ export const fi: AppCatalog<typeof en> = {
   'relation.coworker': 'Työtoveri',
   'relation.emergency': 'Hätäyhteys',
   'relation.other': 'Muu',
+  'batch.copyEmails': 'Kopioi sähköpostiosoitteet',
+  'batch.emailsCopied': 'Sähköpostiosoitteet kopioitu',
+  'birthdays.anniversary': 'Vuosipäivä',
+  'list.sortByLastName': 'Lajittele sukunimen mukaan',
+  'list.sortByFirstName': 'Lajittele etunimen mukaan',
+  'detail.shareByEmail': 'Jaa sähköpostilla',
 };

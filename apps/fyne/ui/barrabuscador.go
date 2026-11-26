@@ -105,6 +105,9 @@ type buscadorBarra struct {
 	alAtajoSi func() bool
 	// paleta es la de la suite, que es lo que abre ⌘K (la pone la barra).
 	paleta *PaletaDeLaSuite
+	// alCambiarFoco avisa a la barra de que el campo ha ganado o perdido el foco: en el
+	// teléfono ocupa la fila mientras se escribe en él (la pone la barra).
+	alCambiarFoco func()
 }
 
 func nuevoBuscadorBarra(t *i18n.Translator, s *sesion.Suite) *buscadorBarra {
@@ -113,6 +116,9 @@ func nuevoBuscadorBarra(t *i18n.Translator, s *sesion.Suite) *buscadorBarra {
 		b.hub = s.Hub
 	}
 	b.campo = NuevaEntrada(t.T("search.placeholder", nil))
+	// Su nombre accesible es el `aria-label` de la web, «Búsqueda global»: sin él, el
+	// lector leía la marca de agua, que es un ejemplo de qué escribir y no lo que es.
+	b.campo.Rotulo = t.T("search.label", nil)
 	b.campo.Icono = iconos.Buscar
 	b.campo.SobreCromo = true
 	b.campo.Radio = tema.RadioPill // `rounded-pill!`
@@ -296,6 +302,9 @@ func (b *buscadorBarra) alEnfocar(enfocado bool) {
 	b.verAtajo()
 	if !enfocado {
 		b.cerrar()
+	}
+	if b.alCambiarFoco != nil {
+		b.alCambiarFoco()
 	}
 }
 
@@ -607,7 +616,13 @@ type filaResultado struct {
 
 func nuevaFilaResultado(titulo, fragmento string, alPulsar func()) *filaResultado {
 	f := &filaResultado{titulo: titulo, fragmento: fragmento}
-	f.Nombre, f.AlPulsar = titulo, alPulsar
+	// El nombre es lo que se ve, título Y detalle, como el texto del `<a>` de la web: con
+	// el título solo, dos «Informe» de Drive (un PDF y una hoja) se oían iguales.
+	nombre := titulo
+	if fragmento != "" {
+		nombre += ", " + fragmento
+	}
+	f.Nombre, f.AlPulsar = nombre, alPulsar
 	f.ExtendBaseWidget(f)
 	return f
 }

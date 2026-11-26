@@ -14,6 +14,7 @@ import {
   MenuSeparator,
   SegmentedControl,
   THEME_COLORS,
+  TopBarButton,
   THEME_FORMAS,
   themeColorSwatch,
   useTheme,
@@ -222,13 +223,14 @@ export function AccountMenu(): JSX.Element {
     <Dropdown
       label={t('account.menu')}
       trigger={({ onClick, ...aria }) => (
-        <button
-          type="button"
+        // `TopBarButton`, como la campana y el candado. Era una copia a mano de sus
+        // clases que se había quedado sin dos cosas: la PISTA —con el teclado, el avatar
+        // era el único control de la barra que no decía qué era— y el anillo del cromo
+        // (`sytue-focus-ring-chrome`). El nombre lleva a la persona, como en Fyne.
+        <TopBarButton
+          label={t('account.menuFor', { name: user.name })}
           onClick={onClick}
-          aria-label={t('account.menuFor', { name: user.name })}
-          class={`hover:bg-chrome-hover active:bg-chrome-active rounded-control ml-0.5 inline-flex h-9 w-9 items-center justify-center transition-colors duration-150 focus-visible:outline-none pointer-coarse:min-h-[max(44px,2.75rem)] pointer-coarse:min-w-[max(44px,2.75rem)] ${
-            aria['aria-expanded'] ? 'bg-chrome-hover' : ''
-          }`}
+          class={`ml-0.5 ${aria['aria-expanded'] ? 'bg-chrome-hover' : ''}`}
           {...aria}
         >
           {/* `xs` (24px) y no `sm` (32): el botón mide 31,5px, así que el avatar
@@ -247,7 +249,7 @@ export function AccountMenu(): JSX.Element {
             presence={presence}
             class="sytue-aro-carril"
           />
-        </button>
+        </TopBarButton>
       )}
     >
       {/* 272 px y no 256: con 16 más, las cuatro opciones de apariencia caben en una

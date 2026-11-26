@@ -63,6 +63,11 @@ export interface BasesField {
   result?: 'number' | 'text';
   /** Solo en un campo de moneda: su código ISO 4217 (EUR, USD…). */
   currency?: string;
+  /**
+   * El valor con el que nace un registro que no trae este campo. En una fecha puede ser
+   * `'today'`: el día de cada alta.
+   */
+  default?: BasesValue;
   position: number;
 }
 
@@ -128,6 +133,40 @@ export interface BasesViewConfig {
   sort?: { field: string; dir: 'asc' | 'desc' }[];
   group_by?: string;
   fields?: string[];
+  /** Formulario: los campos que hay que rellenar para enviarlo (de los de `fields`). */
+  required?: string[];
+}
+
+/**
+ * Lo que una lectura pide además de la vista, sin guardarlo en ella. Es un `type` y no
+ * una `interface` a propósito: viaja como `query`, que es un registro de cadenas, y solo
+ * los tipos literales se asignan a un registro sin declarar su firma de índice.
+ */
+export type BasesReading = {
+  view?: string;
+  /** Búsqueda libre en toda la tabla. */
+  q?: string;
+  /** `campo:asc|desc`, hasta 3 separados por comas: sustituye el orden de la vista. */
+  sort?: string;
+  /** El día de quien mira (AAAA-MM-DD), para los filtros relativos a hoy. */
+  today?: string;
+};
+
+/** El resumen de una columna en el pie de la rejilla. */
+export interface BasesFieldSummary {
+  /** Registros con valor (en una casilla, los marcados; en un enlace, los enlazados). */
+  filled: number;
+  /** Solo en los numéricos con algún valor. */
+  sum?: number;
+  avg?: number;
+  min?: number;
+  max?: number;
+}
+
+/** El pie de la rejilla: lo que pasa la vista entera, no la ventana cargada. */
+export interface BasesSummary {
+  count: number;
+  fields: Record<string, BasesFieldSummary>;
 }
 
 export interface BasesView {
@@ -417,6 +456,10 @@ export class BasesClient {
   setFieldFormula(fieldId: string, formula: string): Promise<void> {
     return this.sendEmpty('PATCH', `/fields/${fieldId}`, { formula });
   }
+  /** Fija el valor por defecto de un campo (solo el propietario); `null` lo quita. */
+  setFieldDefault(fieldId: string, value: BasesValue): Promise<void> {
+    return this.sendEmpty('PATCH', `/fields/${fieldId}`, { default: value });
+  }
   deleteField(fieldId: string): Promise<void> {
     return this.sendEmpty('DELETE', `/fields/${fieldId}`);
   }
@@ -425,16 +468,35 @@ export class BasesClient {
     tableId: string,
     /** `q` busca en toda la tabla y `sort` (`campo:asc|desc`, hasta 3 separados por
      * comas) sustituye el orden de la vista; ninguno de los dos se guarda en ella. */
-    opts: { view?: string; limit?: number; cursor?: string; q?: string; sort?: string } = {},
+    opts: BasesReading & { limit?: number; cursor?: string } = {},
   ): Promise<BasesRecordPage> {
     return this.http.json<BasesRecordPage>({ path: `/tables/${tableId}/records`, query: opts });
   }
+  /** El pie de la rejilla: cuántos registros pasan la lectura y las cifras de cada columna. */
+  summary(tableId: string, reading: BasesReading = {}): Promise<BasesSummary> {
+    return this.http.json<BasesSummary>({ path: `/tables/${tableId}/summary`, query: reading });
+  }
+  /**
+   * `today` es el día de quien da el alta: el de un campo con defecto «hoy». Sin él vale
+   * el del servidor, que en UTC va por detrás de Europa cada noche.
+   */
   createRecord(
     tableId: string,
     data: Record<string, BasesValue>,
     links?: Record<string, string[]>,
+    today?: string,
   ): Promise<BasesRecord> {
-    return this.send('POST', `/tables/${tableId}/records`, { data, links });
+    return this.http.json<BasesRecord>({
+      method: 'POST',
+      path: `/tables/${tableId}/records`,
+      ...(today ? { query: { today } } : {}),
+      body: JSON.stringify({ data, links }),
+      headers: { 'content-type': 'application/json' },
+    });
+  }
+  /** Copia un registro (valores y enlaces; los adjuntos no) en uno nuevo de su tabla. */
+  duplicateRecord(recordId: string): Promise<BasesRecord> {
+    return this.send('POST', `/records/${recordId}/duplicate`);
   }
   /** `rev` es la versión que se vio: si otra persona escribió entretanto, 409 `rev_conflict`. */
   updateRecord(

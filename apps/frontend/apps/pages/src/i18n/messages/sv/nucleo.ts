@@ -377,4 +377,36 @@ export const nucleo = {
 
   'forms.empty': 'Inga svar ännu',
   'forms.empty_help': 'När någon skickar in ett formulär på din webbplats visas det här.',
+  'sites.search': 'Sök webbplatser',
+  'sites.search_empty': 'Ingen webbplats matchar ”{q}”.',
+  'sites.sort_label': 'Sortera webbplatser',
+  'sites.sort_recent': 'Nyligen redigerade',
+  'sites.sort_name': 'Namn (A–Ö)',
+  'sites.view_live': 'Visa webbplats',
+  'sites.view_live_aria': 'Visa publicerade {nombre} (öppnas i en ny flik)',
+  'seo.title': 'Det sökmotorerna kommer att se',
+  'seo.intro':
+    'En granskning av utkastet: titlar, beskrivningar och bilder som sökmotorer och skärmläsare är beroende av. Det är varningar; de hindrar inte publicering.',
+  'seo.open_editor': 'Öppna redigeraren',
+  'seo.recheck': 'Kontrollera igen',
+  'seo.error': 'Granskningen kunde inte läsas in. Försök igen.',
+  'seo.all_good':
+    'Allt bra: varje sida har titel och beskrivning, och bilderna har alternativtext.',
+  'seo.summary': 'Varningar: {count}',
+  'seo.badge_warning': 'Förbättra',
+  'seo.badge_info': 'Obs',
+  'seo.on_page': 'Sida: {page}',
+  'seo.title_missing': 'Sidan har ingen titel: sökmotorn hittar på en.',
+  'seo.title_long': 'Titeln har {count} tecken; ungefär 60 får plats innan sökmotorn kortar den.',
+  'seo.title_duplicate':
+    'En annan sida har samma titel: de kommer att konkurrera med varandra i resultaten.',
+  'seo.description_missing':
+    'Sidan har ingen beskrivning: sökmotorn visar ett slumpmässigt textutdrag.',
+  'seo.description_long': 'Beskrivningen har {count} tecken; ungefär 160 visas.',
+  'seo.image_alt_missing':
+    'Bilder utan alternativtext: {count}. Skärmläsare och sökmotorer vet inte vad de visar; markera dem som dekorativa om de inte visar något.',
+  'seo.page_noindex': 'Den här sidan är dold för sökmotorer (noindex).',
+  'seo.site_noindex': 'Hela webbplatsen är dold för sökmotorer (noindex).',
+  'seo.share_image_missing':
+    'Webbplatsen har ingen delningsbild: länkar i meddelanden och sociala nätverk visas utan bild.',
 };

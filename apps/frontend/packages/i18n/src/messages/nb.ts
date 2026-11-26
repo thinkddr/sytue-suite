@@ -381,10 +381,14 @@ export const nb: Catalog = {
   'import.fromGoogle': 'Hent fra Google',
   'import.fromMicrosoft': 'Hent fra Microsoft 365',
   'import.running': 'Kopierer dataene dine… {count} elementer så langt.',
-  'import.done': '{count} elementer overført, {skipped} utelatt.',
+  'import.done': '{what}: {count} elementer overført, {skipped} utelatt. Ferdig {date}.',
   'import.someFailed':
     'Noen av dataene dine kunne ikke kopieres. Administratoren din kan se hvorfor.',
   'import.failed': 'Importen kunne ikke startes. Prøv igjen om litt.',
+  'import.unavailable':
+    'Tilkoblingen til {source} kan ikke leses akkurat nå: den har utløpt, er trukket tilbake eller aldri godkjent. Be administratoren din om å koble den til på nytt.',
+  'import.needsAdmin':
+    'Tilkoblingen til {source} kan ennå ikke kopiere dataene til hver person. Be administratoren din om å fullføre oppsettet.',
   'dataflow.label': 'Hva som skjer med opplysningene',
   'dataflow.in.title': 'Kommer bare inn i Sytue One',
   'dataflow.in.body':

@@ -16,6 +16,7 @@ import (
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/formula"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
+	"git.sytue.eu/sytue/one/apps/nucleo/office"
 )
 
 // Celda son las coordenadas de una celda, de base cero.
@@ -79,6 +80,11 @@ type Rejilla struct {
 	AlAtajos func()
 	// AlIrA es Ctrl+G o F5, «Ir a»: lleva el foco al cuadro de nombres de la barra.
 	AlIrA func()
+	// AlMandar manda un comando de la cinta desde el teclado (Alt+=, los formatos de
+	// número, los atajos del registro); AlHojaVecina es Ctrl+AvPág (1) y Ctrl+RePág (−1).
+	// Los dos los atiende el lienzo, que es quien ejecuta comandos y cambia de hoja.
+	AlMandar     func(cmd editor.Comando, valor string)
+	AlHojaVecina func(dir int)
 	// AlAbrirEnlace sustituye al sistema al abrir el enlace de una celda (pruebas). Sin
 	// él, el enlace va al navegador o al correo por las puertas de `api` (`enlaces.go`).
 	AlAbrirEnlace func(href string)
@@ -1218,6 +1224,12 @@ func (r *Rejilla) atajo(a *desktop.CustomShortcut) {
 			}
 		}
 		r.Seleccionar(fin.C, fin.F, ext)
+	default:
+		// Lo que el registro común asigna a la hoja y no tiene caso arriba (Ctrl+Mayús+L, el
+		// autofiltro): el mismo manejador que la web, sin tocar la rejilla por cada atajo.
+		if id, valor, ok := office.ComandoDelAtajo(editor.TeclasDelAtajo(a), office.Hoja); ok {
+			r.mandar(editor.Comando(id), valor)
+		}
 	}
 }
 

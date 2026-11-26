@@ -145,6 +145,9 @@ func (in *inicio) cuerpo(c *editor.Contexto) fyne.CanvasObject {
 			// Sin reflejo de estado activo, como en la web: FormatState no los sigue.
 			boton(iconos.EdSuperindice, "format.superscript", false, editor.Superindice),
 			boton(iconos.EdSubindice, "format.subscript", false, editor.Subindice),
+			// Un peldaño más o menos de letra (Ctrl+Mayús+. y ,), como la «A▲» y la «A▼».
+			boton(iconos.EdLetraMayor, "format.fontGrow", false, editor.AumentarLetra),
+			boton(iconos.EdLetraMenor, "format.fontShrink", false, editor.ReducirLetra),
 			colorTexto, resalte,
 			boton(iconos.EdSinFormato, "format.clear", false, editor.SinFormato),
 			botonBrocha(c, f.Brocha), botonMayusculas(c),
@@ -159,6 +162,7 @@ func (in *inicio) cuerpo(c *editor.Contexto) fyne.CanvasObject {
 			boton(iconos.EdListaNumeros, "list.number", f.Numeros, editor.ListaNumero),
 			boton(iconos.EdMenosSangria, "indent.decrease", false, editor.MenosSangria),
 			boton(iconos.EdMasSangria, "indent.increase", false, editor.MasSangria),
+			botonOrdenar(c),
 			selInterl,
 		),
 		editor.SeparadorGrupos(),

@@ -54,6 +54,8 @@ type Miniatura struct {
 	// AlOcultar alterna «oculta al presentar» con Ctrl/⌘+Mayús+H, el atajo de
 	// PowerPoint. nil = no se deja (solo lectura).
 	AlOcultar func()
+	// AlDuplicar duplica esta diapositiva con Ctrl/⌘+D, el atajo de PowerPoint y Slides.
+	AlDuplicar func()
 	// Rotulo traduce una clave del catálogo (para el nombre accesible).
 	Rotulo func(clave string, n, total int) string
 
@@ -127,6 +129,12 @@ func (t *Miniatura) TypedShortcut(s fyne.Shortcut) {
 		}
 		return
 	}
+	if ok && EsAtajoDuplicar(c) {
+		if t.AlDuplicar != nil {
+			t.AlDuplicar()
+		}
+		return
+	}
 	if !ok || t.AlMover == nil || c.Modifier&fyne.KeyModifierShift == 0 ||
 		c.Modifier&(fyne.KeyModifierControl|fyne.KeyModifierSuper) == 0 {
 		return
@@ -169,6 +177,12 @@ func EsAtajoOcultar(c *desktop.CustomShortcut) bool {
 	return c.KeyName == fyne.KeyH && c.Modifier&fyne.KeyModifierShift != 0 &&
 		c.Modifier&(fyne.KeyModifierControl|fyne.KeyModifierSuper) != 0 &&
 		c.Modifier&fyne.KeyModifierAlt == 0
+}
+
+// EsAtajoDuplicar es `esDuplicarDiapo`: Ctrl (⌘ en Mac) + D, sin Mayús ni Alt.
+func EsAtajoDuplicar(c *desktop.CustomShortcut) bool {
+	return c.KeyName == fyne.KeyD && c.Modifier&(fyne.KeyModifierControl|fyne.KeyModifierSuper) != 0 &&
+		c.Modifier&(fyne.KeyModifierShift|fyne.KeyModifierAlt) == 0
 }
 
 // atenuadoOculta es el `opacity-40` de la miniatura oculta: un velo del color del carril

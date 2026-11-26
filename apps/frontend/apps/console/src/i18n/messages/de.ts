@@ -1336,6 +1336,9 @@ export const de: AppCatalog<typeof en> = {
     'Sie läuft im Hintergrund; in einigen Minuten können Sie den Status sehen.',
   'apps.toast.testFailed': 'Die Verbindung ist fehlgeschlagen',
   'apps.toast.actionFailed': 'Konnte nicht abgeschlossen werden',
+  'apps.toast.oauthExists': 'Dieses Konto war bereits verbunden',
+  'apps.toast.oauthExistsHint':
+    'Die bestehende Verbindung {name} wurde beibehalten. Verbinden Sie sie in der Liste neu, falls sie nicht mehr funktioniert.',
   'apps.toast.gatewayDown': 'Der Dienst der Anwendung oder Sytue ID antworten gerade nicht.',
 
   // --- Einmaliges Anmelden (SSO) --------------------------------------------
@@ -2978,6 +2981,8 @@ export const de: AppCatalog<typeof en> = {
     '{app} antwortet gerade nicht. Es liegt nicht an Ihren Angaben: Versuchen Sie es in einer Minute erneut.',
   'wizard.app.fix.generic':
     'Die Verbindung kam nicht zustande. Sehen Sie die Angaben im vorigen Schritt durch und versuchen Sie es erneut.',
+  'wizard.app.fix.alreadyConnected':
+    'Dieses {app}-Konto ist bereits verbunden. Verwenden Sie die bestehende Verbindung oder verbinden Sie sie in der Liste neu, falls sie nicht mehr funktioniert.',
   'wizard.app.toast.activateFailed': 'Aktivierung nicht möglich',
   'wizard.app.fix.activateBadData':
     'Prüfen Sie die Angaben im Schritt „Einrichten“: Wir konnten die Anmeldung nicht einrichten.',

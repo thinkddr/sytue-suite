@@ -1,5 +1,6 @@
 /*
  * GET /api/logs?project=<slug>&q=<texto>&source=build|runtime&since=&until=&cursor=
+ * GET /api/logs?project=<slug>&source=build&build=<id>[&q=…] -> log de UNA compilación
  * GET /api/logs?project=<slug>&download=1[&q=…]  -> descarga el filtro como .log
  *
  * BFF de búsqueda de registros de EJECUCIÓN: reenvía la consulta al control-plane
@@ -38,8 +39,13 @@ export const GET: APIRoute = async (ctx) => {
   // control-plane, que ya responde 400 con el motivo si vienen mal.
   // `source=build` consulta el log de compilación; cualquier otro valor, el de
   // ejecución, que es lo que se busca al preguntar qué está pasando ahora.
+  // `build` acota el log de compilación a una concreta (la de una fila del
+  // historial); sin él, la última. Solo forma: la pertenencia la decide el
+  // control-plane.
+  const build = url.searchParams.get('build') ?? '';
   const opts = {
     ...(url.searchParams.get('source') === 'build' ? { source: 'build' as const } : {}),
+    ...(/^[0-9a-f-]{36}$/i.test(build) ? { buildId: build } : {}),
     ...(url.searchParams.get('since') ? { since: url.searchParams.get('since')! } : {}),
     ...(url.searchParams.get('until') ? { until: url.searchParams.get('until')! } : {}),
     ...(url.searchParams.get('cursor') ? { cursor: url.searchParams.get('cursor')! } : {}),

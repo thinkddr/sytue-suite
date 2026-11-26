@@ -1,0 +1,87 @@
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: (c) 2026 Daniel Delgado Ramos
+ *
+ * Las herramientas de gestión de personas de Sytue Admin (acceso efectivo,
+ * sesiones, bajas recuperables, lotes, export del directorio, dispositivos,
+ * auditoría y roles): traducción del inglés (`en.ts`), que es la fuente de verdad.
+ */
+import type { AppCatalog } from '@sytue/i18n';
+import type { en } from './en.js';
+
+export const pl: AppCatalog<typeof en> = {
+  'gestion.acceso.titulo': 'Co może robić i dlaczego',
+  'gestion.acceso.ver': 'Pokaż',
+  'gestion.acceso.error': 'Nie udało się wczytać rzeczywistego dostępu.',
+  'gestion.acceso.ayuda':
+    'Oblicza go Sytue ID tą samą regułą, którą stosuje przy autoryzacji. Każde uprawnienie pokazuje swoje źródło; jeśli je usuniesz, sprawdź pozostałe wymienione tutaj.',
+  'gestion.acceso.sinPermisos': 'Brak uprawnień administracyjnych.',
+  'gestion.acceso.fuente.integrado': 'Rola wbudowana: {role}',
+  'gestion.acceso.fuente.rol': 'Rola: {name}',
+  'gestion.acceso.fuente.elevacion': 'Podniesiono do {name} do {when}',
+  'gestion.acceso.pendientes': 'Podniesienia czekające na zatwierdzenie',
+  'gestion.acceso.pendiente': '{role}, wniosek z {when}',
+  'gestion.acceso.grupos': 'Grupy',
+  'gestion.acceso.sinGrupos': 'Nie należy do żadnej grupy.',
+  'gestion.acceso.calculado': 'Obliczono {when}',
+  'gestion.sesiones.titulo': 'Otwarte sesje',
+  'gestion.sesiones.ver': 'Pokaż',
+  'gestion.sesiones.error': 'Nie udało się wczytać sesji.',
+  'gestion.sesiones.vacia': 'Brak otwartych sesji.',
+  'gestion.sesiones.inicio': 'zalogowano {when}',
+  'gestion.sesiones.caduca': 'wygasa {when}',
+  'gestion.sesiones.mfa': 'Drugi składnik',
+  'gestion.sesiones.sinMfa': 'Tylko hasło',
+  'gestion.sesiones.total': 'Otwarte sesje: {count}',
+  'gestion.bajas.titulo': 'Zamknięte konta, które można jeszcze przywrócić',
+  'gestion.bajas.ayuda':
+    'Zamknięte konto przechowuje dane przez {days} dni. Przywrócone wraca zawieszone: aby zwrócić dostęp, aktywuj je ponownie w katalogu.',
+  'gestion.bajas.cerrada': 'zamknięto {when}',
+  'gestion.bajas.motivo': 'przyczyna: {reason}',
+  'gestion.bajas.quedan': 'Pozostało dni: {count}',
+  'gestion.bajas.restaurar': 'Przywróć',
+  'gestion.bajas.confirmarTitulo': 'Przywrócić {name}?',
+  'gestion.bajas.confirmar':
+    'Konto wraca zawieszone, razem z danymi. Nikt się na nie nie zaloguje, dopóki go nie aktywujesz.',
+  'gestion.bajas.restaurada': 'Przywrócono {name}',
+  'gestion.bajas.reactivar': 'Jest zawieszone: aktywuj je w katalogu, aby zwrócić dostęp.',
+  'gestion.bajas.fallo': 'Nie udało się przywrócić konta',
+  'gestion.directorio.exportar': 'Eksportuj CSV',
+  'gestion.dispositivos.buscar': 'Szukaj osoby, urządzenia lub IP',
+  'gestion.dispositivos.confianza': 'Filtruj według zaufania',
+  'gestion.dispositivos.todos': 'Wszystkie urządzenia',
+  'gestion.dispositivos.recuento': 'Wyświetlono {count} z {total}',
+  'gestion.dispositivos.sinResultados': 'Brak pasujących urządzeń.',
+  'gestion.auditoria.rango': 'Szybki zakres',
+  'gestion.auditoria.hoy': 'Dziś',
+  'gestion.auditoria.7d': '7 dni',
+  'gestion.auditoria.30d': '30 dni',
+  'gestion.roles.duplicar': 'Duplikuj',
+  'gestion.roles.copia': '{name} (kopia)',
+  'gestion.lotes.titulo': 'Ostatnie działania zbiorcze',
+  'gestion.lotes.ayuda': 'Co zastosowano wobec wielu osób naraz i u kogo się to nie udało.',
+  'gestion.lotes.ver': 'Pokaż',
+  'gestion.lotes.error': 'Nie udało się wczytać działań zbiorczych.',
+  'gestion.lotes.vacio': 'Nie ma jeszcze działań zbiorczych.',
+  'gestion.lotes.progreso': '{done} z {total}',
+  'gestion.lotes.accion.setRole': 'Zmień rolę',
+  'gestion.lotes.estado.ejecutando': 'W toku',
+  'gestion.lotes.estado.terminado': 'Zakończono',
+  'gestion.lotes.estado.cancelado': 'Anulowano',
+  'gestion.lotes.estado.interrumpido': 'Przerwano',
+  'gestion.lotes.detalle': 'Szczegóły',
+  'gestion.lotes.todosBien': 'Zastosowano wobec wszystkich.',
+  'gestion.lote.fallos': 'Nie zastosowano wobec',
+  'gestion.lote.cerrar': 'Zamknij',
+  'gestion.lote.codigo.not_found': 'nie należy do tej organizacji',
+  'gestion.lote.codigo.self': 'to ty',
+  'gestion.lote.codigo.forbidden':
+    'konto właścicielskie można zmienić tylko z uprawnieniami właścicielskimi',
+  'gestion.lote.codigo.deleted': 'konto jest zamknięte',
+  'gestion.lote.codigo.last_owner': 'ostatni właściciel organizacji',
+  'gestion.lote.codigo.last_admin': 'ostatni administrator organizacji',
+  'gestion.lote.codigo.error': 'nieoczekiwany błąd; spróbuj ponownie',
+  'gestion.lote.seleccionarVisibles': 'Zaznacz wszystkie widoczne ({count})',
+  'gestion.lote.recortado':
+    'Działanie zbiorcze obejmuje najwyżej {max} osób: zaznaczono pierwsze {max} widoczne.',
+};

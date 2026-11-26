@@ -407,6 +407,18 @@ func botonDiario(s string, talla ui.Talla, inerte bool, accion func()) *ui.Boton
 	return b
 }
 
+// DiaRelativo es el `diaRelativo` de la web: «daily.yesterday» o «daily.tomorrow» si el
+// día (`AAAA-MM-DD`) es ayer o mañana respecto de `ahora`, en hora local; si no, vacío.
+func DiaRelativo(dia string, ahora time.Time) string {
+	switch dia {
+	case ahora.AddDate(0, 0, -1).Format(time.DateOnly):
+		return "daily.yesterday"
+	case ahora.AddDate(0, 0, 1).Format(time.DateOnly):
+		return "daily.tomorrow"
+	}
+	return ""
+}
+
 // conMayuscula es el `first-letter:uppercase` del título del día: «jueves» abre frase.
 func conMayuscula(s string) string {
 	r, n := utf8.DecodeRuneInString(s)
@@ -425,13 +437,33 @@ func (p *Pantalla) cabeceraDiaria(v tema.Variante, interior float32, acciones []
 	if p.activo.Crudo.DailyDate == time.Now().Format(time.DateOnly) {
 		piezasSub = append(piezasSub, lineaTok("·", tema.TextoSM, ui.Normal, "text-subtle", v),
 			lineaTok(t("daily.today", nil), tema.TextoSM, ui.Medio, "primary-text", v))
+	} else if clave := DiaRelativo(p.activo.Crudo.DailyDate, time.Now()); clave != "" {
+		// «Ayer» y «Mañana» en gris, como la web (`diaRelativo`).
+		piezasSub = append(piezasSub, lineaTok("·", tema.TextoSM, ui.Normal, "text-subtle", v),
+			lineaTok(t(clave, nil), tema.TextoSM, ui.Normal, "text-subtle", v))
 	}
 	inerte := p.abriendoDia || p.svc == nil || !p.hayRed() && p.Almacen == nil
 	anterior := ui.NuevoBotonIcono(iconos.ChevronIzquierda, t("daily.previous", nil), func() { llamar1(p.lateral.AlDia, dia.AddDate(0, 0, -1).Format(time.DateOnly)) })
 	hoy := botonDiario(t("daily.today", nil), ui.TallaSM, inerte, p.lateral.AlHoy)
+	// «Ir a…»: el calendario de un mes colgado del botón; elegir un día lo abre, como el
+	// selector de fecha de la web.
+	var irA *ui.Boton
+	irA = botonDiario(t("daily.goToDate", nil), ui.TallaSM, inerte, func() {
+		m := ui.NuevoMesFecha(p.loc, dia, time.Local)
+		var pop *ui.Emergente
+		m.AlElegir = func(d time.Time) {
+			if pop != nil {
+				pop.Cerrar()
+			}
+			if elegido := d.Format(time.DateOnly); elegido != p.activo.Crudo.DailyDate {
+				llamar1(p.lateral.AlDia, elegido)
+			}
+		}
+		pop = ui.MostrarPopover(irA, m.Objeto())
+	})
 	siguiente := ui.NuevoBotonIcono(iconos.ChevronDerecha, t("daily.next", nil), func() { llamar1(p.lateral.AlDia, dia.AddDate(0, 0, 1).Format(time.DateOnly)) })
 	anterior.Inerte, siguiente.Inerte = inerte, inerte
-	dias := []fyne.CanvasObject{enVozBaja(anterior), hoy, enVozBaja(siguiente)}
+	dias := []fyne.CanvasObject{enVozBaja(anterior), hoy, irA, enVozBaja(siguiente)}
 	if p.AbrirCalendar != nil {
 		fecha := dia.Format(time.DateOnly)
 		dias = append(dias, enVozBaja(ui.NuevoBotonIcono(iconos.Calendario, "Sytue Calendar", func() { p.AbrirCalendar("/?date=" + fecha + "&all_day=1") })))

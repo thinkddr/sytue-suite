@@ -21,10 +21,11 @@ import {
   TIPO_DE_INPUT,
   valorDeTexto,
 } from '../lib/valores.js';
+import { hoyLocal } from '../lib/lectura.js';
 
 interface Props {
   locale: Locale;
-  definicion: { name: string; fields: BasesField[] } | null;
+  definicion: { name: string; fields: BasesField[]; required?: string[] } | null;
 }
 
 export function FormularioPublico({ locale, definicion }: Props): JSX.Element {
@@ -44,6 +45,7 @@ export function FormularioPublico({ locale, definicion }: Props): JSX.Element {
     );
   }
   const campos = definicion.fields;
+  const obligatorios = new Set(definicion.required ?? []);
 
   function valores(): Record<string, BasesValue> | null {
     const v: Record<string, BasesValue> = {};
@@ -60,6 +62,14 @@ export function FormularioPublico({ locale, definicion }: Props): JSX.Element {
         }
         if (x !== null) v[c.id] = x;
       }
+    }
+    // Lo obligatorio, aquí y no solo en el servicio: decirlo antes de resolver la prueba
+    // de trabajo ahorra unos segundos de espera para recibir un «revisa los datos».
+    const falta = campos.find((c) => obligatorios.has(c.id) && !(c.id in v));
+    if (falta) {
+      setError(t('form.required', { name: falta.name }));
+      document.getElementById(`f-${falta.id}`)?.focus();
+      return null;
     }
     if (Object.keys(v).length === 0) {
       setError(t('form.empty'));
@@ -84,7 +94,8 @@ export function FormularioPublico({ locale, definicion }: Props): JSX.Element {
       const res = await fetch(`${base}/enviar`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ values: v, altcha: carga }),
+        // El día de quien responde: el de un campo con defecto «hoy».
+        body: JSON.stringify({ values: v, altcha: carga, today: hoyLocal() }),
       });
       if (res.status === 404) {
         window.location.reload(); // revocado o agotado mientras se rellenaba
@@ -125,8 +136,9 @@ export function FormularioPublico({ locale, definicion }: Props): JSX.Element {
             return (
               <Checkbox
                 key={c.id}
+                id={`f-${c.id}`}
                 class="min-h-[24px]"
-                label={c.name}
+                label={obligatorios.has(c.id) ? `${c.name} *` : c.name}
                 checked={marcas[c.id] === true}
                 onChange={(e) => setMarcas({ ...marcas, [c.id]: e.currentTarget.checked })}
               />
@@ -135,7 +147,14 @@ export function FormularioPublico({ locale, definicion }: Props): JSX.Element {
           if (c.kind === 'multiselect') {
             return (
               <fieldset key={c.id} class="flex flex-col gap-2">
-                <legend class="text-text mb-1 text-sm font-semibold">{c.name}</legend>
+                <legend class="text-text mb-1 text-sm font-semibold">
+                  {c.name}
+                  {obligatorios.has(c.id) ? (
+                    <span class="text-danger-text ml-0.5" aria-hidden="true">
+                      *
+                    </span>
+                  ) : null}
+                </legend>
                 {(c.choices ?? []).map((o) => (
                   <Checkbox
                     key={o}
@@ -156,7 +175,7 @@ export function FormularioPublico({ locale, definicion }: Props): JSX.Element {
             );
           }
           return (
-            <FieldGroup key={c.id} label={c.name} htmlFor={id}>
+            <FieldGroup key={c.id} label={c.name} htmlFor={id} required={obligatorios.has(c.id)}>
               {c.kind === 'select' ? (
                 <Select
                   id={id}

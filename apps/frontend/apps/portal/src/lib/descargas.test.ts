@@ -4,8 +4,9 @@
 // app: en el host de organización nadie enruta `/api/descargas/…` y Traefik
 // contesta un 404 en texto plano. Pasó, y no lo cazó nada porque solo se ve
 // entrando a la página y pulsando el botón.
-import { expect, test } from 'bun:test';
+import { describe, expect, test } from 'bun:test';
 import {
+  leerSumas,
   arquitecturaDe,
   clasificar,
   equipoDelUA,
@@ -206,4 +207,27 @@ test('los nombres de instalador: los mismos que acepta el Hub', async () => {
     });
     if (v.plataforma) expect(arquitecturaDe(v.nombre)).toBe(v.arquitectura as never);
   }
+});
+
+describe('leerSumas (SHA256SUMS)', () => {
+  const h = (c: string) => c.repeat(64);
+  test('lee el formato de sha256sum, en texto y en binario, y se queda con el nombre', () => {
+    const sumas = leerSumas(
+      [
+        `${h('a')}  SytueOne-macos-universal.dmg`,
+        `${h('B')} *SytueOne-windows-amd64.exe`,
+        `${h('c')}  v3.6.0/SytueDrive-linux-amd64.tar.xz`,
+      ].join('\r\n'),
+    );
+    expect(sumas.get('SytueOne-macos-universal.dmg')).toBe(h('a'));
+    // En minúsculas: la huella se compara a ojo con la que da el sistema.
+    expect(sumas.get('SytueOne-windows-amd64.exe')).toBe(h('b'));
+    expect(sumas.get('SytueDrive-linux-amd64.tar.xz')).toBe(h('c'));
+  });
+  test('una línea que no encaja no se enseña como si fuera una huella', () => {
+    const sumas = leerSumas(
+      ['corta  fichero.dmg', `${h('g')}  no-es-hex.dmg`, '', '# x'].join('\n'),
+    );
+    expect(sumas.size).toBe(0);
+  });
 });

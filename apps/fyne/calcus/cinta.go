@@ -476,7 +476,9 @@ func (lz *Lienzo) cuerpoDatos(c *editor.Contexto) fyne.CanvasObject {
 	act := lz.botonesActualizar(c)
 	autofiltro.Activo = lz.Estado().Autofiltro
 
-	herramientas := []fyne.CanvasObject{boton(iconos.EdPapelera, "data.removeDuplicates", CmdDuplicados, ""), textoCols, lz.botonValidacion(c)}
+	herramientas := []fyne.CanvasObject{
+		boton(iconos.EdPapelera, "data.removeDuplicates", CmdDuplicados, ""), textoCols, lz.botonLimpiarTexto(c), lz.botonValidacion(c),
+	}
 
 	return editor.Grupos(
 		editor.NuevoGrupo(c.Traducir("group.externalData"),
@@ -529,14 +531,18 @@ func (lz *Lienzo) cuerpoDatos(c *editor.Contexto) fyne.CanvasObject {
 // taxonomía de pestañas.
 func (lz *Lienzo) cuerpoFormulas(c *editor.Contexto) fyne.CanvasObject {
 	hipotesis := editor.NuevoGrupo(c.Traducir("group.whatIf"), lz.grupoHipotesis(c)...)
+	// Σ antes que el análisis de hipótesis, como en la web: es lo que más se usa.
+	funciones := editor.NuevoGrupo(c.Traducir("group.functions"), lz.botonesAutosuma(c)...)
 	if b := lz.botonRelleno(c); b != nil {
 		return editor.Grupos(
 			editor.NuevoGrupo(c.Traducir("group.assistant"), b),
 			editor.SeparadorGrupos(),
+			funciones,
+			editor.SeparadorGrupos(),
 			hipotesis,
 		)
 	}
-	return editor.Grupos(hipotesis)
+	return editor.Grupos(funciones, editor.SeparadorGrupos(), hipotesis)
 }
 
 // alternarFijar es `toggleFreeze`: si hay algo inmovilizado lo suelta; si no, inmoviliza

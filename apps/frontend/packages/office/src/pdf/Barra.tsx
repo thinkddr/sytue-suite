@@ -68,6 +68,11 @@ interface Props {
   onDosPaginas: (v: boolean) => void;
   leyendo: boolean;
   onLeer: () => void;
+  /** El texto fuera del PDF: el del documento entero, el resumen de los comentarios y el
+   *  de la página que se está mirando. */
+  onDescargarTexto: () => void;
+  onResumenComentarios: () => void;
+  onCopiarPagina: () => void;
   pagina: number;
   total: number;
   onIrA: (n: number) => void;
@@ -386,6 +391,10 @@ export function BarraHerramientas(p: Props) {
               >
                 {t('pdf.menu.download')}
               </a>
+              {/* El texto, para pegarlo donde no cabe un PDF; y el resumen de los
+                  comentarios, para mandarlo o archivarlo sin el documento. */}
+              <BotonTexto onClick={p.onDescargarTexto}>{t('pdf.text.download')}</BotonTexto>
+              <BotonTexto onClick={p.onResumenComentarios}>{t('pdf.comments.summary')}</BotonTexto>
               <BotonTexto
                 onClick={p.onImprimir}
                 disabled={
@@ -473,6 +482,7 @@ export function BarraHerramientas(p: Props) {
                   icono="voz"
                   deshabilitado={p.noDisponible?.leer === true}
                 />
+                <BotonTexto onClick={p.onCopiarPagina}>{t('pdf.text.copyPage')}</BotonTexto>
               </RibbonGroup>
             </>
           )}

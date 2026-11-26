@@ -39,7 +39,7 @@ import {
   useLongPress,
   BulkActionBar,
   withBase,
-  MobileFab,
+  BotonFlotante,
   esAtajoDeApp,
   Checkbox,
   Glifo,
@@ -55,6 +55,14 @@ import { contiene, intlTag, type Locale } from '@sytue/i18n';
 import { useT, type T } from '../i18n/index.js';
 import { BirthdaysModal } from './BirthdaysModal.js';
 import { proximosCumpleanos } from '../client/cumpleanos.js';
+import { apellidoDe, textoBuscable } from '../client/busqueda.js';
+import {
+  claveDeOrden,
+  guardarOrden,
+  leerOrden,
+  ordenar,
+  type OrdenLista,
+} from '../client/orden.js';
 import { listaConCabeceras, type FilaLista } from '../client/iniciales.js';
 import {
   batchFavorite,
@@ -91,7 +99,12 @@ import { downloadVcf, exportFilename, hasEmbeddedPhoto, importVcf } from '../cli
 import { getAccessToken } from '@sytue/auth/client';
 import { ContactModal, type EditingContact } from './ContactModal.js';
 import { ContactDetail, FavoriteToggle } from './ContactDetail.js';
-import { correosDe, enlaceCorreoATodos } from '../client/seleccion.js';
+import {
+  correosDe,
+  correosParaCopiar,
+  enlaceCorreoATodos,
+  enlaceRedactar,
+} from '../client/seleccion.js';
 import { avisarPapelera } from './avisoPapelera.js';
 import { accionDeAtajo, accionDeFlecha, filaDestino, gruposDeAtajos } from './hojaDeAtajos.js';
 
@@ -185,6 +198,8 @@ function ContactsAppBody({ user, hubBaseUrl, locale }: Props): JSX.Element {
   // UID de los contactos destacados del usuario (cross-libreta) + filtro activo.
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [favFilter, setFavFilter] = useState(false);
+  // «Ordenar por apellido» (client/orden.ts): de quien mira, en este navegador.
+  const [orden, setOrden] = useState<OrdenLista>(() => leerOrden(user.id));
   // Modal de papelera abierto.
   const [trashOpen, setTrashOpen] = useState(false);
   // Próximos cumpleaños, del vCard de cada contacto; el contador es a 30 días.
@@ -529,6 +544,21 @@ function ContactsAppBody({ user, hubBaseUrl, locale }: Props): JSX.Element {
     onDeleted: () => setBooksAttempt((n) => n + 1),
   });
 
+  // Lo que la búsqueda mira además del nombre, los correos y la organización: apodo,
+  // cargo, ciudad y nota, sacados del vCard UNA vez por carga y no en cada tecla.
+  const extraDeBusqueda = useMemo(
+    () => new Map(contacts.map((c) => [c.href, textoBuscable(c.vcard)])),
+    [contacts],
+  );
+  // El apellido de cada uno, para ordenar: del vCard, solo si hace falta.
+  const apellidos = useMemo(
+    () =>
+      orden === 'apellido'
+        ? new Map(contacts.map((c) => [c.href, apellidoDe(c.vcard)]))
+        : new Map<string, string>(),
+    [contacts, orden],
+  );
+
   const filtrados = useMemo(() => {
     const memberSet = activeGroup ? new Set(activeGroup.members) : null;
     const q = query.trim().toLowerCase();
@@ -546,9 +576,10 @@ function ContactsAppBody({ user, hubBaseUrl, locale }: Props): JSX.Element {
           contiene(c.fullName, q) ||
           c.emails.some((e) => contiene(e, q)) ||
           contiene(c.organization ?? '', q) ||
+          contiene(extraDeBusqueda.get(c.href) ?? '', q) ||
           (byPhone && c.phones.some((p) => p.replace(/\D/g, '').includes(qDigits)))),
     );
-  }, [contacts, query, activeGroup, favFilter, favorites]);
+  }, [contacts, query, activeGroup, favFilter, favorites, extraDeBusqueda]);
 
   // Cabeceras A–Z (client/iniciales.ts), solo con la libreta entera a la vista: con
   // búsqueda, etiqueta o destacados la lista es un resultado y no hace falta situarse.
@@ -556,10 +587,13 @@ function ContactsAppBody({ user, hubBaseUrl, locale }: Props): JSX.Element {
   // todo lo demás —cursor, j/k, selección por rango— sigue hablando en sus índices: las
   // cabeceras solo existen para la lista virtual, que traduce con `filaDe`.
   const conCabeceras = !query.trim() && !activeGroup && !favFilter;
-  const lista = useMemo(
-    () => listaConCabeceras(filtrados, (c) => c.fullName, locale, conCabeceras),
-    [filtrados, locale, conCabeceras],
-  );
+  const lista = useMemo(() => {
+    const clave = (c: Contact): string =>
+      claveDeOrden(c.fullName, apellidos.get(c.href) ?? '', orden);
+    const enOrden =
+      orden === 'apellido' ? ordenar(filtrados, clave, (c) => c.fullName, locale) : filtrados;
+    return listaConCabeceras(enOrden, clave, locale, conCabeceras);
+  }, [filtrados, locale, conCabeceras, orden, apellidos]);
   const filtered = lista.items;
 
   // Clave estable por fila para el virtualizador (es su clave de caché de
@@ -652,6 +686,12 @@ function ContactsAppBody({ user, hubBaseUrl, locale }: Props): JSX.Element {
   // El manejador se registra UNA vez y lee el estado fresco por ref: si dependiera
   // de la lista, cada recarga reengancharía el listener (como en Mail).
   const atajosRef = useRef<(e: KeyboardEvent) => void>(() => undefined);
+  // Los avisos de la Shell para lo que hace un atajo («#» y su «Deshacer»): este cuerpo
+  // está FUERA de la Shell y `useToast` solo vale dentro; `PuenteDeAvisos` lo trae.
+  const avisosDeAtajos = useRef<ReturnType<typeof useToast> | null>(null);
+  const ponerAvisosDeAtajos = useCallback((avisos: ReturnType<typeof useToast>) => {
+    avisosDeAtajos.current = avisos;
+  }, []);
   atajosRef.current = (e: KeyboardEvent): void => {
     // `esAtajoDeApp` ya calla con un campo, un modificador de sistema o una capa
     // abierta; la hoja se cuenta aparte por si aún no ha pintado su diálogo.
@@ -717,9 +757,34 @@ function ContactsAppBody({ user, hubBaseUrl, locale }: Props): JSX.Element {
         e.preventDefault();
         toggleRow(indice, false);
         return;
+      // «#» como en Gmail: el contacto de la fila o de la ficha a la papelera, con el
+      // «Deshacer» del aviso (la papelera queda lejos y un atajo se pulsa sin querer).
+      case 'papelera':
+        if (offline || !objetivo) return;
+        e.preventDefault();
+        void tirarAtajo(objetivo);
+        return;
       default:
     }
   };
+
+  async function tirarAtajo(c: Contact): Promise<void> {
+    const toast = avisosDeAtajos.current;
+    if (!toast) return;
+    const lote = [cleanUid(c.uid)];
+    try {
+      const { trashed } = await batchTrash(lote);
+      if (selected?.href === c.href) setSelected(null);
+      avisarPapelera(toast, t, { title: t('batch.trashed', { count: 1 }) }, lote, trashed, reload);
+      reload();
+    } catch {
+      toast.notify({
+        tone: 'danger',
+        title: t('common.actionFailed'),
+        description: t('common.tryAgainSoon'),
+      });
+    }
+  }
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => atajosRef.current(e);
@@ -853,17 +918,8 @@ function ContactsAppBody({ user, hubBaseUrl, locale }: Props): JSX.Element {
 
   const sidebar = (
     <Sidebar
-      header={
-        <Button
-          fullWidth
-          variant="primary"
-          leadingIcon={<Icon name="plus" />}
-          disabled={!activeBook || offline}
-          onClick={openCreate}
-        >
-          {t('nav.newContact')}
-        </Button>
-      }
+      // Sin «Nuevo contacto» en la cabecera: es el «+» flotante, en todos los anchos (ver
+      // el `BotonFlotante` de abajo). Producto pidió un solo control (2026-11-25).
       // «Trae tus contactos»: importar un CSV ya estaba, pero traerlos directamente de
       // Google o Microsoft —que es lo que casi todo el mundo quiere— solo se podía desde
       // la consola de administración.
@@ -1048,6 +1104,12 @@ function ContactsAppBody({ user, hubBaseUrl, locale }: Props): JSX.Element {
             <VcardToolbar
               t={t}
               contacts={contacts}
+              orden={orden}
+              onCambiarOrden={() => {
+                const otro = orden === 'apellido' ? 'nombre' : 'apellido';
+                setOrden(otro);
+                guardarOrden(user.id, otro);
+              }}
               addressBookUrl={activeBook?.url ?? null}
               addressBookId={activeBook?.id ?? null}
               onImported={reload}
@@ -1203,7 +1265,8 @@ function ContactsAppBody({ user, hubBaseUrl, locale }: Props): JSX.Element {
             isSeparator={esCabecera}
             id={CONTACT_LIST_ID}
             aria-label={t('list.title')}
-            class="min-h-0 flex-1"
+            // El hueco del «+» flotante al final: el último contacto se baja por encima.
+            class="sytue-reserva-flotante min-h-0 flex-1"
             handleRef={listaRef}
             // La fila del cursor no se desmonta al desplazar: es la parada de Tab.
             keepMounted={lista.filaDe[cursorFila] ?? -1}
@@ -1319,6 +1382,7 @@ function ContactsAppBody({ user, hubBaseUrl, locale }: Props): JSX.Element {
       accessToken={getAccessToken}
       locale={locale}
     >
+      <PuenteDeAvisos alTener={ponerAvisosDeAtajos} />
       {/* La topbar global ya la pinta la Sytue Shell: el AppShell ocupa el resto del viewport. */}
       <AppShell
         topbar={null}
@@ -1343,6 +1407,13 @@ function ContactsAppBody({ user, hubBaseUrl, locale }: Props): JSX.Element {
           onToggleGroup={offline ? undefined : toggleGroupMembership}
           onEdit={offline ? undefined : openEdit}
           onMerge={!offline && contacts.length > 1 ? setMergeFor : undefined}
+          onCompartir={(c, texto) =>
+            window.open(
+              enlaceRedactar(mailBase, { subject: c.fullName, body: texto }),
+              '_blank',
+              'noopener',
+            )
+          }
           onCreate={!offline && activeBook ? openCreate : undefined}
           isFavorite={selected ? favorites.has(cleanUid(selected.uid)) : false}
           onToggleFavorite={offline ? undefined : toggleFav}
@@ -1351,13 +1422,12 @@ function ContactsAppBody({ user, hubBaseUrl, locale }: Props): JSX.Element {
           org={user.tenant}
         />
       </AppShell>
-      {/* Nuevo contacto al alcance del pulgar: en móvil el menú lateral es un cajón cerrado. */}
+      {/* «Nuevo contacto» es el «+» flotante, abajo a la derecha y en todos los anchos: al
+          alcance del pulgar en el teléfono, donde el menú lateral es un cajón cerrado, y
+          el mismo sitio en escritorio. Sin red no se ofrece; sin libreta, apagado, como
+          lo estaba el botón del menú. */}
       {offline ? null : (
-        <MobileFab
-          label={t('nav.newContact')}
-          icon={<Icon name="plus" size={24} />}
-          onClick={openCreate}
-        />
+        <BotonFlotante label={t('nav.newContact')} disabled={!activeBook} onClick={openCreate} />
       )}
 
       <ContactModal
@@ -1455,9 +1525,14 @@ function VcardToolbar({
   onSeleccionar,
   onDuplicados,
   grupos = [],
+  orden,
+  onCambiarOrden,
 }: {
   t: T;
   contacts: Contact[];
+  /** El orden de la libreta y cómo cambiarlo («Ordenar por apellido»). */
+  orden: OrdenLista;
+  onCambiarOrden: () => void;
   addressBookUrl: string | null;
   /** Id REST de la libreta: el alta de una tarjeta entera va por la API, no por CardDAV. */
   addressBookId: string | null;
@@ -1565,6 +1640,17 @@ function VcardToolbar({
   /** Importar y exportar: lo mismo en el menú del escritorio y en el «…» del teléfono. */
   const accionesIo = (cerrar: () => void): JSX.Element => (
     <>
+      {/* El orden de la libreta: por nombre (lo de siempre) o por apellido. Ofrece el
+          otro, que es lo que hace al pulsarlo. */}
+      <MenuItem
+        onClick={() => {
+          cerrar();
+          onCambiarOrden();
+        }}
+      >
+        {t(orden === 'apellido' ? 'list.sortByFirstName' : 'list.sortByLastName')}
+      </MenuItem>
+      <MenuSeparator />
       <MenuItem
         disabled={offline || !addressBookUrl}
         onClick={() => {
@@ -1720,6 +1806,36 @@ function VcardToolbar({
       </Dropdown>
     </>
   );
+}
+
+/** Pasa los avisos de la Shell a quien vive fuera de ella. */
+function PuenteDeAvisos({
+  alTener,
+}: {
+  alTener: (avisos: ReturnType<typeof useToast>) => void;
+}): null {
+  const toast = useToast();
+  useEffect(() => alTener(toast), [toast, alTener]);
+  return null;
+}
+
+/** «Copiar los correos»: el principal de cada uno, sin repetir y sin tope. */
+async function copiarCorreos(
+  toast: ReturnType<typeof useToast>,
+  t: T,
+  contactos: Contact[],
+): Promise<void> {
+  const correos = correosParaCopiar(contactos);
+  if (correos.length === 0) {
+    toast.notify({ tone: 'info', title: t('batch.noEmail') });
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(correos.join(', '));
+    toast.notify({ tone: 'success', title: t('batch.emailsCopied') });
+  } catch {
+    toast.notify({ tone: 'danger', title: t('detail.copyFailed') });
+  }
 }
 
 /**
@@ -2854,6 +2970,11 @@ export function BatchBar({
         }
       >
         {t('batch.exportVcf')}
+      </Button>
+      {/* Las direcciones, para pegarlas donde haga falta (otra herramienta, un CCO
+          largo): «Enviar correo a todos» abre Mail y se queda en las que caben. */}
+      <Button variant="secondary" size="sm" onClick={() => void copiarCorreos(toast, t, contacts)}>
+        {t('batch.copyEmails')}
       </Button>
       <Button
         variant="secondary"

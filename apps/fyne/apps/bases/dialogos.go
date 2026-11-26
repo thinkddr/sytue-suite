@@ -477,15 +477,35 @@ func (f *formVista) camposDelFormulario() fyne.CanvasObject {
 	grupo = append(grupo, f.titulo("view.formFields"),
 		ui.NuevoParrafo(f.p.t("view.formFieldsHelp"), tema.TextoXS, ui.Normal, "text-muted", v).A(f.p.anchoDialogo(560)))
 	for _, c := range campos {
+		// Cada campo, y a su lado si es obligatorio: solo se puede pedir lo que el
+		// formulario enseña, así que la segunda casilla se apaga sin la primera.
+		obligatoria := ui.NuevaCasilla(f.p.t("view.required"), func(si bool) {
+			f.borrador.obligatorios = slices.DeleteFunc(f.borrador.obligatorios, func(id string) bool { return id == c.ID })
+			if si {
+				f.borrador.obligatorios = append(f.borrador.obligatorios, c.ID)
+			}
+			f.ajustar()
+		})
 		casilla := ui.NuevaCasilla(c.Name, func(si bool) {
 			f.borrador.campos = slices.DeleteFunc(f.borrador.campos, func(id string) bool { return id == c.ID })
 			if si {
 				f.borrador.campos = append(f.borrador.campos, c.ID)
 			}
+			if si {
+				obligatoria.Enable()
+			} else {
+				obligatoria.Disable()
+			}
+			obligatoria.Marcada = si && slices.Contains(f.borrador.obligatorios, c.ID)
+			obligatoria.Refresh()
 			f.ajustar()
 		})
 		casilla.Marcada = slices.Contains(f.borrador.campos, c.ID)
-		grupo = append(grupo, casilla)
+		obligatoria.Marcada = casilla.Marcada && slices.Contains(f.borrador.obligatorios, c.ID)
+		if !casilla.Marcada {
+			obligatoria.Disable()
+		}
+		grupo = append(grupo, container.New(ui.Flujo{Hueco: tema.Espacio(4)}, casilla, obligatoria))
 	}
 	return container.New(ui.Columna{Hueco: tema.Espacio(2)}, grupo...)
 }
@@ -527,8 +547,16 @@ func (f *formVista) filtro() fyne.CanvasObject {
 	for j, op := range ops {
 		rotulosOp[j] = p.t("view.op." + op)
 	}
-	linea := []fyne.CanvasObject{f.selector("view.filterOp", rotulosOp, slices.Index(ops, b.filtroOp), func(j int) { b.filtroOp = ops[j] })}
-	if b.filtroOp != "empty" && b.filtroOp != "notempty" {
+	linea := []fyne.CanvasObject{f.selector("view.filterOp", rotulosOp, slices.Index(ops, b.filtroOp), func(j int) {
+		// Pasar a «últimos N días» desde una fecha deja un valor que no es un número: se
+		// propone 7 en vez de dejar el filtro sin guardar, como la web.
+		if slices.Contains(opsConDias, ops[j]) && !slices.Contains(opsConDias, b.filtroOp) {
+			b.filtroValor = "7"
+			f.valor.PonerTexto("7")
+		}
+		b.filtroOp = ops[j]
+	})}
+	if !slices.Contains(opsSinValor, b.filtroOp) {
 		linea = append(linea, f.valorDelFiltro(c))
 	}
 	return container.New(ui.Columna{Hueco: tema.Espacio(2)}, append(hijos, container.New(ui.Fila{Hueco: tema.Espacio(2)}, linea...))...)

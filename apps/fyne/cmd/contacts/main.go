@@ -74,6 +74,7 @@ func main() {
 		subject := resources.PrivateStorageScope().Subject
 		c.Directorio, c.Yo = api.NewDirectorio(s.URL("id"), resources.HTTP(), nil), func() string { return subject }
 		c.Apex = s.Apex()
+		c.Almacen = s.PorPersona() // el orden de la libreta, por persona
 		organization := resources.PrivateStorageScope().Tenant
 		c.Org = func() string { return organization }
 		if runtime.GOOS != "js" {

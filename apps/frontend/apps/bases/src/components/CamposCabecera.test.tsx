@@ -127,9 +127,12 @@ test('el propietario tiene un menú en cada cabecera y una «+» al final', () =
   expect(document.querySelector('table')?.getAttribute('aria-colcount')).toBe('5');
   for (const c of CAMPOS) expect(botonPorNombre(`field.actions:${c.name}`)).not.toBeNull();
 
-  // Un campo corriente: renombrar y borrar, sin fórmula.
+  // Un campo corriente: renombrar, su valor por defecto y borrar, sin fórmula.
   act(() => botonPorNombre('field.actions:Nombre')!.click());
-  expect(itemsDelMenu()).toEqual(['field.rename', 'field.delete']);
+  expect(itemsDelMenu()).toEqual(['field.rename', 'field.default', 'field.delete']);
+  act(() => botonPorTexto('field.default')!.click());
+  expect(acciones.pop()).toEqual(['defecto', 'nom']);
+  act(() => botonPorNombre('field.actions:Nombre')!.click());
   act(() => botonPorTexto('field.rename')!.click());
   expect(acciones).toEqual([['renombrar', 'nom']]);
   expect(document.querySelector('[role="menu"]')).toBeNull();
@@ -294,6 +297,7 @@ test('un campo de selección edita sus opciones y cualquiera se mueve desde el m
   expect(itemsDelMenu()).toEqual([
     'field.rename',
     'field.editChoices',
+    'field.default',
     'field.moveLeft',
     'field.moveRight',
     'field.delete',

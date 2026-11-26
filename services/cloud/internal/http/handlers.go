@@ -36,6 +36,10 @@ type cloudService interface {
 	RotateProjectWebhookSecret(ctx context.Context, id uuid.UUID) (string, error)
 	ProtectPreviews(ctx context.Context, id uuid.UUID) (string, error)
 	UnprotectPreviews(ctx context.Context, id uuid.UUID) error
+	// Congelación de producción (handlers_freeze.go).
+	DeployFreeze(ctx context.Context, projectID uuid.UUID) (domain.DeployFreeze, bool, error)
+	FreezeDeploys(ctx context.Context, projectID uuid.UUID, reason string) (domain.DeployFreeze, error)
+	UnfreezeDeploys(ctx context.Context, projectID uuid.UUID) error
 	WebhookURL() string
 	PublicURL() string
 	// AppCatalog es el catálogo de apps open-source, ya resuelto contra el
@@ -174,6 +178,11 @@ func toAPIError(err error) error {
 		return httpx.ErrForbidden
 	case errors.Is(err, domain.ErrSignatureInvalid):
 		return httpx.ErrUnauthorized.WithMessage("Invalid webhook signature.")
+	case errors.Is(err, domain.ErrDeployFrozen):
+		// Código propio y no el genérico de 409: la interfaz tiene que poder decir
+		// «producción está congelada» y no «estado inválido», que no ayuda a nadie.
+		return httpx.NewError(http.StatusConflict, "deploy_frozen",
+			"Production deployments for this project are frozen. Unfreeze them, or roll back to a previous deployment.")
 	default:
 		return httpx.ErrInternal.Wrap(err)
 	}

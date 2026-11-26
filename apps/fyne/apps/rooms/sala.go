@@ -855,7 +855,19 @@ func (sa *Sala) MenuFila(c Canal, disparador fyne.CanvasObject) {
 	if c.Favorito {
 		fav = t.T("channel.unfavourite", nil)
 	}
-	es := []fyne.CanvasObject{ui.NuevoElementoMenu(fav, iconos.Ninguno, func() { sa.Favorito(c) }), ui.NuevoSeparadorMenu()}
+	var es []fyne.CanvasObject
+	// «Marcar como leído» sin abrirlo, solo con algo pendiente, como la web.
+	if p := sa.pend[c.ID]; p.Unread > 0 || p.Mentions > 0 {
+		es = append(es, ui.NuevoElementoMenu(t.T("channel.markRead", nil), iconos.Tic, func() { sa.MarcarCanalLeido(c) }))
+	}
+	es = append(es, ui.NuevoElementoMenu(fav, iconos.Ninguno, func() { sa.Favorito(c) }),
+		// El enlace al canal, para pegarlo fuera: abre la conversación a quien ya está dentro.
+		ui.NuevoElementoMenu(t.T("channel.copyLink", nil), iconos.Enlace, func() { sa.CopiarEnlaceDeCanal(c) }))
+	// La conversación ABIERTA en un .txt, con lo cargado (ya descifrado aquí).
+	if c.ID == sa.abierto && len(sa.mensajes) > 0 {
+		es = append(es, ui.NuevoElementoMenu(t.T("channel.download", nil), iconos.Descargar, func() { sa.DescargarConversacion(c) }))
+	}
+	es = append(es, ui.NuevoSeparadorMenu())
 	for n := AvisarTodo; n <= AvisarNada; n++ {
 		it := ui.NuevoElementoMenu(t.T(nivelesAviso[n].clave, nil), iconos.Ninguno, func() { sa.PonerAviso(c, n) })
 		it.Marcada = c.Nivel == n
@@ -2254,6 +2266,17 @@ func (sa *Sala) enlaceEn(canal string, m Mensaje) string {
 	return api.AppURL(sa.Apex, "rooms", sa.org(), "/channels/"+url.PathEscape(canal)+"?message="+url.QueryEscape(m.ID))
 }
 
+// enlaceDeCanal es el `channelLink` de la web: el de `enlaceEn` sin el mensaje.
+func (sa *Sala) enlaceDeCanal(canal string) string {
+	return api.AppURL(sa.Apex, "rooms", sa.org(), "/channels/"+url.PathEscape(canal))
+}
+
+// CopiarEnlaceDeCanal lleva el enlace del canal al portapapeles y lo dice.
+func (sa *Sala) CopiarEnlaceDeCanal(c Canal) {
+	sa.Copiar(sa.enlaceDeCanal(c.ID))
+	sa.P.Avisar(ui.AvisoExito, sa.P.T.T("channel.linkCopied", nil))
+}
+
 // org es la organización activa de la sesión, o "" sin sesión y en el guardián.
 func (sa *Sala) org() string {
 	if sa.Org == nil {
@@ -3542,7 +3565,7 @@ func (sa *Sala) AbrirNuevoDirecto() {
 		}, func(canal api.RoomsChannel, err error) {
 			nd.Ocupado = false
 			if err != nil {
-				nd.Fallo = true
+				nd.Fallo, nd.FalloFuera = true, CerradoAFuera(err)
 				nd.Refresh()
 				return
 			}

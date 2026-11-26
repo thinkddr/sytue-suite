@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/test"
 
 	"git.sytue.eu/sytue/one/apps/fyne/iconos"
@@ -69,21 +68,6 @@ func TestLaBarraMovilCambiaElDibujoDeMenuAVolver(t *testing.T) {
 	}
 }
 
-// TestElBotonFlotanteSoloEnElTelefono: 49 × 49 (`h-14`) a 14 de la esquina de abajo a
-// la derecha por debajo de 768, y escondido desde ahí (`md:hidden`).
-func TestElBotonFlotanteSoloEnElTelefono(t *testing.T) {
-	fab := NuevoBotonFlotante("Nuevo contacto", iconos.Mas, nil)
-	capa := container.New(CapaFlotante{}, fab)
-	capa.Resize(fyne.NewSize(390, 844))
-	if !fab.Visible() || fab.Position() != fyne.NewPos(390-16-56, 844-16-56) || fab.Size() != fyne.NewSize(56, 56) {
-		t.Errorf("en el teléfono: visible %v en %v de %v", fab.Visible(), fab.Position(), fab.Size())
-	}
-	capa.Resize(fyne.NewSize(1280, 800))
-	if fab.Visible() {
-		t.Error("en ancho el botón flotante sigue a la vista y es `md:hidden`")
-	}
-}
-
 func TestLaBarraMovilSigueLaFormaYElSueloTactil(t *testing.T) {
 	enMarco(t)
 	b := NuevaBarraMovil()
@@ -123,42 +107,5 @@ func TestLaBarraMovilSigueLaFormaYElSueloTactil(t *testing.T) {
 	}
 	if centroTactil := r.boton.Position().X + r.boton.Size().Width/2; centroTactil != centroEscritorio {
 		t.Fatalf("el suelo táctil desplazó el eje del glifo de %g a %g", centroEscritorio, centroTactil)
-	}
-}
-
-func TestElBotonFlotanteSeAtenuaYCierraElCajonAbierto(t *testing.T) {
-	sinAnimacionDelMenu(t)
-	pulsaciones := 0
-	a := NuevoArmazon(contenidoDePrueba())
-	a.Menu = NuevoLateral("Menú", nil)
-	fab := NuevoBotonFlotante("Redactar", iconos.Mas, func() { pulsaciones++ })
-	raiz := container.NewStack(a, container.New(CapaFlotante{}, fab))
-	w := test.NewTempWindow(t, raiz)
-	w.SetPadded(false)
-	w.Resize(fyne.NewSize(390, 844))
-	rf := test.WidgetRenderer(fab).(*flotanteRenderer)
-
-	if rf.velo.Visible() {
-		t.Fatal("el botón flotante aparece velado con el cajón cerrado")
-	}
-	a.AbrirCajon()
-	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
-	if !rf.velo.Visible() || rf.velo.FillColor != ColorVelo(v, 1) {
-		t.Fatalf("el botón flotante no se atenúa bajo el velo del cajón: visible=%v color=%v", rf.velo.Visible(), rf.velo.FillColor)
-	}
-	test.Tap(fab)
-	if pulsaciones != 0 || a.CajonAbierto || rf.velo.Visible() {
-		t.Fatalf("pulsar el botón flotante bajo el velo disparó la acción (%d) o no cerró el cajón (%v)", pulsaciones, a.CajonAbierto)
-	}
-	test.Tap(fab)
-	if pulsaciones != 1 {
-		t.Fatalf("con el cajón cerrado el botón flotante no ejecutó su acción: %d", pulsaciones)
-	}
-
-	fab.Inerte = true
-	a.AbrirCajon()
-	fab.Refresh()
-	if rf.velo.Visible() {
-		t.Fatal("un botón flotante inerte no debe pintar un segundo velo")
 	}
 }

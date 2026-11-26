@@ -7,13 +7,15 @@
  * y admin. Todo vía el BFF (cookie httpOnly, el token nunca está aquí). Solo @sytue/ui,
  * Graphite & Brass, denso, oscuro, WCAG AA.
  */
-import { useState } from 'preact/hooks';
+import { useMemo, useState } from 'preact/hooks';
 import {
   Badge,
   Button,
   EmptyState,
   Icon,
+  Input,
   SectionHeader,
+  Select,
   ToastProvider,
   useToast,
   ConfirmDialog,
@@ -22,6 +24,8 @@ import type { Locale } from '@sytue/i18n';
 import { useT, type T } from '../i18n/index.js';
 import type { Device } from '../lib/types.js';
 import { formatWhen } from '../lib/format.js';
+import { useTGestion } from '../i18n/gestion/index.js';
+import { filtrarDispositivos, type FiltroConfianza } from '../lib/gestion.js';
 
 interface DevicesPanelProps {
   /** Idioma negociado en el servidor; llega por props desde el `.astro`. */
@@ -53,6 +57,13 @@ function Inner({ locale, myDevices, orgDevices, live }: DevicesPanelProps) {
   const [org, setOrg] = useState<Device[]>(orgDevices);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [pending, setPending] = useState<PendingRevoke | null>(null);
+  const tg = useTGestion(locale);
+  // Con cien personas y tres dispositivos cada una, encontrar «el portátil de
+  // Marta» o todo lo que entra desde una IP sospechosa era hacer scroll a ojo.
+  const [q, setQ] = useState('');
+  const [confianza, setConfianza] = useState<FiltroConfianza>('');
+  const orgVisibles = useMemo(() => filtrarDispositivos(org, q, confianza), [org, q, confianza]);
+  const filtrando = q.trim() !== '' || confianza !== '';
 
   async function trust(d: Device) {
     setBusyId(d.id);
@@ -175,8 +186,43 @@ function Inner({ locale, myDevices, orgDevices, live }: DevicesPanelProps) {
 
       {/* --- Dispositivos de la organización (admin) --- */}
       <div class="px-4 pb-4">
-        <h2 class="text-text mb-2 text-sm font-semibold">{t('devices.org.title')}</h2>
-        {org.length === 0 ? (
+        <div class="mb-2 flex flex-wrap items-center gap-2">
+          <h2 class="text-text text-sm font-semibold">{t('devices.org.title')}</h2>
+          {org.length > 0 ? (
+            <>
+              <Input
+                type="search"
+                value={q}
+                class="ml-auto w-60 max-w-full"
+                leadingIcon={<Icon name="search" size={16} />}
+                placeholder={tg('gestion.dispositivos.buscar')}
+                aria-label={tg('gestion.dispositivos.buscar')}
+                onInput={(e) => setQ(e.currentTarget.value)}
+              />
+              <Select
+                value={confianza}
+                class="w-44"
+                aria-label={tg('gestion.dispositivos.confianza')}
+                onChange={(e) => setConfianza(e.currentTarget.value as FiltroConfianza)}
+              >
+                <option value="">{tg('gestion.dispositivos.todos')}</option>
+                <option value="trusted">{t('devices.trusted')}</option>
+                <option value="untrusted">{t('devices.untrusted')}</option>
+              </Select>
+              {filtrando ? (
+                <span class="text-text-muted text-sm tabular-nums" aria-live="polite">
+                  {tg('gestion.dispositivos.recuento', {
+                    count: orgVisibles.length,
+                    total: org.length,
+                  })}
+                </span>
+              ) : null}
+            </>
+          ) : null}
+        </div>
+        {org.length > 0 && orgVisibles.length === 0 ? (
+          <p class="text-text-muted py-4 text-sm">{tg('gestion.dispositivos.sinResultados')}</p>
+        ) : org.length === 0 ? (
           <EmptyState
             title={t('devices.org.emptyTitle')}
             description={t('devices.org.emptyDescription')}
@@ -193,7 +239,7 @@ function Inner({ locale, myDevices, orgDevices, live }: DevicesPanelProps) {
               <span class="w-24 shrink-0 text-right">{t('devices.col.manage')}</span>
             </div>
             <ul>
-              {org.map((d) => (
+              {orgVisibles.map((d) => (
                 <li
                   key={d.id}
                   class="border-border hover:bg-bg-subtle flex items-center gap-3 border-b px-3 py-2.5 last:border-b-0"

@@ -354,4 +354,8 @@ export const sv: AppCatalog<typeof en> = {
   'moderation.action.unlist': 'Ta bort från den offentliga sidan',
   'moderation.action.unpublish': 'Avpublicera',
   'moderation.action.block': 'Blockera personen i organisationen',
+  'player.loop': 'Upprepa',
+  'watch.chapters': 'Kapitel',
+  'watch.jumpTo': 'Gå till {time}',
+  'share.startAt': 'Börja vid {time}',
 };

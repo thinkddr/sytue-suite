@@ -974,4 +974,14 @@ export const sv: AppCatalog<typeof en> = {
     'Det tidigare e-postsystemet är inte längre tillgängligt. Tills du flyttar din e-post till valvet får du ingen ny e-post: det som skickas till dig under tiden väntar på avsändarens server, som försöker igen i några dagar. Flyttar du i tid kommer det fram till dig efteråt; annars får avsändaren besked om att det inte kunde levereras. Det som redan är krypterat med det tidigare systemet, precis som e-posten du redan hade, kan inte läsas: det raderas inte, men ingen kan öppna det. När du har flyttat kommer e-posten fram igen och öppnas med din Sytue ID-inloggning, som de andra apparna.',
   'privateMail.vaultMoveCheckFailed':
     'Det gick inte att kontrollera statusen för din e-post. Försök igen om en stund.',
+  'shortcuts.goInbox': 'Gå till Inkorg',
+  'shortcuts.goSent': 'Gå till Skickat',
+  'shortcuts.goDrafts': 'Gå till Utkast',
+  'shortcuts.goArchive': 'Gå till Arkiv',
+  'compose.sendAndArchive': 'Skicka och arkivera',
+  'reader.copyAddress': 'Kopiera adressen',
+  'reader.addressCopied': 'Adressen kopierades',
+  'reader.copyAddressFailed': 'Det gick inte att kopiera adressen',
+  'reader.viewPlain': 'Visa som oformaterad text',
+  'reader.viewFormatted': 'Visa med formatering',
 };

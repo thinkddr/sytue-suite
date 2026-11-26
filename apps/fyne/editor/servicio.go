@@ -230,6 +230,11 @@ func (s Servicio) descargar(c context.Context, id, titulo string, t Tipo, format
 	if err != nil {
 		return "", err
 	}
+	return s.guardarEnCarpeta(nombre, datos)
+}
+
+// guardarEnCarpeta deja los bytes en la carpeta de descargas con ese nombre (o uno libre).
+func (s Servicio) guardarEnCarpeta(nombre string, datos []byte) (string, error) {
 	carpeta := s.Carpeta
 	if carpeta == nil {
 		carpeta = ficheros.Carpeta
@@ -239,6 +244,23 @@ func (s Servicio) descargar(c context.Context, id, titulo string, t Tipo, format
 		return "", err
 	}
 	return ficheros.Guardar(dir, nombre, bytes.NewReader(datos))
+}
+
+// GuardarLocal deja en las descargas un fichero que se ha escrito en el dispositivo, sin
+// pedir nada al servicio (el CSV de una hoja), con los mismos avisos que una descarga.
+func (s Servicio) GuardarLocal(nombre string, datos []byte) {
+	s.lanzar(func() {
+		ruta, err := s.guardarEnCarpeta(nombre, datos)
+		fyne.Do(func() {
+			if err != nil {
+				s.avisar(ui.AvisoPeligro, "doc.msg.exportFailed")
+				return
+			}
+			if s.Avisar != nil {
+				s.Avisar(ui.AvisoExito, filepath.Base(ruta))
+			}
+		})
+	})
 }
 
 // GuardarVersion es «Guardar versión» con la etiqueta que se haya escrito; vacía, el

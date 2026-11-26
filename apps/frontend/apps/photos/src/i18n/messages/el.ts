@@ -394,4 +394,9 @@ export const el: AppCatalog<typeof en> = {
   'gallery.encrypted.editHint':
     'Η επεξεργασία γίνεται σε αυτή τη συσκευή και αποθηκεύεται κρυπτογραφημένη ως νέα έκδοση της φωτογραφίας.',
   'gallery.encrypted.albumEmpty': 'Αυτό το κρυπτογραφημένο άλμπουμ δεν έχει ακόμη φωτογραφίες.',
+  'shortcuts.favorite': 'Προσθήκη ή αφαίρεση από τα αγαπημένα',
+  'trash.restoreAll': 'Επαναφορά όλων',
+  'trash.restoredAll': 'Επέστρεψαν στις φωτογραφίες σας: {count}',
+  'album.download': 'Λήψη άλμπουμ',
+  'viewer.openInDrive': 'Προβολή του πρωτοτύπου στο Sytue Drive',
 };

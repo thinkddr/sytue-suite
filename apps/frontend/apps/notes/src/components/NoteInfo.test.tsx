@@ -105,6 +105,8 @@ test('info counts the plain text and shows dates, notebook and how many notes li
     'noteInfo.created': formatDateTime('en', '2026-10-20T08:15:00Z'),
     'noteInfo.edited': formatDateTime('en', '2026-11-02T17:40:00Z'),
     'noteInfo.notebook': 'Casa',
+    // Lo que sale de la nota (ninguno en esta), junto a lo que entra.
+    'noteInfo.links': '0',
     'noteInfo.backlinks': 'notebook.notes{"count":2}',
   });
   expect(document.body.textContent).toContain('Lista');

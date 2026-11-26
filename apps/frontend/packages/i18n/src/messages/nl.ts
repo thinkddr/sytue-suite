@@ -394,10 +394,14 @@ export const nl: Catalog = {
   'import.fromGoogle': 'Overzetten vanuit Google',
   'import.fromMicrosoft': 'Overzetten vanuit Microsoft 365',
   'import.running': 'Je gegevens worden gekopieerd… tot nu toe {count} items.',
-  'import.done': '{count} items overgezet, {skipped} overgeslagen.',
+  'import.done': '{what}: {count} items overgezet, {skipped} overgeslagen. Klaar op {date}.',
   'import.someFailed':
     'Een deel van je gegevens kon niet worden gekopieerd. Je beheerder kan zien waarom.',
   'import.failed': 'De import kon niet worden gestart. Probeer het zo meteen opnieuw.',
+  'import.unavailable':
+    'De verbinding met {source} kan nu niet worden gelezen: die is verlopen, ingetrokken of nooit geautoriseerd. Vraag je beheerder om haar opnieuw te verbinden.',
+  'import.needsAdmin':
+    'De verbinding met {source} kan de gegevens van elke persoon nog niet kopiëren. Vraag je beheerder om de instelling af te ronden.',
   'dataflow.label': 'Wat er met de gegevens gebeurt',
   'dataflow.in.title': 'Komt alleen binnen in Sytue One',
   'dataflow.in.body':

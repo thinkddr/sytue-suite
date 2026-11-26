@@ -413,4 +413,9 @@ export const pl: AppCatalog<typeof en> = {
   'gallery.encrypted.editHint':
     'Edycja odbywa się na tym urządzeniu i jest zapisywana w postaci zaszyfrowanej jako nowa wersja zdjęcia.',
   'gallery.encrypted.albumEmpty': 'Ten zaszyfrowany album nie ma jeszcze zdjęć.',
+  'shortcuts.favorite': 'Oznacz lub usuń z ulubionych',
+  'trash.restoreAll': 'Przywróć wszystko',
+  'trash.restoredAll': 'Przywrócone do zdjęć: {count}',
+  'album.download': 'Pobierz album',
+  'viewer.openInDrive': 'Zobacz oryginał w Sytue Drive',
 };

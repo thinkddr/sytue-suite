@@ -107,6 +107,9 @@ type rejilla struct {
 	// AlMover avisa de que el foco ha cambiado de celda, con su caja dentro de la
 	// rejilla, para que quien desplaza la deje a la vista.
 	AlMover func(pos fyne.Position, tam fyne.Size)
+	// AlAyuda abre la hoja de atajos: «?» sobre una celda que no se escribe tecleando
+	// (en una de texto, «?» empieza a escribirla, como en la web).
+	AlAyuda func()
 
 	foco     celda
 	enfocada bool
@@ -225,6 +228,9 @@ func (g *rejilla) menuCampo(col int) {
 	}
 	if c.Kind == api.BasesKindSelect || c.Kind == api.BasesKindMultiselect {
 		elementos = append(elementos, ui.NuevoElementoMenu(g.t("field.editChoices"), iconos.Lista, func() { al(accionOpciones, c) }))
+	}
+	if admiteDefecto(c) {
+		elementos = append(elementos, ui.NuevoElementoMenu(g.t("field.default"), iconos.Etiqueta, func() { al(accionDefecto, c) }))
 	}
 	if g.AlMoverCampo != nil {
 		izq := ui.NuevoElementoMenu(g.t("field.moveLeft"), iconos.ChevronIzquierda, func() { g.moverCampo(col, -1) })
@@ -661,6 +667,8 @@ func (g *rejilla) TypedRune(ru rune) {
 		g.empezarEdicion("")
 	case !unicode.IsSpace(ru) && tecleable(campo.Kind):
 		g.empezarEdicion(string(ru))
+	case ru == '?' && g.AlAyuda != nil:
+		g.AlAyuda()
 	}
 }
 

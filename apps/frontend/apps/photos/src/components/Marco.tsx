@@ -16,9 +16,18 @@ export interface MarcoProps {
   locale: Locale;
   title: string;
   children: ComponentChildren;
+  /** El «+» flotante de la vista (`BotonFlotante`): «Añadir fotos» en la galería. */
+  flotante?: ComponentChildren;
 }
 
-export function Marco({ user, hubBaseUrl, locale, title, children }: MarcoProps): JSX.Element {
+export function Marco({
+  user,
+  hubBaseUrl,
+  locale,
+  title,
+  children,
+  flotante,
+}: MarcoProps): JSX.Element {
   return (
     <SytueShell
       currentApp="photos"
@@ -30,9 +39,13 @@ export function Marco({ user, hubBaseUrl, locale, title, children }: MarcoProps)
       {/* La topbar global la pinta la Sytue Shell: el AppShell ocupa el resto. */}
       <AppShell topbar={null} class="h-[calc(100dvh-var(--spacing-topbar))]!" title={title}>
         {/* `relative`: el que desplaza es este panel, no el `main` del AppShell; lo que
-            lleva dentro (un `sr-only`) se ancla a él y no un piso más arriba. */}
-        <div class="relative h-full min-h-0 overflow-y-auto">{children}</div>
+            lleva dentro (un `sr-only`) se ancla a él y no un piso más arriba. Con el «+»
+            flotante, acaba con su hueco (`sytue-reserva-flotante`, que sin él no hace
+            nada): la última fila de fotos se baja por encima. */}
+        <div class="sytue-reserva-flotante relative h-full min-h-0 overflow-y-auto">{children}</div>
       </AppShell>
+      {/* FUERA del AppShell, como en las demás apps: es `fixed`. */}
+      {flotante}
     </SytueShell>
   );
 }

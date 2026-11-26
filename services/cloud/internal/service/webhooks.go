@@ -419,6 +419,14 @@ func (s *Service) HandleGitEvent(ctx context.Context, rr store.ResolvedRepo, ev 
 			Target:        domain.TargetProduction,
 			CreatedBy:     ev.Pusher,
 		})
+		// Producción congelada: el webhook hizo su trabajo y la decisión de no
+		// publicar es correcta, así que se responde «procesado», como con un push
+		// que no toca el subdirectorio. Un error haría reintentar a la forja el
+		// mismo push una y otra vez mientras dure la congelación. El intento queda
+		// en la auditoría (deploy.blocked_frozen).
+		if errors.Is(err, domain.ErrDeployFrozen) {
+			return nil, true, nil
+		}
 		if err != nil {
 			return nil, false, err
 		}

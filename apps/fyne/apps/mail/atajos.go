@@ -6,6 +6,7 @@ package mail
 import (
 	"runtime"
 	"slices"
+	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/driver/desktop"
@@ -57,6 +58,11 @@ func (b *Buzon) Atajo(c fyne.Canvas, r rune) bool {
 	if b.redaccion != nil || (c != nil && c.Overlays().Top() != nil) {
 		return false
 	}
+	// «g» y la letra de la carpeta, antes que los atajos sueltos («a» responde a todos
+	// sola, pero tras la «g» es Archivo). Vale también desde los ajustes.
+	if ir, ok := b.atajoDeIr(r); ok {
+		return ir
+	}
 	// En la página de ajustes no hay lista ni lector: j/k, archivar o destacar
 	// actuarían sobre una conversación que no se ve. Quedan la ayuda y redactar,
 	// como en la web (`enAjustes` en MailApp.tsx).
@@ -88,15 +94,49 @@ func (b *Buzon) Atajo(c fyne.Canvas, r rune) bool {
 	case 'I', 'U', '!', 'z':
 		return b.atajoDeTriaje(r, abierta, hay)
 	case 's', 'e', '#':
-		h := map[rune]func(Conversacion){'s': a.Destacar, 'e': a.Archivar, '#': a.Papelera}[r]
-		if !hay || h == nil {
-			return false
-		}
-		h(abierta)
+		return atajoDelHilo(r, a, abierta, hay)
 	default:
 		return false
 	}
 	return true
+}
+
+// atajoDelHilo son «s» (destacar), «e» (archivar) y «#» (a la papelera) sobre el hilo
+// abierto: sin hilo, o sin la acción en esta vista, no son nada.
+func atajoDelHilo(r rune, a *Acciones, abierta Conversacion, hay bool) bool {
+	h := map[rune]func(Conversacion){'s': a.Destacar, 'e': a.Archivar, '#': a.Papelera}[r]
+	if !hay || h == nil {
+		return false
+	}
+	h(abierta)
+	return true
+}
+
+// RolDeIr es `ROL_DE_IR` de la web: la letra tras «g» y el rol de la carpeta a la que
+// lleva (por rol, no por nombre: «Recibidos» se llama distinto en cada cuenta).
+var RolDeIr = map[rune]string{'i': "inbox", 't': "sent", 'd': "drafts", 'a': "archive"}
+
+// VentanaIr es `VENTANA_IR_MS`: lo que se espera la segunda tecla.
+const VentanaIr = 1500 * time.Millisecond
+
+// atajoDeIr atiende la «g» y la tecla que la sigue. El segundo valor dice si la tecla
+// era de «ir a» (y el primero, si se usó); si no, sigue su camino como atajo suelto.
+func (b *Buzon) atajoDeIr(r rune) (usada, era bool) {
+	ahora := time.Now()
+	pendiente := b.irPendiente
+	b.irPendiente = time.Time{}
+	if rol, ok := RolDeIr[r]; ok && !pendiente.IsZero() && ahora.Sub(pendiente) <= VentanaIr {
+		c, hay := b.carpetaDeRol(rol)
+		if hay {
+			b.ElegirCarpeta(c)
+		}
+		return hay, true
+	}
+	if r == 'g' {
+		b.irPendiente = ahora
+		return true, true
+	}
+	return false, false
 }
 
 // atajoDeSeleccion son «x» (marcar la del cursor), «l» (Etiquetar) y «v» (Mover a…).
@@ -299,10 +339,15 @@ func (b *Buzon) verAtajos() {
 	mayus := func(tecla, clave string) filaAtajo {
 		return filaAtajo{[]string{b.teclaMayus(), tecla}, t.T(clave, nil)}
 	}
+	ir := func(tecla, clave string) filaAtajo {
+		return filaAtajo{[]string{"g", tecla}, t.T(clave, nil)}
+	}
 	grupos := []grupoAtajos{
 		{t.T("shortcuts.group.move", nil), []filaAtajo{
 			fila("j", "shortcuts.next"), fila("k", "shortcuts.prev"),
 			fila("u", "shortcuts.backToList"), fila("/", "shortcuts.search"),
+			ir("i", "shortcuts.goInbox"), ir("t", "shortcuts.goSent"),
+			ir("d", "shortcuts.goDrafts"), ir("a", "shortcuts.goArchive"),
 		}},
 		{t.T("shortcuts.group.write", nil), []filaAtajo{
 			fila("c", "shortcuts.compose"), fila("r", "shortcuts.reply"), fila("a", "shortcuts.replyAll"),

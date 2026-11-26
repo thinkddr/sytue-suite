@@ -364,4 +364,8 @@ export const el: AppCatalog<typeof en> = {
   'moderation.action.unlist': 'Αφαίρεση από τη δημόσια σελίδα',
   'moderation.action.unpublish': 'Αναίρεση δημοσίευσης',
   'moderation.action.block': 'Αποκλεισμός του ατόμου στον οργανισμό',
+  'player.loop': 'Επανάληψη',
+  'watch.chapters': 'Κεφάλαια',
+  'watch.jumpTo': 'Μετάβαση στο {time}',
+  'share.startAt': 'Έναρξη στο {time}',
 };

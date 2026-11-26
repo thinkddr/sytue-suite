@@ -1077,6 +1077,47 @@ func (s *Store) ObtenerPedidoPorID(ctx context.Context, tenant string, siteID, o
 	return o, err
 }
 
+// MarcarPedidoServido pasa un pedido PAGADO a servido (`fulfilled`, con su hora) o,
+// con servido=false, deshace ese paso. Es el «marcar como enviado» que la tienda no
+// tenía: el estado y la columna existían desde la 0004 y nada los escribía, así que
+// un pedido entregado y uno pendiente de preparar se veían iguales en la lista.
+//
+// Solo desde el estado de partida exacto: servir un pedido sin pagar, reembolsado o
+// en disputa no tiene sentido, y deshacer solo vale sobre uno servido. Un reembolso
+// posterior sigue funcionando: su UPDATE no mira el estado del pedido.
+func (s *Store) MarcarPedidoServido(ctx context.Context, tenant string, siteID, orderID uuid.UUID, servido bool) (*domain.Order, error) {
+	var o *domain.Order
+	err := s.enSitio(ctx, tenant, siteID, func(tx pgx.Tx) error {
+		tag, err := tx.Exec(ctx, `
+			UPDATE orders
+			   SET status = CASE WHEN $4 THEN 'fulfilled' ELSE 'paid' END,
+			       fulfilled_at = CASE WHEN $4 THEN now() ELSE NULL END,
+			       updated_at = now()
+			 WHERE id = $1 AND site_id = $2 AND tenant = $3
+			   AND status = CASE WHEN $4 THEN 'paid' ELSE 'fulfilled' END`,
+			orderID, siteID, tenant, servido)
+		if err != nil {
+			return err
+		}
+		if tag.RowsAffected() == 0 {
+			// Distinguir «no existe» de «no está en ese estado»: lo segundo es un 409
+			// que la pantalla explica; lo primero, un 404.
+			var existe bool
+			if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM orders WHERE id = $1 AND site_id = $2 AND tenant = $3)`,
+				orderID, siteID, tenant).Scan(&existe); err != nil {
+				return err
+			}
+			if !existe {
+				return domain.ErrPedidoNoExiste
+			}
+			return domain.ErrEstadoPedido
+		}
+		o, err = s.obtenerPedidoTx(ctx, tx, tenant, orderID)
+		return err
+	})
+	return o, err
+}
+
 // ObtenerPedidoPorNumero recupera un pedido por su número (P-000123).
 func (s *Store) ObtenerPedidoPorNumero(ctx context.Context, tenant string, siteID uuid.UUID, number string) (*domain.Order, error) {
 	var orderID uuid.UUID

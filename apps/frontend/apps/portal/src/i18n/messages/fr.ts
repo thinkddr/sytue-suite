@@ -833,4 +833,17 @@ export const fr: AppCatalog<typeof en> = {
   'search.loadMoreFailed': 'Impossible de charger plus de résultats. Réessayez.',
   'privacy.notice':
     'Nous ne vendons pas vos données et ne les cédons pas à des tiers. Nous ne les utilisons ni pour vous profiler, ni pour la publicité, ni pour entraîner ou améliorer nos services ou ceux d’autrui. Elles sont chiffrées en transit et au repos, et ne quittent notre infrastructure européenne que pour le strict nécessaire de la facturation et dans les intégrations que vous activez, où le tiers vous demandera votre accord sur les données utilisées.',
+  'inbox.markAllOf': 'Marquer celles de {app} comme lues',
+  'inbox.markUnread': 'Marquer comme non lue',
+  'inbox.muteLikeThis': 'Désactiver les notifications de ce type',
+  'inbox.mutedLikeThis':
+    'Vous ne recevrez plus de notifications de ce type. Vous pouvez le changer plus bas, dans « Ce que vous voulez recevoir ».',
+  'inbox.muteFailed': 'Impossible de les désactiver. Réessayez.',
+  'inbox.actionsOf': 'Actions pour « {title} »',
+  'downloads.checksum': 'Vérifier le téléchargement',
+  'downloads.checksumHelp':
+    'Son empreinte SHA-256. Calculez celle du fichier téléchargé et vérifiez qu’elles correspondent.',
+  'downloads.checksumLabel': 'Empreinte SHA-256',
+  'downloads.copyChecksum': 'Copier l’empreinte',
+  'downloads.checksumCopied': 'Empreinte copiée',
 };

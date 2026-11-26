@@ -86,6 +86,9 @@ type fakeStore struct {
 	markErr  error
 	listErr  error
 	markedID uuid.UUID
+	// unmarkedID es el último devuelto a «sin leer»; markAllSource, el origen de «Marcar todas».
+	unmarkedID    uuid.UUID
+	markAllSource string
 	// Preferencias de notificación: las que devuelve al listar y la última guardada.
 	prefs     []domain.NotificationPref
 	prefsErr  error
@@ -101,7 +104,13 @@ func (f *fakeStore) MarkRead(_ context.Context, id uuid.UUID, _ []string) error 
 	return f.markErr
 }
 
-func (f *fakeStore) MarkAllRead(_ context.Context, _ []string) (int64, error) {
+func (f *fakeStore) MarkUnread(_ context.Context, id uuid.UUID, _ []string) error {
+	f.unmarkedID = id
+	return f.markErr
+}
+
+func (f *fakeStore) MarkAllRead(_ context.Context, _ []string, origen string) (int64, error) {
+	f.markAllSource = origen
 	return f.updated, f.markErr
 }
 
@@ -926,5 +935,44 @@ func TestAvisosDeFueraConElNombreDeSuOrganizacion(t *testing.T) {
 	}
 	if len(nombres.pedidos) != 1 || !slices.Equal(nombres.pedidos[0], []string{"otra", "sin-nombre"}) {
 		t.Fatalf("se pregunta solo por las de fuera de sus avisos, una vez cada una: %v", nombres.pedidos)
+	}
+}
+
+// «Marcar como no leído» y «Marcar todas» con filtro de producto: el id malformado es un
+// 400 antes de tocar el store; el origen viaja al store tal cual; y uno que no existe
+// es un 400 y NO «todas», que marcaría como leído lo que no se está viendo.
+func TestMarkUnreadYMarcarTodasDeUnProducto(t *testing.T) {
+	st := &fakeStore{updated: 2}
+	h := newHandlers(nil, nil, st, nil, nil)
+
+	rec := httptest.NewRecorder()
+	r := withURLParam(request(t, "POST", "/api/v1/notifications/xxx/unread", userClaims(), ""), "id", "nope")
+	h.MarkUnread(rec, r)
+	if rec.Code != http.StatusBadRequest || st.unmarkedID != uuid.Nil {
+		t.Fatalf("id inválido: code=%d, store=%v", rec.Code, st.unmarkedID)
+	}
+	id := uuid.New()
+	rec = httptest.NewRecorder()
+	r = withURLParam(request(t, "POST", "/api/v1/notifications/"+id.String()+"/unread", userClaims(), ""), "id", id.String())
+	h.MarkUnread(rec, r)
+	if rec.Code != http.StatusNoContent || st.unmarkedID != id {
+		t.Fatalf("markUnread: code=%d, store=%v", rec.Code, st.unmarkedID)
+	}
+
+	rec = httptest.NewRecorder()
+	h.MarkAllRead(rec, request(t, "POST", "/api/v1/notifications/read_all?source=drive", userClaims(), ""))
+	if rec.Code != http.StatusOK || st.markAllSource != "drive" {
+		t.Fatalf("read_all?source=drive: code=%d, origen=%q", rec.Code, st.markAllSource)
+	}
+	st.markAllSource = "sin tocar"
+	rec = httptest.NewRecorder()
+	h.MarkAllRead(rec, request(t, "POST", "/api/v1/notifications/read_all?source=inventado", userClaims(), ""))
+	if rec.Code != http.StatusBadRequest || st.markAllSource != "sin tocar" {
+		t.Fatalf("origen desconocido: code=%d, origen=%q (no debe llegar al store)", rec.Code, st.markAllSource)
+	}
+	rec = httptest.NewRecorder()
+	h.MarkAllRead(rec, request(t, "POST", "/api/v1/notifications/read_all", userClaims(), ""))
+	if rec.Code != http.StatusOK || st.markAllSource != "" {
+		t.Fatalf("read_all sin origen: code=%d, origen=%q", rec.Code, st.markAllSource)
 	}
 }

@@ -382,10 +382,15 @@ export const pt: Catalog = {
   'import.fromGoogle': 'Trazer do Google',
   'import.fromMicrosoft': 'Trazer do Microsoft 365',
   'import.running': 'A copiar os seus dados… {count} elementos até agora.',
-  'import.done': '{count} elementos trazidos, {skipped} deixados de fora.',
+  'import.done':
+    '{what}: {count} elementos trazidos, {skipped} deixados de fora. Terminou em {date}.',
   'import.someFailed':
     'Não foi possível copiar alguns dos seus dados. A administração da sua organização pode ver porquê.',
   'import.failed': 'Não foi possível iniciar a importação. Tente de novo dentro de momentos.',
+  'import.unavailable':
+    'Neste momento não é possível ler a ligação com {source}: expirou, foi revogada ou nunca foi autorizada. Peça à administração da sua organização que a volte a ligar.',
+  'import.needsAdmin':
+    'A ligação com {source} ainda não consegue copiar os dados de cada pessoa. Peça à administração da sua organização que termine a configuração.',
   'dataflow.label': 'O que acontece aos dados',
   'dataflow.in.title': 'Só entra no Sytue One',
   'dataflow.in.body':

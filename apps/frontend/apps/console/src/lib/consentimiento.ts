@@ -13,6 +13,11 @@
 /** Lo que responde `POST /api/v1/oauth/finish` del servicio de integraciones. */
 export interface DesenlaceConsentimiento {
   instance?: string;
+  /**
+   * Con `error: 'exists'`: la conexión que YA había de esa misma cuenta. La que se estaba
+   * creando se ha descartado, así que es a esta a la que se vuelve.
+   */
+  existing?: string;
   section?: string;
   out?: boolean;
   error?: string;
@@ -25,7 +30,8 @@ const SECCIONES = new Set(['apps', 'migrations']);
 export function destinoTrasConsentimiento(base: string, d: DesenlaceConsentimiento): string {
   const seccion = d.section !== undefined && SECCIONES.has(d.section) ? d.section : 'apps';
   const q = new URLSearchParams();
-  if (d.instance) q.set('instance', d.instance);
+  const instancia = d.error === 'exists' && d.existing ? d.existing : d.instance;
+  if (instancia) q.set('instance', instancia);
   if (d.error) {
     q.set('oauth_error', d.error);
   } else {

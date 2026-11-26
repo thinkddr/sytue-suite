@@ -24,6 +24,33 @@ export function atajoConMayus(t: T, tecla: string, mac: boolean = esMac()): stri
   return mac ? `⇧${tecla}` : `${teclaMayus(t, mac)}+${tecla}`;
 }
 
+/**
+ * «Ir a» de Gmail: «g» y, en menos de un segundo y medio, la letra de la carpeta. La
+ * carpeta es por ROL, no por nombre: «Recibidos» se llama distinto en cada idioma y
+ * en cada cuenta importada. Fyne usa la misma tabla (`atajos.go`, `rolDeIr`).
+ */
+export const ROL_DE_IR: Readonly<Record<string, 'inbox' | 'sent' | 'drafts' | 'archive'>> = {
+  i: 'inbox',
+  t: 'sent',
+  d: 'drafts',
+  a: 'archive',
+};
+/** Lo que se espera a la segunda tecla tras «g». */
+export const VENTANA_IR_MS = 1500;
+
+/**
+ * La carpeta a la que lleva una tecla tras «g», o null si no es una de «ir a» o si la
+ * «g» ya caducó (`pendiente` es cuándo se pulsó; 0, ninguna).
+ */
+export function destinoDeIr(
+  tecla: string,
+  pendiente: number,
+  ahora: number,
+): 'inbox' | 'sent' | 'drafts' | 'archive' | null {
+  if (!pendiente || ahora - pendiente > VENTANA_IR_MS) return null;
+  return ROL_DE_IR[tecla] ?? null;
+}
+
 export function gruposDeAtajos(t: T): GrupoDeAtajos[] {
   const mayus = teclaMayus(t);
   return [
@@ -34,6 +61,10 @@ export function gruposDeAtajos(t: T): GrupoDeAtajos[] {
         { teclas: ['k'], descripcion: t('shortcuts.prev') },
         { teclas: ['u'], descripcion: t('shortcuts.backToList') },
         { teclas: ['/'], descripcion: t('shortcuts.search') },
+        { teclas: ['g', 'i'], descripcion: t('shortcuts.goInbox') },
+        { teclas: ['g', 't'], descripcion: t('shortcuts.goSent') },
+        { teclas: ['g', 'd'], descripcion: t('shortcuts.goDrafts') },
+        { teclas: ['g', 'a'], descripcion: t('shortcuts.goArchive') },
       ],
     },
     {

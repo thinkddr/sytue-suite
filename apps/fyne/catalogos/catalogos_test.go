@@ -274,6 +274,15 @@ var literalesQueNoSonClaves = map[string]bool{
 	"crm.lead":        true,
 	// El tipo de aviso que Rooms le manda al Hub por un directo (`rooms/avisosdirectos.go`).
 	"rooms.message": true,
+	// Los tipos de aviso que el Hub no deja callar (`hub.TiposCriticos`, copia de
+	// `tiposCriticos` de services/hub): se comparan con el `type` de cada aviso.
+	"pages.order.oversold":       true,
+	"pages.payment.duplicated":   true,
+	"pages.erp.failed":           true,
+	"pages.store.busy":           true,
+	"pages.withdrawal.requested": true,
+	"rooms.report":               true,
+	"cast.report":                true,
 	// El tipo del aviso del Hub que desbloquea en vivo la franja de solo lectura
 	// (`peticion.Opciones.Concedido`): se compara con el `type` que llega, no se
 	// traduce. Su título sale de `notifications.kind.<tipo>` del catálogo común.
@@ -297,6 +306,9 @@ var literalesQueNoSonClaves = map[string]bool{
 	// El tamaño de las notas del moderador de Diapos (`diapos/moderador.go`), con la
 	// clave del `localStorage` de la web.
 	"sytue.slides.notesSize": true,
+	// Los segundos del avance automático de Diapos en este dispositivo
+	// (`diapos/herramientas.go`, `ClaveAvance`): se guarda, no se traduce.
+	"diapos.avance": true,
 	// El orden de «Álbumes» en Photos (`apps/photos/orden_albumes.go`), con la clave
 	// del `localStorage` de la web.
 	"sytue.photos.ordenAlbumes": true,
@@ -304,6 +316,9 @@ var literalesQueNoSonClaves = map[string]bool{
 	// del `localStorage` de la web (`lib/orden.ts`).
 	"sytue.drive.orden": true,
 	"sytue.drive.vista": true,
+	// El orden de la libreta de Contacts (`contactos/orden.go`), «ordenar por
+	// apellido», como el `localStorage` de la web (`client/orden.ts`).
+	"sytue.contacts.orden": true,
 	// Tipos de aviso del Hub (`sesion/actualizar.go`, `ui/barraavisos.go`): se mandan o
 	// se comparan con el `type`; el título sale de `notifications.kind.<tipo>`.
 	"one.update.available":  true,
@@ -332,11 +347,14 @@ var literalesQueNoSonClaves = map[string]bool{
 	"vault.closed":           true,
 	"vault.changed":          true,
 	"vault.copy":             true,
-	"auth.changed":           true,
-	"auth.login":             true,
-	"offline.paused":         true,
-	"offline.store":          true,
-	"matrix.recovery":        true,
+	// La clave de firma que no es la activa en Sytue ID, sin más detalle (con él,
+	// `vault.unavailable.<check>` se compone y no es un literal).
+	"vault.unavailable.signing": true,
+	"auth.changed":              true,
+	"auth.login":                true,
+	"offline.paused":            true,
+	"offline.store":             true,
+	"matrix.recovery":           true,
 }
 
 // clavesDelArbol recorre `apps/fyne` y devuelve cada literal con forma de clave con el

@@ -47,13 +47,13 @@ func (s *Servicio) Formularios(ctx context.Context, tenant string, siteID uuid.U
 	for id, n := range enVivo {
 		f := domain.FormInbox{FormID: id, Name: n.Name, Live: true, Fields: n.Fields}
 		if r, ok := resumen[id]; ok {
-			f.Notify, f.Total = correos(r.Notify), r.Total
+			f.Notify, f.Total, f.Unread = correos(r.Notify), r.Total, r.SinLeer
 		}
 		out = append(out, f)
 	}
 	for id, r := range resumen {
 		if _, ok := enVivo[id]; !ok && r.Total > 0 {
-			out = append(out, domain.FormInbox{FormID: id, Notify: correos(r.Notify), Total: r.Total})
+			out = append(out, domain.FormInbox{FormID: id, Notify: correos(r.Notify), Total: r.Total, Unread: r.SinLeer})
 		}
 	}
 	sort.Slice(out, func(i, j int) bool {
@@ -123,4 +123,33 @@ func EtiquetaCampo(c ir.CampoFormulario, idioma string) string {
 		return t
 	}
 	return c.ID
+}
+
+// MaxMarcarDeUnaVez acota los ids de un «marcar como leídas»: la bandeja enseña como
+// mucho MaxEnviosBandeja, y eso es lo más que tiene sentido marcar a mano de una vez.
+const MaxMarcarDeUnaVez = MaxEnviosBandeja
+
+// MarcarEnviosLeidos marca como leídas (o sin leer) las respuestas dadas; sin ids y con
+// `leidas`, todas las que quedaban sin leer. Devuelve cuántas cambiaron.
+func (s *Servicio) MarcarEnviosLeidos(ctx context.Context, tenant string, siteID uuid.UUID, formID string, ids []uuid.UUID, leidas bool) (int64, error) {
+	if !reFormID.MatchString(formID) {
+		return 0, domain.ErrFormularioNoExiste
+	}
+	// Sin ids es «todas»: tiene sentido para marcarlas leídas, no para devolverlas a
+	// sin leer de golpe (que es deshacer el trabajo de alguien sin querer).
+	if len(ids) == 0 && !leidas {
+		return 0, domain.ErrEntradaInvalida
+	}
+	if len(ids) > MaxMarcarDeUnaVez {
+		return 0, domain.ErrEntradaInvalida
+	}
+	return s.store.MarcarEnviosLeidos(ctx, tenant, siteID, formID, ids, leidas)
+}
+
+// BorrarEnvio borra una respuesta (derecho de supresión de quien la escribió).
+func (s *Servicio) BorrarEnvio(ctx context.Context, tenant string, siteID uuid.UUID, formID string, id uuid.UUID) error {
+	if !reFormID.MatchString(formID) {
+		return domain.ErrFormularioNoExiste
+	}
+	return s.store.BorrarEnvio(ctx, tenant, siteID, formID, id)
 }

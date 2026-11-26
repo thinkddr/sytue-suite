@@ -275,11 +275,28 @@ type Presentacion struct {
 	r           *presentacionRenderer
 	// efectos son las animaciones de las cajas del paso revelado.
 	efectos []*fyne.Animation
+
+	// Laser es el puntero láser (L): un punto rojo que sigue al ratón, sin el cursor.
+	// laserEn es dónde está; nil hasta que se mueve o cuando sale.
+	Laser   bool
+	laserEn *fyne.Position
+	// rueda es lo girado desde el último paso, y ultimaRueda cuándo se pasó.
+	rueda       float32
+	ultimaRueda time.Time
+	// Avance son los segundos del avance automático en bucle (0, a mano). Programar es
+	// el reloj con el que se cuentan (nil: uno de verdad; las pruebas ponen el suyo) y
+	// parar detiene el que va contando.
+	Avance    int
+	Programar func(d time.Duration, f func()) (parar func())
+	parar     func()
 }
 
 var (
-	_ fyne.Widget   = (*Presentacion)(nil)
-	_ fyne.Tappable = (*Presentacion)(nil)
+	_ fyne.Widget        = (*Presentacion)(nil)
+	_ fyne.Tappable      = (*Presentacion)(nil)
+	_ fyne.Scrollable    = (*Presentacion)(nil)
+	_ desktop.Hoverable  = (*Presentacion)(nil)
+	_ desktop.Cursorable = (*Presentacion)(nil)
 )
 
 // NuevaPresentacion monta el visor desde la diapositiva `desde`.
@@ -332,6 +349,7 @@ func (p *Presentacion) Ir(diapo, paso int) {
 	if p.AlMover != nil {
 		p.AlMover()
 	}
+	p.ArmarAvance() // el avance automático vuelve a contar desde cero
 }
 
 // transicionar arranca la transición de la diapositiva a la que se llega con `dir` (1
@@ -626,6 +644,8 @@ func (p *Presentacion) Runa(r rune) {
 		p.apagar(Blanca)
 	case '?', 'h', 'H':
 		p.verAyuda()
+	case 'l', 'L':
+		p.alternarLaser()
 	}
 }
 
@@ -700,6 +720,7 @@ func GruposDeTeclasPresentando(t func(string, i18nVars) string) []ui.GrupoDeAtaj
 			{Teclas: []string{"W", ","}, Descripcion: k("slides.present.help.white")},
 			{Teclas: []string{"N"}, Descripcion: k("slides.present.help.notes")},
 			{Teclas: []string{"P"}, Descripcion: k("slides.present.help.presenter")},
+			{Teclas: []string{"L"}, Descripcion: k("slides.present.help.laser")},
 			{Teclas: []string{"?", "H"}, Descripcion: k("slides.present.help.keys")},
 			{Teclas: []string{k("slides.present.key.esc")}, Descripcion: k("slides.present.exit")},
 		}},
@@ -707,6 +728,10 @@ func GruposDeTeclasPresentando(t func(string, i18nVars) string) []ui.GrupoDeAtaj
 }
 
 func (p *Presentacion) salir() {
+	if p.parar != nil {
+		p.parar()
+		p.parar = nil
+	}
 	if p.AlSalir != nil {
 		p.AlSalir()
 	}
@@ -769,6 +794,8 @@ func (p *Presentacion) CreateRenderer() fyne.WidgetRenderer {
 		notasDe:    -1,
 		pista:      ui.Texto("", tema.TextoXS, ui.Normal, color.NRGBA{R: 255, G: 255, B: 255, A: 115}),
 		apagon:     canvas.NewRectangle(color.Black),
+		laser:      canvas.NewCircle(rojoLaser),
+		halo:       canvas.NewCircle(haloLaser),
 	}
 	p.mandos = []*botonVisor{
 		nuevoBotonVisor(p, iconos.EdComentario, p.t("slides.notes", nil), p.alternarNotas),
@@ -797,6 +824,8 @@ type presentacionRenderer struct {
 	// apagon es la pantalla negra o blanca: encima de todo, mandos y notas incluidos,
 	// que lo que se quiere es que no se vea nada.
 	apagon *canvas.Rectangle
+	// laser y halo son el punto del puntero láser y su resplandor.
+	laser, halo *canvas.Circle
 }
 
 func (r *presentacionRenderer) MinSize() fyne.Size { return fyne.NewSize(1, 1) }
@@ -814,6 +843,9 @@ func (r *presentacionRenderer) Objects() []fyne.CanvasObject {
 	objs = append(objs, r.pista)
 	for _, b := range r.botones() {
 		objs = append(objs, b)
+	}
+	if r.p.Laser && r.p.laserEn != nil && r.p.Pantalla == Encendida {
+		objs = append(objs, r.halo, r.laser)
 	}
 	if r.p.Pantalla != Encendida {
 		objs = append(objs, r.apagon)
@@ -903,6 +935,12 @@ func (r *presentacionRenderer) colocarNotas(t fyne.Size) {
 
 func (r *presentacionRenderer) Refresh() {
 	p := r.p
+	if p.laserEn != nil {
+		r.laser.Move(p.laserEn.SubtractXY(ladoLaser/2, ladoLaser/2))
+		r.laser.Resize(fyne.NewSquareSize(ladoLaser))
+		r.halo.Move(p.laserEn.SubtractXY(ladoHalo/2, ladoHalo/2))
+		r.halo.Resize(fyne.NewSquareSize(ladoHalo))
+	}
 	p.lienzo.Indice, p.lienzo.Paso = p.Diapo, p.Paso
 	p.lienzo.Refresh()
 
@@ -1166,6 +1204,7 @@ func Presentar(m *Modelo, desde int, moderador bool, idioma i18n.Locale,
 	w.SetPadded(false)
 	p := NuevaPresentacion(m, desde, rotulo)
 	p.Almacen = almacen
+	p.Avance = LeerAvance(almacen)
 	p.AlSalir = func() { w.Close() }
 	p.AbrirMedio = AbrirMedioDelSistema
 	teclado(w, p)
@@ -1185,6 +1224,7 @@ func Presentar(m *Modelo, desde int, moderador bool, idioma i18n.Locale,
 	if moderador {
 		p.alternarModerador()
 	}
+	p.ArmarAvance()
 	return p
 }
 

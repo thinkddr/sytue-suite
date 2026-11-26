@@ -9,7 +9,6 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 
-	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
@@ -89,9 +88,10 @@ func NuevaPantalla(t *i18n.Translator, l i18n.Locale) *Pantalla {
 		p.Movil.CajonAbierto = abierto
 		p.Movil.Refresh()
 	}
-	// «Redactar al alcance del pulgar: en móvil el menú lateral es un cajón cerrado»
-	// (`MobileFab` en MailApp.tsx).
-	fab := ui.NuevoBotonFlotante(t.T("nav.compose", nil), iconos.Mas, func() {
+	// «Redactar» es el «+» flotante, abajo a la derecha y en todos los anchos
+	// (`BotonFlotante` en MailApp.tsx): al alcance del pulgar en el teléfono, donde el menú
+	// lateral es un cajón cerrado, y el mismo sitio en escritorio.
+	fab := ui.NuevoBotonFlotante(t.T("nav.compose", nil), func() {
 		if p.Menu.AlRedactar != nil {
 			p.Menu.AlRedactar()
 		}

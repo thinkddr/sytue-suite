@@ -178,7 +178,9 @@ func (p *Pantalla) vistaHoraria() fyne.CanvasObject {
 	if ui.EsTactil() {
 		canalon = 0
 	}
-	desplazar, conScroll := desplazable(container.New(ui.Margen{Der: canalon}, cuerpo))
+	// Con el hueco del «+» flotante al final: las últimas horas se bajan por encima de él
+	// (`sytue-reserva-flotante` en TimeGrid.tsx).
+	desplazar, conScroll := desplazable(ui.ConReservaFlotante(container.New(ui.Margen{Der: canalon}, cuerpo)))
 	// Al abrir, encuadra la jornada: con hoy a la vista, la hora actual; si no, las
 	// 08:00, una hora por encima. Solo al MONTAR la vista: navegar de semana conserva
 	// el desplazamiento, que por eso vive en la pantalla y no aquí.

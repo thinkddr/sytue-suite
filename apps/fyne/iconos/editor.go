@@ -189,6 +189,8 @@ const (
 	EdTeclado            // keyboard
 	EdAnchoCol           // colWidth
 	EdAltoFila           // rowHeight
+	EdLetraMayor         // fontGrow
+	EdLetraMenor         // fontShrink
 	// numEd va SIEMPRE el último y no es un icono: es cuántos hay.
 	numEd
 )
@@ -201,6 +203,8 @@ var catalogoEd = [...]entrada{
 	EdRellenar:        {"formFill", "M5 4.5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-13a1 1 0 0 1 1-1Z M7.5 9h9 M7.5 12.5h4.5 M7.5 16h3 M13 15.5l1.5 1.5 3-3.5"},
 	EdBrocha:          {"formatPainter", "M5.5 4h11a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Z M17.5 6.5H20v5h-8v3.5 M11 15h2v5h-2Z"},
 	EdMayusculas:      {"changeCase", "M3.5 18 8 6l4.5 12 M5 14h6 M20 15.5a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0Z M20 13v5"},
+	EdLetraMayor:      {"fontGrow", "M3.5 18 8 6l4.5 12 M5 14h6 M15.5 11.5l3-3.5 3 3.5"},
+	EdLetraMenor:      {"fontShrink", "M3.5 18 8 6l4.5 12 M5 14h6 M15.5 8l3 3.5 3-3.5"},
 	EdLapiz:           {"pencil", "M4.5 19.5 4 20l.5-4L15 5.5a1.8 1.8 0 0 1 2.6 0l.9.9a1.8 1.8 0 0 1 0 2.6L8 19.5Z M13.5 7l3.5 3.5"},
 	EdNombreDefinido:  {"definedName", "M3.5 12 8.5 6.5h12v11h-12Z M7.5 12h.01 M11.5 12h5.5"},
 	EdOpenInApp:       {"openInApp", "M4 4.5h16a1 1 0 0 1 1 1V15a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5.5a1 1 0 0 1 1-1Z M9 20h6 M12 16v4"},

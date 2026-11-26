@@ -758,4 +758,17 @@ export const is: AppCatalog<typeof en> = {
   'search.loadMoreFailed': 'Ekki tókst að hlaða inn fleiri niðurstöðum. Reyndu aftur.',
   'privacy.notice':
     'Við seljum ekki gögnin þín og látum þau ekki þriðju aðilum í té. Við notum þau hvorki til að búa til snið um þig, til auglýsinga né til að þjálfa eða bæta þjónustu okkar eða annarra. Þau eru dulkóðuð í flutningi og í geymslu og fara aðeins út fyrir evrópsku innviðina okkar að því marki sem nauðsynlegt er til að rukka þig og í þeim samþættingum sem þú kveikir á, þar sem þriðji aðilinn biður þig um samþykki fyrir þeim gögnum sem hann notar.',
+  'inbox.markAllOf': 'Merkja {app} sem lesið',
+  'inbox.markUnread': 'Merkja sem ólesið',
+  'inbox.muteLikeThis': 'Þagga tilkynningar eins og þessa',
+  'inbox.mutedLikeThis':
+    'Þú færð ekki lengur tilkynningar eins og þessa. Þú getur breytt því hér fyrir neðan, í „Hvað viltu fá“.',
+  'inbox.muteFailed': 'Ekki tókst að þagga. Reyndu aftur.',
+  'inbox.actionsOf': 'Aðgerðir fyrir „{title}“',
+  'downloads.checksum': 'Staðfesta niðurhalið',
+  'downloads.checksumHelp':
+    'SHA-256 fingrafar þess. Reiknaðu fingrafar skrárinnar sem þú sóttir og athugaðu hvort þau passi.',
+  'downloads.checksumLabel': 'SHA-256 fingrafar',
+  'downloads.copyChecksum': 'Afrita fingrafar',
+  'downloads.checksumCopied': 'Fingrafar afritað',
 };

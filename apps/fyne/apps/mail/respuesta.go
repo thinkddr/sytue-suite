@@ -158,9 +158,36 @@ func TituloRedactor(t *i18n.Translator, asunto string, borrador bool) string {
 	return t.T("compose.newTitle", nil)
 }
 
-// patronAdjunto es el de `client/adjuntos.ts`: «te adjunto», «attached», «pièce
-// jointe», «Anhang»… en los idiomas que la web vigila.
-var patronAdjunto = regexp.MustCompile(`(?i)\b(adjunt[oa]s?|adjuntad[oa]s?|attach(?:ed|ment|ments|ing)?|pi[eè]ces? jointes?|ci-joint[es]?|anh[aä]ng(?:e|end)?|angeh[aä]ngt|beigef[uü]gt|anbei|allegat[oaie]|allego)\b`)
+// RaicesAdjunto son las de `client/adjuntos.vectores.json` de la web, en su orden:
+// «te adjunto», «attached», «pièce jointe», «Anhang», «załącznik», «bilaga»… en los
+// 26 idiomas. `TestLasRaicesDelAdjuntoSonLasDeLaWeb` las compara con las de allí.
+var RaicesAdjunto = []string{
+	`adjunt\p{L}*`, `attach\p{L}*`, `pi[eè]ces?\s+jointes?`, `ci-joint\p{L}*`,
+	`anh[aä]ng\p{L}*`, `angeh[aä]ngt\p{L}*`, `beigef[uü]gt\p{L}*`, `anbei`,
+	`allegat\p{L}*`, `allego`, `anex\p{L}*`,
+	`bijlage\p{L}*`, `bijgevoegd\p{L}*`, `bijgaand\p{L}*`,
+	`załącz\p{L}*`,
+	`přílo[hz]\p{L}*`, `přilož\p{L}*`, `přikládám`,
+	`prílo[hž]\p{L}*`, `prilož\p{L}*`, `prikladám`,
+	`priponk\p{L}*`, `prilog\p{L}*`, `prilagam`, `privit\p{L}*`,
+	`mellékel\p{L}*`, `melléklet\p{L}*`, `csatol\p{L}*`,
+	`ata[șş]a\p{L}*`,
+	`прикач\p{L}*`, `в\s+приложение`,
+	`συνημμέν\p{L}*`, `επισυν\p{L}*`,
+	`pried[aeuoą]\p{L}*`, `prided\p{L}*`, `priseg\p{L}*`,
+	`pielikum\p{L}*`,
+	`manus(?:e|ena|es|t)?`,
+	`liite\p{L}*`, `liittee\p{L}*`, `liitän`,
+	`bilag\p{L}*`, `bifoga\p{L}*`, `vedh[æa]ft\p{L}*`, `vedlegg\p{L}*`, `vedlagt\p{L}*`,
+	`viðhen\p{L}*`, `meðfylgjandi`,
+	`(?:gc|ch?)eangal\p{L}*`,
+	`mehmuż\p{L}*`, `anness\p{L}*`,
+}
+
+// patronAdjunto es el de `client/adjuntos.ts`. El borde de palabra no es `\b`, que en
+// RE2 solo entiende ASCII («συνημμένο» no lo tendría): antes y después, cualquier cosa
+// que no sea una letra ni un dígito de ningún alfabeto, o el principio o el final.
+var patronAdjunto = regexp.MustCompile(`(?i)(?:^|[^\p{L}\p{N}])(?:` + strings.Join(RaicesAdjunto, "|") + `)(?:$|[^\p{L}\p{N}])`)
 
 // MencionaAdjunto es `mencionaAdjunto(sinCitas(…))`: el texto dice que lleva algo
 // adjunto. Las líneas citadas («> …») no cuentan: el «te adjunto» de quien escribió

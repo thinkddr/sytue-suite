@@ -27,6 +27,7 @@ const (
 	atajoNinguno accionAtajo = iota
 	// La galería (la línea de tiempo y Favoritas).
 	atajoSubir
+	atajoBuscar
 	atajoSalirDeSeleccion
 	// El visor.
 	atajoAnterior
@@ -36,6 +37,8 @@ const (
 	atajoPase
 	atajoFicha
 	atajoTamanyoReal
+	atajoFavorita
+	atajoEditar
 	atajoPapelera
 	atajoCerrar
 	// Las dos.
@@ -57,6 +60,8 @@ var (
 	atajosGaleria = []filaAtajo{
 		// El atajo que pulsa el menú de la app de escritorio.
 		{[]string{"u"}, atajoSubir, "gallery.add"},
+		// «/» al buscador, como en la web (lib/atajos.ts).
+		{[]string{"/"}, atajoBuscar, "gallery.search"},
 		{[]string{string(fyne.KeyEscape)}, atajoSalirDeSeleccion, "gallery.cancelSelection"},
 		{[]string{"?"}, atajoAyuda, "shortcuts.help"},
 	}
@@ -69,6 +74,9 @@ var (
 		{[]string{" "}, atajoPase, "shortcuts.slideshow"},
 		{[]string{"i"}, atajoFicha, "shortcuts.info"},
 		{[]string{"z"}, atajoTamanyoReal, "shortcuts.zoom"},
+		// El corazón y el editor, sin buscar su botón (lib/atajos.ts).
+		{[]string{"f"}, atajoFavorita, "shortcuts.favorite"},
+		{[]string{"e"}, atajoEditar, "viewer.edit"},
 		{[]string{string(fyne.KeyDelete), string(fyne.KeyBackspace)}, atajoPapelera, "viewer.delete"},
 		{[]string{string(fyne.KeyEscape)}, atajoCerrar, "viewer.close"},
 		{[]string{"?"}, atajoAyuda, "shortcuts.help"},
@@ -137,7 +145,10 @@ func grupoAtajos(v Vista, titulo string, filas []filaAtajo) ui.GrupoDeAtajos {
 func gruposDeAtajos(v Vista, enVisor, saltos, papelera bool) []ui.GrupoDeAtajos {
 	visor := make([]filaAtajo, 0, len(atajosVisor))
 	for _, f := range atajosVisor {
-		if (!saltos && (f.accion == atajoPrimera || f.accion == atajoUltima)) || (!papelera && f.accion == atajoPapelera) {
+		// La F va con la papelera: las dos piden una foto del servicio (una cifrada no
+		// tiene corazón ni se tira desde aquí), como `favorita` en la web.
+		if (!saltos && (f.accion == atajoPrimera || f.accion == atajoUltima)) ||
+			(!papelera && (f.accion == atajoPapelera || f.accion == atajoFavorita)) {
 			continue
 		}
 		visor = append(visor, f)

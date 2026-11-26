@@ -377,4 +377,37 @@ export const nucleo = {
 
   'forms.empty': 'Ingen svar endnu',
   'forms.empty_help': 'Når nogen indsender en formular på dit websted, ser du det her.',
+  'sites.search': 'Søg websteder',
+  'sites.search_empty': 'Intet websted matcher »{q}«.',
+  'sites.sort_label': 'Sortér websteder',
+  'sites.sort_recent': 'Senest redigeret',
+  'sites.sort_name': 'Navn (A–Å)',
+  'sites.view_live': 'Se websted',
+  'sites.view_live_aria': 'Se {nombre} som udgivet (åbner i en ny fane)',
+  'seo.title': 'Det, søgemaskinerne vil se',
+  'seo.intro':
+    'En gennemgang af kladden: titler, beskrivelser og billeder, som søgemaskiner og skærmlæsere er afhængige af. Det er advarsler; de forhindrer ikke udgivelse.',
+  'seo.open_editor': 'Åbn editoren',
+  'seo.recheck': 'Tjek igen',
+  'seo.error': 'Gennemgangen kunne ikke indlæses. Prøv igen.',
+  'seo.all_good':
+    'Alt i orden: hver side har titel og beskrivelse, og billederne har alternativ tekst.',
+  'seo.summary': 'Advarsler: {count}',
+  'seo.badge_warning': 'Forbedr',
+  'seo.badge_info': 'Bemærk',
+  'seo.on_page': 'Side: {page}',
+  'seo.title_missing': 'Siden har ingen titel: søgemaskinen finder selv på en.',
+  'seo.title_long':
+    'Titlen har {count} tegn; der er plads til omkring 60, før søgemaskinen afkorter den.',
+  'seo.title_duplicate':
+    'En anden side har samme titel: de vil konkurrere med hinanden i resultaterne.',
+  'seo.description_missing':
+    'Siden har ingen beskrivelse: søgemaskinen viser et tilfældigt tekststykke.',
+  'seo.description_long': 'Beskrivelsen har {count} tegn; omkring 160 vises.',
+  'seo.image_alt_missing':
+    'Billeder uden alternativ tekst: {count}. Skærmlæsere og søgemaskiner kan ikke se, hvad de viser; markér dem som dekorative, hvis de ikke viser noget.',
+  'seo.page_noindex': 'Denne side er skjult for søgemaskiner (noindex).',
+  'seo.site_noindex': 'Hele webstedet er skjult for søgemaskiner (noindex).',
+  'seo.share_image_missing':
+    'Webstedet har intet delingsbillede: links i beskeder og sociale netværk vises uden billede.',
 };

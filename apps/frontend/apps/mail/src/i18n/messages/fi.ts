@@ -970,4 +970,14 @@ export const fi: AppCatalog<typeof en> = {
     'Aiempi postijärjestelmä ei ole enää käytettävissä. Ennen kuin siirrät postisi holviin, et saa uutta postia: sillä välin sinulle lähetetty posti odottaa lähettäjän palvelimella, joka yrittää uudelleen muutaman päivän ajan. Jos siirrät ajoissa, posti tulee perille sen jälkeen; muuten lähettäjä saa ilmoituksen, ettei sitä voitu toimittaa. Aiemmalla järjestelmällä jo salattua, kuten jo saamaasi postia, ei voi lukea: sitä ei poisteta, mutta kukaan ei voi avata sitä. Siirron jälkeen posti alkaa taas tulla ja avautuu Sytue ID -kirjautumisellasi kuten muutkin sovellukset.',
   'privateMail.vaultMoveCheckFailed':
     'Postisi tilaa ei voitu tarkistaa. Yritä hetken kuluttua uudelleen.',
+  'shortcuts.goInbox': 'Siirry Saapuneisiin',
+  'shortcuts.goSent': 'Siirry Lähetettyihin',
+  'shortcuts.goDrafts': 'Siirry Luonnoksiin',
+  'shortcuts.goArchive': 'Siirry Arkistoon',
+  'compose.sendAndArchive': 'Lähetä ja arkistoi',
+  'reader.copyAddress': 'Kopioi osoite',
+  'reader.addressCopied': 'Osoite kopioitu',
+  'reader.copyAddressFailed': 'Osoitetta ei voitu kopioida',
+  'reader.viewPlain': 'Näytä pelkkänä tekstinä',
+  'reader.viewFormatted': 'Näytä muotoiltuna',
 };

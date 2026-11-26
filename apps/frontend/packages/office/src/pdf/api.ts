@@ -784,7 +784,17 @@ export function tramosDelIndice(
  * se ordenan por posición, que es como se leería en papel.
  */
 export function textoParaLeer(frags: Fragmento[]): string {
-  if (frags.length === 0) return '';
+  return lineasDeTexto(frags).join('. ');
+}
+
+/**
+ * Las líneas de una página, en el orden en que se leen en papel: los fragmentos se
+ * agrupan por altura y se ordenan por posición (ver `textoParaLeer`, que las une con una
+ * pausa para la voz). Es también lo que escriben «Descargar el texto» y «Copiar el texto
+ * de la página», una por renglón. Go: `LineasDeTexto` (apps/fyne/apps/certipdf/api.go).
+ */
+export function lineasDeTexto(frags: Fragmento[]): string[] {
+  if (frags.length === 0) return [];
   // Dos fragmentos son de la misma línea si sus bases caen dentro de media
   // altura de letra. Con un umbral fijo, un pie de página de 6 pt y un título de
   // 30 pt no pueden compartir criterio.
@@ -809,8 +819,52 @@ export function textoParaLeer(frags: Fragmento[]): string {
         // palabra inventada.
         .join(' '),
     )
-    .filter((l) => l !== '')
-    .join('. ');
+    .filter((l) => l !== '');
+}
+
+/**
+ * «Descargar el texto»: el de todas las páginas, una línea por renglón y una línea en
+ * blanco entre página y página; las que no tienen capa de texto quedan vacías, para que
+ * la página siga siendo la misma. Un salto al final.
+ */
+export function textoDelPdf(paginas: readonly (Fragmento[] | null)[]): string {
+  if (paginas.length === 0) return '';
+  return `${paginas.map((f) => lineasDeTexto(f ?? []).join('\n')).join('\n\n')}\n`;
+}
+
+/** Los rótulos que pide el resumen de comentarios, ya traducidos. */
+export interface RotulosResumen {
+  pagina: (n: number) => string;
+  tipo: (tipo: string) => string;
+  anonimo: string;
+}
+
+/**
+ * «Resumen de comentarios» de Acrobat: por página, cada anotación con texto, su tipo y
+ * su autor, y debajo sus respuestas sangradas. Lo que se ve en el panel, para mandarlo
+ * por correo o archivarlo sin el PDF. Vacío si no hay ninguno con texto.
+ */
+export function resumenDeComentarios(
+  anotaciones: readonly AnotacionLeida[],
+  r: RotulosResumen,
+): string {
+  const linea = (a: AnotacionLeida) =>
+    `${r.tipo(a.tipo)} · ${a.autor?.trim() || r.anonimo}: ${(a.texto ?? '').trim().replace(/\s*\n\s*/g, ' ')}`;
+  const conTexto = (a: AnotacionLeida) => (a.texto ?? '').trim() !== '';
+  const porPagina = new Map<number, string[]>();
+  anotaciones.forEach((a, i) => {
+    if (a.respuesta_a !== undefined || !conTexto(a)) return;
+    const lineas = porPagina.get(a.pagina) ?? [];
+    lineas.push(linea(a));
+    anotaciones.forEach((b) => {
+      if (b.respuesta_a === i && conTexto(b)) lineas.push(`  ↳ ${linea(b)}`);
+    });
+    porPagina.set(a.pagina, lineas);
+  });
+  const bloques = [...porPagina.keys()]
+    .sort((a, b) => a - b)
+    .map((p) => [r.pagina(p + 1), ...porPagina.get(p)!].join('\n'));
+  return bloques.length === 0 ? '' : `${bloques.join('\n\n')}\n`;
 }
 
 /**

@@ -793,4 +793,17 @@ export const lt: AppCatalog<typeof en> = {
   'search.loadMoreFailed': 'Nepavyko įkelti daugiau rezultatų. Bandykite dar kartą.',
   'privacy.notice':
     'Jūsų duomenų neparduodame ir neperduodame tretiesiems asmenims. Nenaudojame jų profiliavimui, reklamai, taip pat mūsų ar kieno nors kito paslaugoms mokyti ar tobulinti. Jie šifruojami perduodant ir saugant, o mūsų Europos infrastruktūrą palieka tik tiek, kiek būtina sąskaitoms išrašyti, ir jūsų įjungtose integracijose, kuriose trečioji šalis paprašys jūsų sutikimo dėl naudojamų duomenų.',
+  'inbox.markAllOf': 'Pažymėti {app} kaip perskaitytus',
+  'inbox.markUnread': 'Pažymėti kaip neperskaitytą',
+  'inbox.muteLikeThis': 'Nutildyti tokius pranešimus',
+  'inbox.mutedLikeThis':
+    'Tokių pranešimų nebegausite. Tai galite pakeisti žemiau, skiltyje „Ką norite gauti“.',
+  'inbox.muteFailed': 'Nepavyko nutildyti. Bandykite dar kartą.',
+  'inbox.actionsOf': 'Veiksmai: „{title}“',
+  'downloads.checksum': 'Patikrinti atsisiuntimą',
+  'downloads.checksumHelp':
+    'Jo SHA-256 piršto atspaudas. Apskaičiuokite atsisiųsto failo atspaudą ir patikrinkite, ar jie sutampa.',
+  'downloads.checksumLabel': 'SHA-256 piršto atspaudas',
+  'downloads.copyChecksum': 'Kopijuoti atspaudą',
+  'downloads.checksumCopied': 'Atspaudas nukopijuotas',
 };

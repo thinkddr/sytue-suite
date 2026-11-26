@@ -1152,4 +1152,11 @@ export const ga: AppCatalog<typeof en> = {
   'nativeResource.description':
     'Ceangail an aip seo le do chuntas in {tenant}. Fanfaidh do cheadanna rochtana reatha i bhfeidhm.',
   'nativeResource.approve': 'Ceangail',
+  'channel.markRead': 'Marcáil mar léite',
+  'channel.copyLink': 'Cóipeáil an nasc',
+  'channel.linkCopied': 'Nasc cóipeáilte',
+  'channel.download': 'Íoslódáil an comhrá',
+  'channel.downloaded': 'Comhrá sábháilte i',
+  'channel.downloadFailed': 'Níorbh fhéidir an comhrá a shábháil',
+  'status.nothingUnread': 'Bhí gach rud léite cheana',
 };

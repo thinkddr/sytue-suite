@@ -197,6 +197,7 @@ func NuevaPantalla(tv TraductorVars) *Pantalla {
 	p.barra.AlPanel = func(v bool) { p.PanelAbierto = v; p.Recomponer() }
 	p.barra.AlPulsarDialogo = p.abrirDialogo
 	p.barra.AlDescargar, p.barra.AlImprimir = p.descargar, p.imprimir
+	p.barra.AlDescargarTexto, p.barra.AlResumen, p.barra.AlCopiarPagina = p.descargarTexto, p.descargarResumen, p.copiarPagina
 	p.movil = ui.NuevaBarraMovil()
 	p.movil.EnDetalle, p.movil.AlVolver = true, p.barra.AlVolver
 	p.arm = ui.NuevoArmazon(nil)

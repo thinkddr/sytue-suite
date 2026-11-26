@@ -220,3 +220,45 @@ test('con un menú abierto la barra no se esconde aunque el vídeo siga', async 
   expect(barra.className).toContain('opacity-100');
   expect(h.querySelector('[role="menu"]')).not.toBeNull();
 });
+
+test('J y L mueven 10 s, Inicio y Fin van a los extremos y 0–9 a las décimas', async () => {
+  const h = await montar();
+  const v = h.querySelector('video')!;
+  // happy-dom no carga vídeo: una duración de mentira.
+  Object.defineProperty(v, 'duration', { configurable: true, get: () => 200 });
+  v.currentTime = 50;
+  await pulsar(h, 'l');
+  expect(v.currentTime).toBe(60);
+  await pulsar(h, 'J');
+  await pulsar(h, 'j');
+  expect(v.currentTime).toBe(40);
+  await pulsar(h, '7');
+  expect(v.currentTime).toBe(140);
+  await pulsar(h, 'End');
+  expect(v.currentTime).toBe(200);
+  await pulsar(h, 'Home');
+  expect(v.currentTime).toBe(0);
+  // Con Ctrl, el número es del navegador (cambiar de pestaña), no del vídeo.
+  await act(() => {
+    h.querySelector('[role="region"]')!.dispatchEvent(
+      new KeyboardEvent('keydown', { key: '5', ctrlKey: true, bubbles: true }),
+    );
+  });
+  expect(v.currentTime).toBe(0);
+});
+
+test('«Repetir», en el menú de la velocidad, pone y quita el `loop` del vídeo', async () => {
+  const h = await montar();
+  const v = h.querySelector('video')!;
+  expect(v.loop).toBe(false);
+  await act(() => botonVelocidad(h).click());
+  const repetir = h.querySelector<HTMLButtonElement>('[role="menuitemcheckbox"]')!;
+  expect(repetir.textContent).toBe('Repetir');
+  expect(repetir.getAttribute('aria-checked')).toBe('false');
+  await act(() => repetir.click());
+  expect(v.loop).toBe(true);
+  expect(h.querySelector('[role="menu"]')).toBeNull();
+  expect(document.activeElement).toBe(botonVelocidad(h));
+  await act(() => botonVelocidad(h).click());
+  expect(h.querySelector('[role="menuitemcheckbox"]')?.getAttribute('aria-checked')).toBe('true');
+});

@@ -64,6 +64,36 @@ func TestLosAtajosSonLosDeLaWeb(t *testing.T) {
 	}
 }
 
+// TestIrACarpetaConG: «g» y la letra llevan a la carpeta por su rol; tras «g» la «a» es
+// Archivo y no «responder a todos»; y una «g» caducada no se come la tecla siguiente.
+func TestIrACarpetaConG(t *testing.T) {
+	s := servicioConTodas()
+	s.carpetas = append(s.carpetas, api.Mailbox{ID: "se", Name: "Sent", Role: "sent"})
+	b, w, _ := buzonConVentana(t, s, fyne.NewSize(1280, 744))
+	c := w.Canvas()
+	enviados, ok := b.carpetaDeRol("sent")
+	if !ok {
+		t.Fatal("sin Enviados en el servicio falso")
+	}
+	if !b.Atajo(c, 'g') || !b.Atajo(c, 't') || b.carpetaID != enviados.ID {
+		t.Fatalf("g t no lleva a Enviados: carpeta %q", b.carpetaID)
+	}
+	recibidos, _ := b.carpetaDeRol("inbox")
+	b.Atajo(c, 'g')
+	b.Atajo(c, 'i')
+	if b.carpetaID != recibidos.ID {
+		t.Fatalf("g i no lleva a Recibidos: carpeta %q", b.carpetaID)
+	}
+	// Una «g» de hace dos segundos ya no cuenta: la «t» sola no es nada.
+	b.irPendiente = time.Now().Add(-2 * time.Second)
+	if b.Atajo(c, 't') || b.carpetaID != recibidos.ID {
+		t.Errorf("una «g» caducada movió de carpeta a %q", b.carpetaID)
+	}
+	if b.redaccion != nil {
+		t.Error("la «a» tras la «g» abrió el redactor")
+	}
+}
+
 // TestLaHojaDeAtajosSeGuarda y el móvil: capturas de la hoja, de la barra móvil y del
 // botón flotante (SYTUE_CAPTURAS).
 func TestLaHojaDeAtajosSeGuarda(t *testing.T) {

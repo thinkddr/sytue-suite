@@ -776,4 +776,17 @@ export const sl: AppCatalog<typeof en> = {
   'search.loadMoreFailed': 'Več rezultatov ni bilo mogoče naložiti. Poskusite znova.',
   'privacy.notice':
     'Vaših podatkov ne prodajamo in jih ne delimo s tretjimi osebami. Ne uporabljamo jih za profiliranje, oglaševanje ali za učenje oziroma izboljševanje naših ali tujih storitev. Šifrirani so med prenosom in shranjevanjem ter našo evropsko infrastrukturo zapustijo le, kadar je to nujno za izdajo računa, in v integracijah, ki jih vklopite, kjer vas tretja oseba zaprosi za soglasje za podatke, ki jih bo uporabila.',
+  'inbox.markAllOf': 'Označi {app} kot prebrano',
+  'inbox.markUnread': 'Označi kot neprebrano',
+  'inbox.muteLikeThis': 'Utišaj obvestila, kot je to',
+  'inbox.mutedLikeThis':
+    'Takih obvestil ne boste več prejemali. To lahko spremenite spodaj, v razdelku »Kaj želite prejemati«.',
+  'inbox.muteFailed': 'Utišanje ni uspelo. Poskusite znova.',
+  'inbox.actionsOf': 'Dejanja za »{title}«',
+  'downloads.checksum': 'Preveri prenos',
+  'downloads.checksumHelp':
+    'Njegov prstni odtis SHA-256. Izračunajte odtis prenesene datoteke in preverite, ali se ujemata.',
+  'downloads.checksumLabel': 'Prstni odtis SHA-256',
+  'downloads.copyChecksum': 'Kopiraj odtis',
+  'downloads.checksumCopied': 'Odtis kopiran',
 };

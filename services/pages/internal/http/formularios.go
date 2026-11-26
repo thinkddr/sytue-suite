@@ -13,6 +13,7 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
@@ -36,7 +37,67 @@ func montarFormularios(g grupos, h *Handlers) {
 		r.Put("/{formId}/notify", h.guardarAvisosFormulario)
 		r.Get("/{formId}/submissions", h.listarEnvios)
 		r.Get("/{formId}/submissions.csv", h.exportarEnviosCSV)
+		// Marcar como leídas: la columna read_at existía desde la 0004 y nadie la
+		// escribía, así que la bandeja no podía decir qué era nuevo.
+		r.Post("/{formId}/submissions/read", h.marcarEnviosLeidos)
+		// Borrar una respuesta: el derecho de supresión de quien la escribió (RGPD,
+		// art. 17). Hasta ahora la única forma era borrar el sitio entero.
+		r.Delete("/{formId}/submissions/{sid}", h.borrarEnvio)
 	})
+}
+
+// marcarEnviosLeidos — POST …/submissions/read {ids?: [uuid], read: bool}. Sin ids y
+// con read=true marca todas. Devuelve {changed}.
+func (h *Handlers) marcarEnviosLeidos(w http.ResponseWriter, r *http.Request) {
+	siteID, err := idSitio(r)
+	if err != nil {
+		httpx.Fail(w, r, err)
+		return
+	}
+	var in struct {
+		IDs  []string `json:"ids"`
+		Read *bool    `json:"read"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil || in.Read == nil {
+		httpx.Fail(w, r, httpx.ErrBadRequest.WithCode("invalid_json"))
+		return
+	}
+	ids := make([]uuid.UUID, 0, len(in.IDs))
+	for _, s := range in.IDs {
+		id, err := uuid.Parse(s)
+		if err != nil {
+			httpx.Fail(w, r, httpx.ErrBadRequest.WithCode("invalid_id"))
+			return
+		}
+		ids = append(ids, id)
+	}
+	t, _ := tenancy.From(r.Context())
+	n, err := h.Tienda.MarcarEnviosLeidos(r.Context(), t.Slug, siteID, chi.URLParam(r, "formId"), ids, *in.Read)
+	if err != nil {
+		httpx.Fail(w, r, errorFormulario(err))
+		return
+	}
+	httpx.JSON(w, r, http.StatusOK, map[string]int64{"changed": n})
+}
+
+// borrarEnvio — DELETE …/submissions/{sid}. 204, o 404 si no había esa respuesta.
+func (h *Handlers) borrarEnvio(w http.ResponseWriter, r *http.Request) {
+	siteID, err := idSitio(r)
+	if err != nil {
+		httpx.Fail(w, r, err)
+		return
+	}
+	sid, err := uuid.Parse(chi.URLParam(r, "sid"))
+	if err != nil {
+		httpx.Fail(w, r, httpx.ErrBadRequest.WithCode("invalid_id"))
+		return
+	}
+	t, _ := tenancy.From(r.Context())
+	if err := h.Tienda.BorrarEnvio(r.Context(), t.Slug, siteID, chi.URLParam(r, "formId"), sid); err != nil {
+		httpx.Fail(w, r, errorFormulario(err))
+		return
+	}
+	httpx.NoContent(w)
 }
 
 func (h *Handlers) listarFormularios(w http.ResponseWriter, r *http.Request) {
@@ -190,6 +251,8 @@ func errorFormulario(err error) error {
 		return httpx.ErrNotFound.WithCode("form_not_found").Wrap(err)
 	case errors.Is(err, domain.ErrAvisadosInvalidos):
 		return httpx.NewError(http.StatusUnprocessableEntity, "invalid_notify", "pages: una dirección no es válida o hay más de 10")
+	case errors.Is(err, domain.ErrEntradaInvalida):
+		return httpx.ErrBadRequest.WithCode("invalid_request").Wrap(err)
 	}
 	return errorAPI(err)
 }

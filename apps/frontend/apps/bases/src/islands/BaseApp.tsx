@@ -13,11 +13,13 @@ import {
   Button,
   CardIcon,
   Dropdown,
+  esAtajoDeApp,
   Icon,
   IconButton,
   marcarAppLista,
   MenuItem,
   MenuSeparator,
+  ShortcutsModal,
   Skeleton,
   Tabs,
   useConfirm,
@@ -33,6 +35,7 @@ import type {
   BasesNewField,
   BasesPresence,
   BasesRecord,
+  BasesSummary,
   BasesTable,
   BasesValue,
   BasesView,
@@ -42,6 +45,7 @@ import type {
 import {
   DialogoBorrarCampo,
   DialogoCampo,
+  DialogoDefectoCampo,
   DialogoFormulaCampo,
   DialogoImportar,
   DialogoOpcionesCampo,
@@ -73,11 +77,15 @@ import { moverCampo as moverCampoEn } from '../lib/esquema.js';
 import { hayCambios } from '../lib/ficha.js';
 import {
   SIN_LECTURA,
+  consultaDeExportacion,
   crearTurnos,
   hayLectura,
+  hoyLocal,
   opcionesDeLectura,
   type Lectura,
 } from '../lib/lectura.js';
+import { CLAVE_PIE } from '../lib/resumen.js';
+import { gruposDeAtajos } from '../lib/atajos.js';
 import { MAX_OPCIONES_ENLACE, PAGINA } from '../lib/limites.js';
 import { errorDeAdjunto, MAX_BYTES_ADJUNTO } from '../lib/adjuntos.js';
 import { campoDeAdjuntos, esCSV, llevaFicheros } from '../lib/pegar.js';
@@ -160,6 +168,15 @@ export function BaseApp({ baseId, locale, user, hubBaseUrl }: Props): JSX.Elemen
   /** Hay fórmulas pendientes de recalcular en la tabla que se mira. */
   const [recalculando, setRecalculando] = useState(false);
   const [vistas, setVistas] = useState<BasesView[]>([]);
+  /**
+   * El pie con los totales de la vista: si está encendido (por persona y navegador, en
+   * `localStorage`) y lo último que contó el servicio. Apagado por defecto, porque cada
+   * cuenta es una pasada por la tabla entera.
+   */
+  const [conPie, setConPie] = useState(false);
+  const [resumen, setResumen] = useState<BasesSummary | null>(null);
+  /** La hoja de atajos de teclado («?»). */
+  const [verAtajos, setVerAtajos] = useState(false);
   /** La vista guardada que se está mirando; '' = todos los registros, en rejilla. */
   const [vistaId, setVistaId] = useState('');
   // Búsqueda y orden de un momento, encima de la vista; se leen por ref para que todas
@@ -295,6 +312,58 @@ export function BaseApp({ baseId, locale, user, hubBaseUrl }: Props): JSX.Elemen
     [t, turnos, lecturaRef],
   );
 
+  // Si el pie de totales estaba encendido: se lee al montar, no al pintar en el servidor,
+  // para que la primera pintura del servidor y la del navegador coincidan.
+  useEffect(() => {
+    try {
+      setConPie(localStorage.getItem(CLAVE_PIE) === '1');
+    } catch {
+      /* sin almacenamiento: apagado */
+    }
+  }, []);
+
+  // El pie se pide al servicio con lo mismo que la rejilla (vista, búsqueda, día), y otra
+  // vez cuando cambian los registros cargados: una celda editada mueve la suma. Con un
+  // respiro, para que pegar cien filas no sean cien cuentas.
+  useEffect(() => {
+    if (!conPie || !activa) {
+      setResumen(null);
+      return;
+    }
+    let vigente = true;
+    const reloj = setTimeout(() => {
+      cliente()
+        .summary(activa, {
+          ...(vistaId ? { view: vistaId } : {}),
+          ...opcionesDeLectura(lectura),
+        })
+        .then((r) => {
+          if (vigente) setResumen(r);
+        })
+        .catch(() => {
+          // Sin pie si falla: la rejilla sigue sirviendo y no se enseñan cifras viejas.
+          if (vigente) setResumen(null);
+        });
+    }, 400);
+    return () => {
+      vigente = false;
+      clearTimeout(reloj);
+    };
+  }, [conPie, activa, vistaId, lectura, ventanas]);
+
+  // «?» abre la hoja de atajos, si no se está escribiendo ni hay otra capa delante. En una
+  // celda de texto «?» empieza a escribirla: la rejilla ya la ha atendido
+  // (`defaultPrevented`) y aquí no se abre nada encima.
+  useEffect(() => {
+    const alPulsar = (ev: KeyboardEvent): void => {
+      if (ev.key !== '?' || ev.defaultPrevented || !esAtajoDeApp(ev)) return;
+      ev.preventDefault();
+      setVerAtajos(true);
+    };
+    window.addEventListener('keydown', alPulsar);
+    return () => window.removeEventListener('keydown', alPulsar);
+  }, []);
+
   // Al cambiar de tabla: sus vistas guardadas, y se vuelve a «todos los registros».
   useEffect(() => {
     setFicha(null);
@@ -354,7 +423,7 @@ export function BaseApp({ baseId, locale, user, hubBaseUrl }: Props): JSX.Elemen
   /** Añade un registro con `datos` de partida (los de la columna del tablero, si viene de ahí). */
   async function nuevoRegistro(datos: Record<string, BasesValue> = {}): Promise<void> {
     try {
-      const r = await cliente().createRecord(activa, datos);
+      const r = await cliente().createRecord(activa, datos, undefined, hoyLocal());
       setVentanas((v) => anadir(v, r));
       setEstado(t('grid.added'));
       // Añadir es rellenar: la ficha del registro nuevo se abre sola.
@@ -371,7 +440,7 @@ export function BaseApp({ baseId, locale, user, hubBaseUrl }: Props): JSX.Elemen
   async function crearVarios(filas: Record<string, BasesValue>[]): Promise<string | null> {
     try {
       for (const datos of filas) {
-        const r = await cliente().createRecord(activa, datos);
+        const r = await cliente().createRecord(activa, datos, undefined, hoyLocal());
         setVentanas((v) => anadir(v, r));
       }
       setEstado(t('grid.added'));
@@ -491,6 +560,41 @@ export function BaseApp({ baseId, locale, user, hubBaseUrl }: Props): JSX.Elemen
     if (otro) await nuevoRegistro();
   }
 
+  /**
+   * Pasa la ficha al registro de al lado en la rejilla (el de arriba o el de abajo de lo
+   * cargado), guardando antes lo cambiado en el que se deja, como «Guardar».
+   */
+  async function irEnFicha(
+    paso: -1 | 1,
+    datos: Record<string, BasesValue>,
+    enlaces: Record<string, string[]>,
+  ): Promise<void> {
+    if (!ficha) return;
+    const { registro } = ficha;
+    const destino = registros[registros.findIndex((r) => r.id === registro.id) + paso];
+    if (!destino) return;
+    setFicha({ registro: destino, nuevo: false });
+    if (hayCambios({ datos, enlaces, invalidos: [] })) {
+      const err = await cambiar(registro, datos, enlaces);
+      if (err) setError(err);
+    }
+  }
+
+  /**
+   * Copia un registro en uno nuevo de la misma tabla (valores y enlaces; los adjuntos no,
+   * lo dice el botón) y abre su ficha: casi siempre se duplica para cambiar algo.
+   */
+  async function duplicarRegistro(r: BasesRecord): Promise<void> {
+    try {
+      const copia = await cliente().duplicateRecord(r.id);
+      setVentanas((v) => anadir(v, copia));
+      setEstado(t('record.duplicated'));
+      setFicha({ registro: copia, nuevo: false });
+    } catch (e) {
+      setError(mensajeDeError(e, t));
+    }
+  }
+
   async function guardarVarios(ids: string[]): Promise<void> {
     if (dialogo?.tipo !== 'varios') return;
     const { registro, campo } = dialogo;
@@ -592,6 +696,27 @@ export function BaseApp({ baseId, locale, user, hubBaseUrl }: Props): JSX.Elemen
       if (vistaId === nueva.id) void cargarRegistros(activa, nueva.id);
     } catch (e) {
       setErrorDialogo(mensajeDeError(e, t));
+    }
+  }
+
+  /**
+   * Una vista nueva con la configuración de la que se mira y «(copia)» en el nombre: la
+   * forma rápida de tener «Pendientes de Ana» a partir de «Pendientes» sin volver a
+   * montar filtro, orden y agrupación. Los enlaces públicos de un formulario no se
+   * copian: son de la vista, y abrir otro es decisión de quien la comparte.
+   */
+  async function duplicarVista(v: BasesView): Promise<void> {
+    try {
+      const nombre = t('view.copyName', { name: v.name }).slice(0, 120);
+      const nueva = await cliente().createView(activa, {
+        name: nombre,
+        kind: v.kind,
+        config: v.config,
+      });
+      setVistas(await cliente().listViews(activa));
+      setVistaId(nueva.id);
+    } catch (e) {
+      setError(mensajeDeError(e, t));
     }
   }
 
@@ -857,9 +982,23 @@ export function BaseApp({ baseId, locale, user, hubBaseUrl }: Props): JSX.Elemen
     ? ventanas.primera * PAGINA +
       (registros.findIndex((r) => r.id === ficha.registro.id) + 1 || registros.length + 1)
     : 0;
+  /** Dónde está el registro de la ficha entre los cargados (-1 si no está). */
+  const posFicha = ficha ? registros.findIndex((r) => r.id === ficha.registro.id) : -1;
+  /** El pie de totales es de la rejilla: el tablero, la galería y el formulario no lo llevan. */
+  const enRejilla = !campoTablero && vista?.kind !== 'gallery' && vista?.kind !== 'form';
+  const alternarPie = (): void => {
+    const otro = !conPie;
+    setConPie(otro);
+    try {
+      localStorage.setItem(CLAVE_PIE, otro ? '1' : '0');
+    } catch {
+      /* sin almacenamiento (ventana privada): vale para esta visita */
+    }
+  };
 
+  // Se exporta lo que se ve: la vista, la búsqueda y el orden del momento.
   const exportar = (formato: 'csv' | 'json') =>
-    ruta(`/api/tables/${activa}/export?format=${formato}`);
+    ruta(`/api/tables/${activa}/export?${consultaDeExportacion(formato, vistaId, lectura)}`);
   const nombreBase = base?.name || t('nav.title');
   const accionesBase = `${t('actions.more')} · ${nombreBase}`;
   const accionesTabla = `${t('actions.more')} · ${tabla?.name ?? t('base.tables')}`;
@@ -1122,6 +1261,17 @@ export function BaseApp({ baseId, locale, user, hubBaseUrl }: Props): JSX.Elemen
                                 ) : null}
                                 {vista ? (
                                   <MenuItem
+                                    icon={<Icon name="copies" size={16} />}
+                                    onClick={() => {
+                                      cerrar();
+                                      void duplicarVista(vista);
+                                    }}
+                                  >
+                                    {t('view.duplicate')}
+                                  </MenuItem>
+                                ) : null}
+                                {vista ? (
+                                  <MenuItem
                                     danger
                                     onClick={() => {
                                       cerrar();
@@ -1207,6 +1357,26 @@ export function BaseApp({ baseId, locale, user, hubBaseUrl }: Props): JSX.Elemen
                               onClick={cerrar}
                             >
                               {t('export.json')}
+                            </MenuItem>
+                            {enRejilla ? (
+                              <MenuItem
+                                icon={<Icon name="chart" size={16} />}
+                                onClick={() => {
+                                  cerrar();
+                                  alternarPie();
+                                }}
+                              >
+                                {conPie ? t('summary.hide') : t('summary.show')}
+                              </MenuItem>
+                            ) : null}
+                            <MenuItem
+                              icon={<Icon name="teclado" size={16} />}
+                              onClick={() => {
+                                cerrar();
+                                setVerAtajos(true);
+                              }}
+                            >
+                              {t('shortcuts.title')}
                             </MenuItem>
                             {esPropietario ? (
                               <>
@@ -1362,6 +1532,7 @@ export function BaseApp({ baseId, locale, user, hubBaseUrl }: Props): JSX.Elemen
                                 },
                               }
                             : {})}
+                          {...(conPie ? { resumen } : {})}
                           desde={ventanas.primera * PAGINA}
                           hayAntes={hayAntes}
                           onAntes={() => void cargarRegistros(activa, vistaId, 'antes')}
@@ -1430,6 +1601,18 @@ export function BaseApp({ baseId, locale, user, hubBaseUrl }: Props): JSX.Elemen
           ocupado={ocupado}
           onGuardar={(opciones) =>
             void cambiarCampo(() => cliente().setFieldChoices(dialogo.campo.id, opciones))
+          }
+          onCerrar={() => setDialogo(null)}
+        />
+      ) : null}
+      {dialogo?.tipo === 'editarCampo' && dialogo.accion === 'defecto' ? (
+        <DialogoDefectoCampo
+          t={t}
+          campo={dialogo.campo}
+          error={errorDialogo}
+          ocupado={ocupado}
+          onGuardar={(valor) =>
+            void cambiarCampo(() => cliente().setFieldDefault(dialogo.campo.id, valor))
           }
           onCerrar={() => setDialogo(null)}
         />
@@ -1546,6 +1729,10 @@ export function BaseApp({ baseId, locale, user, hubBaseUrl }: Props): JSX.Elemen
             setFicha(null);
             void borrarRegistro(r);
           }}
+          onDuplicar={() => void duplicarRegistro(fichaActual)}
+          onIr={(paso, datos, enlaces) => void irEnFicha(paso, datos, enlaces)}
+          hayAnterior={posFicha > 0}
+          haySiguiente={posFicha >= 0 && posFicha < registros.length - 1}
           onAdjuntos={(campo) =>
             setDialogo({ tipo: 'adjuntos', registro: ficha.registro.id, campo })
           }
@@ -1605,6 +1792,12 @@ export function BaseApp({ baseId, locale, user, hubBaseUrl }: Props): JSX.Elemen
           onCerrar={() => setComentando(null)}
         />
       ) : null}
+      <ShortcutsModal
+        open={verAtajos}
+        title={t('shortcuts.title')}
+        groups={gruposDeAtajos(t)}
+        onClose={() => setVerAtajos(false)}
+      />
       {dialogoConfirmar}
       {dialogoPreguntar}
     </Marco>

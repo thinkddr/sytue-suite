@@ -375,4 +375,10 @@ export const sl: AppCatalog<typeof en> = {
   'relation.coworker': 'Kolega',
   'relation.emergency': 'Nujni stik',
   'relation.other': 'Drugo',
+  'batch.copyEmails': 'Kopiraj e-poštne naslove',
+  'batch.emailsCopied': 'E-poštni naslovi kopirani',
+  'birthdays.anniversary': 'Obletnica',
+  'list.sortByLastName': 'Razvrsti po priimku',
+  'list.sortByFirstName': 'Razvrsti po imenu',
+  'detail.shareByEmail': 'Deli po e-pošti',
 };

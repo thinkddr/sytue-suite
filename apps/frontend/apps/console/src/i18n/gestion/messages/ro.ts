@@ -1,0 +1,87 @@
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: (c) 2026 Daniel Delgado Ramos
+ *
+ * Las herramientas de gestión de personas de Sytue Admin (acceso efectivo,
+ * sesiones, bajas recuperables, lotes, export del directorio, dispositivos,
+ * auditoría y roles): traducción del inglés (`en.ts`), que es la fuente de verdad.
+ */
+import type { AppCatalog } from '@sytue/i18n';
+import type { en } from './en.js';
+
+export const ro: AppCatalog<typeof en> = {
+  'gestion.acceso.titulo': 'Ce poate face și de ce',
+  'gestion.acceso.ver': 'Afișează',
+  'gestion.acceso.error': 'Accesul efectiv nu a putut fi încărcat.',
+  'gestion.acceso.ayuda':
+    'Calculat de Sytue ID cu aceeași regulă pe care o aplică la autorizare. Fiecare permisiune arată de unde provine; dacă elimini acea sursă, verifică-le și pe celelalte de aici.',
+  'gestion.acceso.sinPermisos': 'Nicio permisiune de administrare.',
+  'gestion.acceso.fuente.integrado': 'Rol integrat: {role}',
+  'gestion.acceso.fuente.rol': 'Rol: {name}',
+  'gestion.acceso.fuente.elevacion': 'Ridicat la {name} până la {when}',
+  'gestion.acceso.pendientes': 'Ridicări în așteptarea aprobării',
+  'gestion.acceso.pendiente': '{role}, cerută la {when}',
+  'gestion.acceso.grupos': 'Grupuri',
+  'gestion.acceso.sinGrupos': 'Nu este în niciun grup.',
+  'gestion.acceso.calculado': 'Calculat la {when}',
+  'gestion.sesiones.titulo': 'Sesiuni deschise',
+  'gestion.sesiones.ver': 'Afișează',
+  'gestion.sesiones.error': 'Sesiunile nu au putut fi încărcate.',
+  'gestion.sesiones.vacia': 'Nicio sesiune deschisă.',
+  'gestion.sesiones.inicio': 'conectat la {when}',
+  'gestion.sesiones.caduca': 'expiră la {when}',
+  'gestion.sesiones.mfa': 'Al doilea factor',
+  'gestion.sesiones.sinMfa': 'Doar parolă',
+  'gestion.sesiones.total': 'Sesiuni deschise: {count}',
+  'gestion.bajas.titulo': 'Conturi închise pe care încă le poți restaura',
+  'gestion.bajas.ayuda':
+    'Un cont închis își păstrează datele {days} zile. Restaurarea îl readuce suspendat: reactivează-l în director pentru a-i reda accesul.',
+  'gestion.bajas.cerrada': 'închis la {when}',
+  'gestion.bajas.motivo': 'motiv: {reason}',
+  'gestion.bajas.quedan': 'Zile rămase: {count}',
+  'gestion.bajas.restaurar': 'Restaurează',
+  'gestion.bajas.confirmarTitulo': 'Restaurezi {name}?',
+  'gestion.bajas.confirmar':
+    'Contul revine suspendat, cu datele sale. Nimeni nu se poate conecta cu el până nu îl reactivezi.',
+  'gestion.bajas.restaurada': '{name} restaurat',
+  'gestion.bajas.reactivar': 'Este suspendat: reactivează-l în director pentru a-i reda accesul.',
+  'gestion.bajas.fallo': 'Contul nu a putut fi restaurat',
+  'gestion.directorio.exportar': 'Exportă CSV',
+  'gestion.dispositivos.buscar': 'Caută persoană, dispozitiv sau IP',
+  'gestion.dispositivos.confianza': 'Filtrează după încredere',
+  'gestion.dispositivos.todos': 'Toate dispozitivele',
+  'gestion.dispositivos.recuento': 'Se afișează {count} din {total}',
+  'gestion.dispositivos.sinResultados': 'Niciun dispozitiv nu corespunde.',
+  'gestion.auditoria.rango': 'Interval rapid',
+  'gestion.auditoria.hoy': 'Azi',
+  'gestion.auditoria.7d': '7 zile',
+  'gestion.auditoria.30d': '30 de zile',
+  'gestion.roles.duplicar': 'Duplică',
+  'gestion.roles.copia': '{name} (copie)',
+  'gestion.lotes.titulo': 'Acțiuni în masă recente',
+  'gestion.lotes.ayuda': 'Ce s-a aplicat mai multor persoane deodată și cui nu i s-a putut aplica.',
+  'gestion.lotes.ver': 'Afișează',
+  'gestion.lotes.error': 'Acțiunile în masă nu au putut fi încărcate.',
+  'gestion.lotes.vacio': 'Încă nu există acțiuni în masă.',
+  'gestion.lotes.progreso': '{done} din {total}',
+  'gestion.lotes.accion.setRole': 'Schimbă rolul',
+  'gestion.lotes.estado.ejecutando': 'În curs',
+  'gestion.lotes.estado.terminado': 'Finalizat',
+  'gestion.lotes.estado.cancelado': 'Anulat',
+  'gestion.lotes.estado.interrumpido': 'Întrerupt',
+  'gestion.lotes.detalle': 'Detalii',
+  'gestion.lotes.todosBien': 'Aplicat tuturor.',
+  'gestion.lote.fallos': 'Neaplicat pentru',
+  'gestion.lote.cerrar': 'Închide',
+  'gestion.lote.codigo.not_found': 'nu este în această organizație',
+  'gestion.lote.codigo.self': 'ești chiar tu',
+  'gestion.lote.codigo.forbidden':
+    'un cont cu rol de proprietate se modifică doar cu drepturi de proprietate',
+  'gestion.lote.codigo.deleted': 'contul este închis',
+  'gestion.lote.codigo.last_owner': 'ultimul proprietar al organizației',
+  'gestion.lote.codigo.last_admin': 'ultimul administrator al organizației',
+  'gestion.lote.codigo.error': 'eroare neașteptată; încearcă din nou',
+  'gestion.lote.seleccionarVisibles': 'Selectează toate cele vizibile ({count})',
+  'gestion.lote.recortado':
+    'O acțiune în masă cuprinde cel mult {max} persoane: au fost selectate primele {max} vizibile.',
+};

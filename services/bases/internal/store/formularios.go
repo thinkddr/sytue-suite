@@ -50,6 +50,8 @@ type EnlaceFormulario struct {
 type FormularioPublico struct {
 	Name   string         `json:"name"`
 	Fields []domain.Campo `json:"fields"`
+	// Required son los ids de los campos que hay que rellenar (se pintan con «*»).
+	Required []string `json:"required"`
 }
 
 func hashToken(t string) string {
@@ -232,9 +234,35 @@ func (s *Store) FormularioPorToken(ctx context.Context, token string) (Formulari
 			return err
 		}
 		out.Fields = camposDelFormulario(todos, cfg)
+		out.Required = obligatoriosDe(out.Fields, cfg)
 		return nil
 	})
 	return out, err
+}
+
+// faltaObligatorio dice si a una respuesta le falta un campo obligatorio. Una casilla
+// obligatoria es una que hay que MARCAR («Acepto las condiciones»): desmarcada viaja como
+// false, que es un valor, y no basta.
+func faltaObligatorio(campos []domain.Campo, cfg domain.ConfigVista, limpio map[string]json.RawMessage) error {
+	for _, id := range obligatoriosDe(campos, cfg) {
+		if v, ok := limpio[id]; !ok || string(v) == "false" {
+			return fmt.Errorf("%w: falta un campo obligatorio", domain.ErrInvalido)
+		}
+	}
+	return nil
+}
+
+// obligatoriosDe son los campos obligatorios de un formulario que siguen en él, en el
+// orden del formulario. Uno que ya no se enseña (lo quitaron de la vista, o lo borraron)
+// deja de serlo: un obligatorio invisible haría el formulario imposible de enviar.
+func obligatoriosDe(campos []domain.Campo, cfg domain.ConfigVista) []string {
+	out := []string{}
+	for _, c := range campos {
+		if slices.Contains(cfg.Required, c.ID) {
+			out = append(out, c.ID)
+		}
+	}
+	return out
 }
 
 // EnviarFormulario añade un registro desde un enlace público. Todo en UNA transacción:
@@ -242,6 +270,13 @@ func (s *Store) FormularioPorToken(ctx context.Context, token string) (Formulari
 // los mismos tipos que la rejilla e insertar. Lo que no es un campo del formulario se
 // RECHAZA: quien envía no puede escribir donde la vista no le deja.
 func (s *Store) EnviarFormulario(ctx context.Context, token string, valores map[string]json.RawMessage) error {
+	return s.EnviarFormularioEl(ctx, token, valores, time.Now())
+}
+
+// EnviarFormularioEl es EnviarFormulario con el día de quien responde, para los
+// campos con defecto «hoy». Los obligatorios se comprueban AQUÍ, no solo en la
+// página: quien llame a la API sin pasar por ella tampoco se los salta.
+func (s *Store) EnviarFormularioEl(ctx context.Context, token string, valores map[string]json.RawMessage, hoy time.Time) error {
 	e, err := s.resolverToken(ctx, token)
 	if err != nil {
 		return err
@@ -282,6 +317,12 @@ func (s *Store) EnviarFormulario(ctx context.Context, token string, valores map[
 		if len(limpio) == 0 {
 			return fmt.Errorf("%w: formulario vacío", domain.ErrInvalido)
 		}
+		if err := faltaObligatorio(permitidos, cfg, limpio); err != nil {
+			return err
+		}
+		// El defecto vale también para los campos que el formulario no enseña: quien
+		// lo diseña no tiene por qué preguntar el estado «Nuevo» de cada respuesta.
+		limpio = domain.ConDefectos(todos, valores, limpio, hoy)
 		if err := domain.TamanoDatos(limpio); err != nil {
 			return err
 		}

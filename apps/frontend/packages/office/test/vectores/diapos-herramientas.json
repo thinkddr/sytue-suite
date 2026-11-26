@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "nota": "El avance automático en bucle, la rueda, el cronómetro del moderador y las notas del orador de Diapos. La web los recorre en slides-herramientas.test.ts y Go en apps/fyne/diapos/herramientas_test.go. En `avance`, cada diapositiva dice si está oculta y no lleva animaciones; `notas` se titulan «Diapositiva N».",
+  "avance": [
+    { "ocultas": [false, false, false], "desde": 0, "sale": 1 },
+    { "ocultas": [false, true, false], "desde": 0, "sale": 2 },
+    { "ocultas": [false, false, false], "desde": 2, "sale": 0 },
+    { "ocultas": [true, false, false], "desde": 2, "sale": 1 },
+    { "ocultas": [false, false, true], "desde": 1, "sale": 0 }
+  ],
+  "rueda": [
+    { "acumulado": 0, "abajo": 100, "umbral": 50, "dir": 1, "resto": 0 },
+    { "acumulado": 0, "abajo": -120, "umbral": 50, "dir": -1, "resto": 0 },
+    { "acumulado": 0, "abajo": 20, "umbral": 50, "dir": 0, "resto": 20 },
+    { "acumulado": 40, "abajo": 20, "umbral": 50, "dir": 1, "resto": 0 },
+    { "acumulado": 40, "abajo": -60, "umbral": 50, "dir": 0, "resto": -20 }
+  ],
+  "crono": [
+    { "inicio": 1000, "pausa": null, "ahora": 61000, "transcurrido": 60000 },
+    { "inicio": 1000, "pausa": 31000, "ahora": 91000, "transcurrido": 30000 },
+    { "inicio": 5000, "pausa": null, "ahora": 1000, "transcurrido": 0 }
+  ],
+  "pausa": [
+    { "inicio": 1000, "pausa": null, "ahora": 4000, "sale": { "inicio": 1000, "pausa": 4000 } },
+    { "inicio": 1000, "pausa": 4000, "ahora": 9000, "sale": { "inicio": 6000, "pausa": null } }
+  ],
+  "notas": [
+    {
+      "notas": ["Hola\n  mundo  \n", "", "\n\nFin"],
+      "sale": "Diapositiva 1\nHola\n  mundo\n\nDiapositiva 2\n\nDiapositiva 3\nFin\n"
+    },
+    { "notas": [], "sale": "" }
+  ]
+}

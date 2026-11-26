@@ -399,8 +399,9 @@ export {
   SidebarAction,
   SIDEBAR_ACTION_CLASS,
 } from './components/Sidebar.js';
-export { MobileFab } from './components/MobileFab.js';
-export type { MobileFabProps } from './components/MobileFab.js';
+// El «+» flotante: la acción de crear de cada app, en todos los anchos.
+export { BotonFlotante } from './components/BotonFlotante.js';
+export type { BotonFlotanteProps } from './components/BotonFlotante.js';
 export type {
   SidebarProps,
   SidebarSectionProps,

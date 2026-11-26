@@ -212,6 +212,9 @@ type Barra struct {
 	// AlDescargar y AlImprimir son «Descargar» e «Imprimir» del grupo «Documento». Nil:
 	// el botón no sale.
 	AlDescargar, AlImprimir func()
+	// AlDescargarTexto, AlResumen y AlCopiarPagina son el texto fuera del PDF: el del
+	// documento entero, el resumen de los comentarios y el de la página que se mira.
+	AlDescargarTexto, AlResumen, AlCopiarPagina func()
 	// AlNuevo y AlAbrir son «Crear nuevo» y «Abrir un archivo» del grupo «Archivo»:
 	// orden del dueño para los editores de Fyne (2026-09-23), que la cinta de la web no
 	// tiene —allí se crea y se abre desde la portada—. Nil: el grupo no sale.
@@ -614,8 +617,18 @@ func (b *Barra) gruposDeVer() []fyne.CanvasObject {
 		editor.NuevoGrupo(b.t("pdf.ribbon.group.page"), b.conPista(anterior), pagina, b.conPista(siguiente)),
 		editor.NuevoGrupo(b.t("pdf.ribbon.group.zoom"), b.conPista(menos),
 			container.New(centrado{}, caja, porciento), b.conPista(mas), b.conPista(ancho), b.conPista(pag)),
-		editor.NuevoGrupo(b.t("pdf.ribbon.group.reading"), b.conPista(dos), b.conPista(voz)),
+		editor.NuevoGrupo(b.t("pdf.ribbon.group.reading"), b.lectura(dos, voz)...),
 	}
+}
+
+// lectura son los mandos de «Lectura»: dos páginas, leer en voz alta y, si hay quien lo
+// atienda, «Copiar el texto de la página».
+func (b *Barra) lectura(dos, voz *ui.BotonIcono) []fyne.CanvasObject {
+	out := []fyne.CanvasObject{b.conPista(dos), b.conPista(voz)}
+	if b.AlCopiarPagina != nil {
+		out = append(out, b.botonAccion("pdf.text.copyPage", b.AlCopiarPagina))
+	}
+	return out
 }
 
 // conPista es [Barra.pista] con el nombre del botón: el `title={titulo}` de `BotonSimple`.
@@ -739,6 +752,14 @@ func (b *Barra) botonesDeDocumento() []fyne.CanvasObject {
 	}
 	if b.AlDescargar != nil {
 		objs = append(objs, b.botonAccion("pdf.menu.download", b.AlDescargar))
+	}
+	// Tras «Descargar», como en la web: el texto, para pegarlo donde no cabe un PDF, y el
+	// resumen de los comentarios, para mandarlo o archivarlo sin el documento.
+	if b.AlDescargarTexto != nil {
+		objs = append(objs, b.botonAccion("pdf.text.download", b.AlDescargarTexto))
+	}
+	if b.AlResumen != nil {
+		objs = append(objs, b.botonAccion("pdf.comments.summary", b.AlResumen))
 	}
 	if b.AlImprimir != nil && !b.SinImpresion {
 		imprimir := NuevaAccion(b.t("pdf.menu.print"), b.AlImprimir)

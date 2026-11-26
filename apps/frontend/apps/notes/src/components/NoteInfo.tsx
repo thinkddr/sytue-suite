@@ -75,6 +75,23 @@ export function NoteInfo({
     [t('noteInfo.created'), fecha(note.created_at)],
     [t('noteInfo.edited'), fecha(note.updated_at)],
     [t('noteInfo.notebook'), cuaderno || SIN_DATO],
+    // Una tarea dice en qué está: la tarjeta solo lo enseña con la casilla y el tachado.
+    ...(note.kind === 'todo'
+      ? ([
+          [
+            t('noteInfo.task'),
+            t(
+              note.cancelled_at
+                ? 'noteInfo.task.cancelled'
+                : note.checked
+                  ? 'noteInfo.task.done'
+                  : 'noteInfo.task.open',
+            ),
+          ],
+        ] as [string, string][])
+      : []),
+    // Lo que sale de la nota hacia otras notas y ficheros, junto a lo que entra.
+    [t('noteInfo.links'), numero(note.links?.length ?? 0)],
     [
       t('noteInfo.backlinks'),
       enlazan === 'cargando'

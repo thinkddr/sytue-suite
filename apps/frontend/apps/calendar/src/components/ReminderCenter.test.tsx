@@ -123,6 +123,7 @@ const ESTADO: EstadoRecordatorios = {
   ocupado: null,
   permiso: 'default',
   descartar: async () => {},
+  posponer: async () => {},
   irA: () => {},
   pedirPermiso: async () => {},
   reintentar: () => {},
@@ -253,6 +254,49 @@ test('si el sondeo falla, la rama dice el fallo (no «sin recordatorios») y «R
   // Sin esperar al backoff (que tras un fallo es de minutos): la petición sale ya.
   await esperar(() => n === 2 && (host.textContent ?? '').includes('Tenis'));
   expect(host.querySelector('[role="alert"]')).toBeNull();
+  render(null, host);
+  host.remove();
+});
+
+test('posponer: sale de la campana, pide al BFF los minutos elegidos y dice cuándo vuelve', async () => {
+  const cuerpos: unknown[] = [];
+  globalThis.fetch = (async (_url: string, init?: RequestInit) => {
+    if (init?.method === 'POST') {
+      cuerpos.push(JSON.parse(String(init.body)));
+      return new Response(JSON.stringify({ ok: true, trigger_at: '2026-11-06T13:10:00Z' }), {
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    // Hasta que se pospone, el servicio lo da por vencido; después ya no.
+    const lista = cuerpos.length ? [] : [RECORDATORIO];
+    return new Response(JSON.stringify({ reminders: lista, next_cursor: '' }), {
+      headers: { 'content-type': 'application/json' },
+    });
+  }) as typeof fetch;
+  function App() {
+    const estado = useRecordatorios({ t, locale: 'es', onDeepLink: () => {} });
+    return (
+      <ul>
+        <ReminderCenter t={t} locale="es" estado={estado} disparador="fila" />
+      </ul>
+    );
+  }
+  const host = montar(<App />);
+  act(() => host.querySelector<HTMLButtonElement>('button[aria-expanded]')!.click());
+  await esperar(() => (host.textContent ?? '').includes('Tenis'));
+  const reloj = [...host.querySelectorAll<HTMLButtonElement>('ul[role="group"] button')].find(
+    (b) => b.getAttribute('aria-label') === t('reminders.snooze', { title: 'Tenis' }),
+  )!;
+  // Actúa en el sitio: en el cajón del teléfono no lo cierra.
+  expect(reloj.hasAttribute('data-mantiene-nav')).toBe(true);
+  act(() => reloj.click());
+  const diez = [...host.querySelectorAll<HTMLButtonElement>('[role="group"] button')].find(
+    (b) => b.textContent === t('settings.durationMinutes', { count: 10 }),
+  )!;
+  act(() => diez.click());
+  await esperar(() => cuerpos.length === 1);
+  expect(cuerpos[0]).toEqual({ id: 'r1', snooze: 10 });
+  await esperar(() => !(host.textContent ?? '').includes('Tenis'));
   render(null, host);
   host.remove();
 });

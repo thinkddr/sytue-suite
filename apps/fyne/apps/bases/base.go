@@ -73,6 +73,8 @@ type Base struct {
 
 	// portadas son las miniaturas de la vista de galería (galeria.go).
 	portadas portadas
+	// resumen son los totales de lo que se mira (resumen.go); nil sin pedir o si fallan.
+	resumen *api.BasesSummary
 	// rt es el tiempo real de la base (tiemporeal.go); nil sin servicio. propias son las
 	// operaciones de celda lanzadas desde aquí, para no volver a pedir su eco.
 	rt      *enVivo

@@ -54,12 +54,7 @@ func (e *EditorNota) menuInsertar(disparador fyne.CanvasObject) {
 	var pintar func(revelar bool)
 	pintar = func(revelar bool) {
 		v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
-		visibles = visibles[:0]
-		for _, c := range filtrarComandos(campo.Texto(), e.rotuloComando) {
-			if e.comandoDisponible(c) {
-				visibles = append(visibles, c)
-			}
-		}
+		visibles = e.comandosParaInsertar(visibles[:0], campo.Texto())
 		activa = min(activa, max(len(visibles)-1, 0))
 		filas := make([]fyne.CanvasObject, 0, len(visibles)+1)
 		for i, c := range visibles {
@@ -81,12 +76,11 @@ func (e *EditorNota) menuInsertar(disparador fyne.CanvasObject) {
 		d := container.NewVScroll(col)
 		alto := min(col.MinSize().Height, float32(filasMenuCmd)*ui.SueloTactil(max(tema.TextoSM.Linea, cajaDibCmd)+2*pyFilaCmd))
 		d.SetMinSize(fyne.NewSize(anchoMenuSug, alto))
+		var altoFila float32
 		if revelar && len(visibles) > 0 {
-			h := filas[0].MinSize().Height
-			yActiva := float32(activa) * h
-			desplazado = min(max(desplazado, yActiva+h-alto), yActiva)
+			altoFila = filas[0].MinSize().Height
 		}
-		desplazado = min(max(desplazado, 0), max(col.MinSize().Height-alto, 0))
+		desplazado = desplazamientoMenu(desplazado, float32(activa)*altoFila, altoFila, alto, col.MinSize().Height)
 		d.Offset = fyne.NewPos(0, desplazado)
 		d.OnScrolled = func(p fyne.Position) { desplazado = p.Y }
 		lista.Objects = []fyne.CanvasObject{d}
@@ -123,6 +117,27 @@ func (e *EditorNota) menuInsertar(disparador fyne.CanvasObject) {
 	em = ui.MostrarPopover(disparador, container.New(ui.Columna{Hueco: tema.Espacio(2)}, campo, lista))
 	em.Rotulo = e.tr.T("editor.insert", nil)
 	e.insertando = em
+}
+
+// comandosParaInsertar añade a `dst` los comandos del catálogo que casan con `filtro` y
+// se pueden usar donde está el cursor, en el orden del catálogo.
+func (e *EditorNota) comandosParaInsertar(dst []comando, filtro string) []comando {
+	for _, c := range filtrarComandos(filtro, e.rotuloComando) {
+		if e.comandoDisponible(c) {
+			dst = append(dst, c)
+		}
+	}
+	return dst
+}
+
+// desplazamientoMenu es lo que queda desplazada la lista de «+»: lo que ya lo estaba,
+// movido solo lo justo para que se vea la fila activa cuando se pide (`altoFila` > 0:
+// las flechas o el filtro), y dentro de lo que la lista da de sí.
+func desplazamientoMenu(actual, yActiva, altoFila, visible, total float32) float32 {
+	if altoFila > 0 {
+		actual = min(max(actual, yActiva+altoFila-visible), yActiva)
+	}
+	return min(max(actual, 0), max(total-visible, 0))
 }
 
 // ClavesColorEstado son los rótulos de los seis colores de la lista cerrada.

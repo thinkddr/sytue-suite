@@ -233,25 +233,6 @@ func docDeCelda(bloques []Bloque, p celdaPuesta) *Documento {
 	return d
 }
 
-// anchoMaquetado es lo que ocupa de ancho lo maquetado: su línea más larga con la
-// sangría de su bloque, sin lo que la corre una alineación (una cabecera centrada a un
-// ancho sin límite empezaría en medio millón).
-func anchoMaquetado(m *Maquetado) float32 {
-	var w float32
-	for _, l := range m.Lineas {
-		w = max(w, l.X1-l.X0+m.Bloques[l.Bloque].X)
-	}
-	for _, a := range m.Adornos {
-		if a.Tipo != adornoFondo && a.Tipo != adornoRegla {
-			w = max(w, a.X+a.An)
-		}
-	}
-	return w
-}
-
-// anchoMaximo es «sin límite» para medir el ancho de contenido de una celda.
-const anchoMaximo = 1e6
-
 // horizontal es lo que el borde y el relleno de una celda le quitan de ancho.
 func (e estiloCelda) horizontal() float32 { return e.relleno[1] + e.relleno[3] }
 

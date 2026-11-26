@@ -177,3 +177,25 @@ func empaquetarAppsOffice(t *testing.T) []string {
 	}
 	return apps
 }
+
+// SYTUE_PARA_ESTE_EQUIPO=1 deja pasar un binario que exige una glibc más nueva que el suelo
+// de la release (Debian 12): es para `sytue-deploy --mode sytue-office`, que instala en el
+// mismo equipo que compila. Ningún workflow puede ponerla, o una release saldría con un
+// binario que no arranca en Debian 12 ni en Ubuntu 22.04. Visto en rojo poniéndola en el
+// env de release-office.yml.
+func TestEmpaquetarElSueloDeGlibcSoloSeSaltaFueraDeLaRelease(t *testing.T) {
+	d := empaquetarDirs(t)
+	guion := empaquetarLeer(d.guion)
+	if !strings.Contains(guion, `if [ "${SYTUE_PARA_ESTE_EQUIPO:-}" = 1 ]; then`) {
+		t.Fatal("empaquetar.sh ya no tiene la salida de SYTUE_PARA_ESTE_EQUIPO: esta prueba sobra o hay que rehacerla")
+	}
+	flujos, err := filepath.Glob(filepath.Join(d.raiz, ".github", "workflows", "*.yml"))
+	if err != nil || len(flujos) == 0 {
+		t.Fatalf("sin workflows que mirar: %v", err)
+	}
+	for _, f := range flujos {
+		if strings.Contains(empaquetarLeer(f), "SYTUE_PARA_ESTE_EQUIPO") {
+			t.Errorf("%s pone SYTUE_PARA_ESTE_EQUIPO: una release no se salta el suelo de glibc", filepath.Base(f))
+		}
+	}
+}

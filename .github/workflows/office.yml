@@ -68,6 +68,12 @@ env:
   # Los forks de apps/fyne/go.mod (Fyne, GLFW, typesetting) son públicos y se bajan de
   # GitHub: empaquetar.sh pide que GOPRIVATE los cubra para no pasar por el proxy.
   GOPRIVATE: github.com/thinkddr/*
+  # El checkout lo escribe el runner (uid 1001) y los pasos corren como root dentro del
+  # `container:`: git ve un propietario ajeno, se niega («dubious ownership») y `go build`
+  # muere con «error obtaining VCS status». Igual que en el ci-desktop.yml de sytue-one.
+  GIT_CONFIG_COUNT: "1"
+  GIT_CONFIG_KEY_0: safe.directory
+  GIT_CONFIG_VALUE_0: "*"
 
 jobs:
   # Linux y Windows: en el mismo Debian 12 (glibc 2.36) que sytue-one, fijado por digest y

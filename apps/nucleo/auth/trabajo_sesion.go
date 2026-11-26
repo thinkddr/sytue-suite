@@ -19,12 +19,12 @@ type TestigoTrabajo struct {
 var ErrTrabajoSesion = errors.New("auth: device work belongs to a previous session")
 
 func (a *AlmacenSesion) publicarAccesoTrabajo(t Tokens) error {
-	snapshot := IdentitySnapshot{a.emisor, a.cliente, t.Subject, organizacionDe(t)}
+	snapshot := IdentitySnapshot{Issuer: a.emisor, Client: a.cliente, Subject: t.Subject, Organization: organizacionDe(t)}
 	identity := snapshot.IdentidadSesion()
 	active := t.Refresh != "" && identity != ""
 	contexto := ""
 	if active {
-		contexto = string(snapshot.contextoSesion())
+		contexto = string(snapshot.ContextoSesion())
 	} else {
 		identity = ""
 	}

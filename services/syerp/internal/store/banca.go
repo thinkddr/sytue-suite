@@ -12,7 +12,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"git.sytue.eu/sytue/one/services/syerp/internal/domain"
+	domain "git.sytue.eu/sytue/one/apps/nucleo/erp/dominio"
 )
 
 // El banco entra al ERP como TAREAS: cada movimiento es una `linea_extracto`
@@ -592,7 +592,7 @@ func escribirAsiento(ctx context.Context, tx pgx.Tx, diario string, fecha time.T
 	if err := exigirPeriodoAbierto(ctx, tx, fecha); err != nil {
 		return Asiento{}, err
 	}
-	ref, err := reservarRef(ctx, tx, "asiento:"+diario, prefijoDiario(diario), fmt.Sprintf("%04d", fecha.Year()))
+	ref, err := reservarRef(ctx, tx, "asiento:"+diario, domain.PrefijoDiario(diario), fmt.Sprintf("%04d", fecha.Year()))
 	if err != nil {
 		return Asiento{}, err
 	}

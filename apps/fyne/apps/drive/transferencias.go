@@ -125,6 +125,14 @@ type Entrada struct {
 	Flujo  io.ReadCloser
 	Nombre string
 	Tamano int64
+
+	// Como es el nombre con que se queda en Drive si no es el suyo («Guardar los dos» al
+	// subir uno que se llama como otro). Vacío: el suyo.
+	Como string
+	// Sustituye es el id del fichero que esta entrada sustituye, por su identificador
+	// («Sustituir» uno de los que se llaman igual en una unidad de la nube). Vacío: se
+	// sube por el nombre, como siempre.
+	Sustituye string
 }
 
 // Fluido es una entrada que llega como flujo, sin ruta.
@@ -143,6 +151,9 @@ func Rutas(rutas []string) []Entrada {
 
 // nombre es el que se queda el fichero en Drive.
 func (e Entrada) nombre() string {
+	if e.Como != "" {
+		return e.Como
+	}
 	if e.Flujo != nil {
 		return filepath.Base(e.Nombre)
 	}
@@ -332,6 +343,12 @@ func subirUno(ctx context.Context, svc *api.Drive, carpeta string, e Entrada, p 
 	// punto porcentual, no uno por bloque leído, que inundaba la rutina de la interfaz.
 	cuerpo := ficheros.ConProgreso(r, tamano, avanzar(p))
 	nombre := e.nombre()
+	if e.Sustituye != "" {
+		// Encima del elegido, por su id: un original con solo el id es «sustituir sin
+		// más» (en el equipo; la conectada no lo pone nunca).
+		_, err = svc.ReplaceFile(ctx, api.File{ID: e.Sustituye, FolderID: carpeta, Name: nombre}, TipoDe(nombre), cuerpo, tamano)
+		return err
+	}
 	_, err = svc.Upload(ctx, carpeta, nombre, TipoDe(nombre), cuerpo, tamano)
 	return err
 }

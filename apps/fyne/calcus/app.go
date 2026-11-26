@@ -20,7 +20,7 @@ import (
 	"git.sytue.eu/sytue/one/apps/fyne/editor"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
-	"git.sytue.eu/sytue/one/apps/nucleo/auth"
+	"git.sytue.eu/sytue/one/apps/nucleo/autorizacion"
 	"git.sytue.eu/sytue/one/apps/nucleo/ficheros"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 	"git.sytue.eu/sytue/one/apps/nucleo/office/guardardrive"
@@ -54,6 +54,9 @@ type App struct {
 	lanzar func(func())
 	// abrirArchivo es «Abrir un archivo» del menú Archivo y de la portada (PonerAbrir).
 	abrirArchivo *editor.AbrirArchivo
+	// Fichero son «Guardar» y «Guardar como…» en un fichero del disco: solo la edición
+	// local (editor.Fichero). nil: no salen.
+	Fichero *editor.Fichero
 	// EnlaceDoc y EnlacePublico escriben las direcciones de la web que copia «Compartir»:
 	// las pone el binario, que sabe el dominio de la organización. nil: no sale.
 	EnlaceDoc     func(id string) string
@@ -70,7 +73,7 @@ type App struct {
 	// Reclamos dice quién ha entrado: su `sub` desbloquea las celdas de sus rangos
 	// editables en una hoja protegida (`fijarYo` de la web). nil, o sin sesión: nadie, y
 	// ningún rango concede nada.
-	Reclamos func(context.Context) (auth.Reclamos, error)
+	Reclamos func(context.Context) (autorizacion.Reclamos, error)
 }
 
 // abierto es el documento que hay en el editor.
@@ -312,6 +315,16 @@ func (a *App) ImportarAlAbrir(importar func(context.Context, api.Apertura) (api.
 	}
 }
 
+// AbrirLocalCon hace que «Abrir…» traiga los ficheros de la máquina con `abrir` (la
+// edición local los ancla, editor.AbrirArchivo.AbrirLocal) y acepte además esas
+// extensiones (la nativa, `.calcus`). Sin PonerAbrir no hace nada.
+func (a *App) AbrirLocalCon(abrir func(context.Context, api.Apertura) (api.Document, error), extensiones ...string) {
+	if a.abrirArchivo != nil {
+		a.abrirArchivo.AbrirLocal = abrir
+		a.abrirArchivo.Importa = append(a.abrirArchivo.Importa, extensiones...)
+	}
+}
+
 // AbrirApertura abre un fichero que llega de fuera (Finder, Explorador, Drive) como hoja
 // EDITABLE; ver [editor.AbrirArchivo.AbrirApertura]. Sin PonerAbrir no hay con qué.
 func (a *App) AbrirApertura(ctx context.Context, ap api.Apertura) error {
@@ -340,6 +353,7 @@ func (a *App) archivo(ab *abierto, escribe bool) {
 		srv.HacerCopia(api.Document{ID: ab.id, Kind: api.DocSheet, Title: ctx.Titulo}, a.guardarAntes(ab),
 			func(d api.Document) { a.AbrirID(d.ID, d.Title) }, listo)
 	}
+	a.Fichero.Enganchar(ctx, ab.id, func() func() error { return a.guardarAntes(ab) })
 	if escribe {
 		ctx.GuardarVersion = func(etiqueta string) { srv.GuardarVersion(ab.id, etiqueta) }
 		ctx.RestaurarVersion = func(v api.DocVersion) {

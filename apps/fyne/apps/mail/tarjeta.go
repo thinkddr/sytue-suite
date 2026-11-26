@@ -88,6 +88,8 @@ type TarjetaMensaje struct {
 	// el puntero está en una (la mano del cursor). Ver `enlaces.go`.
 	zonas       []zonaEnlace
 	sobreEnlace bool
+	// fmtc es el cuerpo con formato montado (formato_lector.go); nil, en texto.
+	fmtc *formatoTarjeta
 }
 
 var (
@@ -237,6 +239,14 @@ func recortar(s string) string {
 // cita, su botón (`mt-2`) y —desplegada— sus líneas (otro `mt-2`).
 func (t *TarjetaMensaje) medidaCuerpo(ancho float32) (aviso, lineas, citadas []string, conCita bool, alto float32) {
 	util := t.anchoUtilCuerpo(ancho)
+	if f := t.conFormato(); f != nil {
+		aviso, alto = t.medidaFormato(f, util)
+		if f.prosa == nil {
+			texto, _, _, _, _ := t.cuerpo()
+			lineas = repartirPre(texto, tema.TextoBase, ui.Normal, util)
+		}
+		return aviso, lineas, nil, false, alto
+	}
 	texto, cita, cargando, conFormato, _ := t.cuerpo()
 	if conFormato {
 		aviso = ui.Repartir(t.L.T.T("reader.plainTextOnly", nil), tema.TextoSM, ui.Normal,
@@ -411,8 +421,10 @@ type tarjetaRenderer struct {
 	infoIcono *iconos.Dibujo
 	infoTexto *canvas.Text
 	claveAdj  string
-	pie       *fyne.Container
-	objetos   []fyne.CanvasObject
+	// fmto es el cuerpo con formato puesto en los objetos (formato_lector.go).
+	fmto    *formatoTarjeta
+	pie     *fyne.Container
+	objetos []fyne.CanvasObject
 }
 
 // filaAdjunto es el enlace de un adjunto y, si hay Drive, su «Guardar en Drive».
@@ -494,6 +506,9 @@ func (r *tarjetaRenderer) Layout(tam fyne.Size) {
 			ty += tema.TextoSM.Linea
 		}
 		y += alto + bajoAviso
+	}
+	if f := r.fmto; f != nil {
+		y = f.colocar(x, y, util)
 	}
 	var zonas []zonaEnlace
 	y, zonas = colocarTramos(r.parrafo, r.trozos, r.lineas, x, y, zonas)
@@ -688,7 +703,10 @@ func (r *tarjetaRenderer) pintarCuerpo(v tema.Variante) bool {
 	r.parrafo, r.trozos, c2 = pintarTramos(r.parrafo, tramosDeLineas(texto, lineas, enlazar), tintaCuerpo, v)
 	c3 = r.pintarCita(v, conCita, cita, citadas, enlazar)
 	verlo(r.carga, t.Expandida && cargando && t.Mensaje.Extracto != "")
-	return c1 || c2 || c3
+	f := t.conFormato()
+	c4 := f != r.fmto
+	r.fmto = f
+	return c1 || c2 || c3 || c4
 }
 
 // pintarCita pone el botón de la cita con el rótulo de su estado y el galón que dice
@@ -776,6 +794,9 @@ func (r *tarjetaRenderer) montar() {
 	}
 	for _, l := range r.parrafo {
 		r.objetos = append(r.objetos, l)
+	}
+	if r.fmto != nil {
+		r.objetos = append(r.objetos, r.fmto.objetos()...)
 	}
 	r.objetos = append(r.objetos, r.botonCita)
 	for _, l := range r.citadas {

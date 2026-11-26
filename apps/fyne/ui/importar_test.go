@@ -22,6 +22,11 @@ import (
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 )
 
+// transporteFunc es un http.RoundTripper hecho de una función.
+type transporteFunc func(*http.Request) (*http.Response, error)
+
+func (f transporteFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
 func TestImportarCancelaLecturasYNoPublicaOtraCuenta(t *testing.T) {
 	tr := traductorPrueba(t)
 	var d *ImportarDatos

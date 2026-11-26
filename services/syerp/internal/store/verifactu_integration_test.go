@@ -24,10 +24,10 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"git.sytue.eu/sytue/one/apps/nucleo/erp/catalogo"
 	"git.sytue.eu/sytue/one/platform/pkg/keycrypto"
 	"git.sytue.eu/sytue/one/platform/pkg/pgtest"
 	"git.sytue.eu/sytue/one/services/syerp/db"
-	"git.sytue.eu/sytue/one/services/syerp/internal/catalogo"
 	"git.sytue.eu/sytue/one/services/syerp/internal/store"
 	"git.sytue.eu/sytue/one/services/syerp/internal/verifactu"
 )

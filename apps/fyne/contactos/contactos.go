@@ -26,6 +26,7 @@
 package contactos
 
 import (
+	"context"
 	"image"
 
 	"fyne.io/fyne/v2"
@@ -65,6 +66,10 @@ type Pantalla struct {
 	// Libretas son las del usuario y Activa la que se está viendo.
 	Libretas []api.AddressBook
 	Activa   *api.AddressBook
+	// Cuentas agrupa las libretas sincronizadas con cuentas externas (Sytue Office,
+	// K-06): cada cuenta sale en su sección, debajo de «Libretas», con «Sincronizar
+	// ahora». nil, como siempre.
+	Cuentas []GrupoCuenta
 	// Etiquetas son los grupos de la libreta activa; EtiquetaActiva filtra por una.
 	Etiquetas      []api.ContactGroup
 	EtiquetaActiva string
@@ -119,6 +124,9 @@ type Pantalla struct {
 	AlBuscar         func(string)
 	AlElegirLibreta  func(api.AddressBook)
 	AlCrearLibreta   func()
+	// alCrearEnCuenta abre el diálogo de una libreta nueva en la cuenta de un
+	// GrupoCuenta con CrearLibreta; lo pone la App.
+	alCrearEnCuenta  func(GrupoCuenta)
 	AlElegirEtiqueta func(id string)
 	AlCrearEtiqueta  func()
 	AlVerDestacados  func()
@@ -348,9 +356,10 @@ func (p *Pantalla) configurarArmazon(a *ui.Armazon) {
 func (p *Pantalla) capaFlotante() fyne.CanvasObject {
 	// «Nuevo contacto» es el «+» flotante, abajo a la derecha y en todos los anchos
 	// (BotonFlotante en ContactsApp.tsx): al alcance del pulgar en el teléfono, donde el
-	// menú lateral es un cajón cerrado, y el mismo sitio en escritorio. Sin red no se
-	// ofrece; sin libreta, apagado, como lo estaba el botón del menú.
-	if p.SinConexion {
+	// menú lateral es un cajón cerrado, y el mismo sitio en escritorio. Sin red o con una
+	// libreta de solo lectura no se ofrece; sin libreta, apagado, como lo estaba el botón
+	// del menú.
+	if !p.escribe() {
 		return container.New(ui.CapaFlotante{})
 	}
 	fab := ui.NuevoBotonFlotante(p.t("nav.newContact", nil), p.AlCrearContacto)
@@ -422,6 +431,11 @@ func (p *Pantalla) enMenu(f func()) func() {
 // flotante (`capaFlotante`), en todos los anchos.
 func (p *Pantalla) menu() fyne.CanvasObject {
 	bloques := []fyne.CanvasObject{p.seccionVistas(), p.seccionLibretas()}
+	if !p.CargandoLibretas && !p.ErrorLibretas {
+		for _, g := range p.Cuentas {
+			bloques = append(bloques, p.seccionCuenta(g))
+		}
+	}
 	if p.AlServiciosVinculados != nil {
 		bloques = append(bloques, ui.NuevaFilaLateral(p.t("linkedServices.connected", nil), iconos.Trazo(iconos.Globo, ui.GlifoMenu, "sidebar-fg", tema.De(fyne.CurrentApp().Settings().ThemeVariant())).Objeto(), p.enMenu(p.AlServiciosVinculados)))
 	}
@@ -497,7 +511,129 @@ func (p *Pantalla) seccionLibretas() *ui.SeccionLateral {
 	case len(p.Libretas) == 0:
 		s.Filas = []fyne.CanvasObject{textoDeMenu(p.t("nav.booksEmpty", nil))}
 	}
+	deCuenta := p.deCuenta()
 	for _, b := range p.Libretas {
+		if deCuenta[b.ID] {
+			continue
+		}
+		s.Filas = append(s.Filas, p.filaLibreta(b, v))
+	}
+	if !p.SinConexion {
+		s.Filas = append(s.Filas, ui.NuevaFilaLateral(p.t("nav.newAddressBook", nil),
+			iconos.Trazo(iconos.Mas, ui.GlifoMenu, "sidebar-fg-muted", v).Objeto(), p.enMenu(p.AlCrearLibreta)))
+	}
+	return s
+}
+
+// GrupoCuenta son las libretas de una cuenta externa (CardDAV, Google, Microsoft).
+type GrupoCuenta struct {
+	// Rotulo es el nombre de la cuenta.
+	Rotulo string
+	// Libretas son los ids de sus libretas.
+	Libretas []string
+	// SoloLectura son las que la cuenta no deja escribir: lo que se cambiara aquí no
+	// subiría, así que en ellas la pantalla no deja crear, editar, etiquetar, importar
+	// ni borrar (destacar sí: es de este equipo).
+	SoloLectura map[string]bool
+	// RotuloSoloLectura es la insignia de esas.
+	RotuloSoloLectura string
+	// AvisoSoloLectura, si no está vacío, va sobre la lista de una de esas libretas
+	// («Esta libreta es de solo lectura en su cuenta…»).
+	AvisoSoloLectura string
+	// Aviso, si no está vacío, va bajo el nombre («Hay que volver a entrar»).
+	Aviso string
+	// RotuloSincronizar y AlSincronizar son «Sincronizar ahora»; nil, no sale.
+	RotuloSincronizar string
+	AlSincronizar     func()
+	// CrearLibreta, si no es nil, crea una libreta en la cuenta (el MKCOL extendido en
+	// CardDAV, una carpeta de contactos en Outlook): la sección lleva «Nueva libreta», que
+	// abre el mismo diálogo que la de «Libretas». nil, no sale.
+	CrearLibreta func(ctx context.Context, nombre string) error
+}
+
+// soloLectura dice si la libreta abierta es de una cuenta que no deja escribir en ella
+// (Sytue Office, K-06). Sin cuentas, nunca.
+func (p *Pantalla) soloLectura() bool {
+	if p.Activa == nil {
+		return false
+	}
+	for _, g := range p.Cuentas {
+		if g.SoloLectura[p.Activa.ID] {
+			return true
+		}
+	}
+	return false
+}
+
+// DeSoloLectura dice si la libreta abierta es de solo lectura en su cuenta: quien
+// importa en ella desde fuera de la pantalla (un fichero soltado) lo mira antes.
+func (p *Pantalla) DeSoloLectura() bool { return p.soloLectura() }
+
+// avisoSoloLectura es el aviso de la libreta abierta si es de solo lectura, o "".
+func (p *Pantalla) avisoSoloLectura() string {
+	if p.Activa == nil {
+		return ""
+	}
+	for _, g := range p.Cuentas {
+		if g.SoloLectura[p.Activa.ID] {
+			return g.AvisoSoloLectura
+		}
+	}
+	return ""
+}
+
+// escribe dice si se puede cambiar la libreta abierta: con red y si no es de solo
+// lectura en su cuenta.
+func (p *Pantalla) escribe() bool { return !p.SinConexion && !p.soloLectura() }
+
+func (p *Pantalla) deCuenta() map[string]bool {
+	m := map[string]bool{}
+	for _, g := range p.Cuentas {
+		for _, id := range g.Libretas {
+			m[id] = true
+		}
+	}
+	return m
+}
+
+// seccionCuenta es la sección de una cuenta con sus libretas.
+func (p *Pantalla) seccionCuenta(g GrupoCuenta) *ui.SeccionLateral {
+	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
+	s := ui.NuevaSeccionLateral(g.Rotulo)
+	if g.AlSincronizar != nil {
+		a := ui.NuevaAccionLateralCon(g.RotuloSincronizar, iconos.Trazo(iconos.Rotar, 16, "sidebar-fg-muted", v), p.enMenu(g.AlSincronizar))
+		a.Inerte = p.SinConexion
+		s.Acciones = append(s.Acciones, a)
+	}
+	if g.CrearLibreta != nil && p.alCrearEnCuenta != nil {
+		grupo := g
+		a := ui.NuevaAccionLateralCon(p.t("nav.newAddressBook", nil), iconos.Trazo(iconos.Mas, 16, "sidebar-fg-muted", v), p.enMenu(func() { p.alCrearEnCuenta(grupo) }))
+		a.Inerte = p.SinConexion
+		s.Acciones = append(s.Acciones, a)
+	}
+	if g.Aviso != "" {
+		s.Filas = append(s.Filas, textoDeMenu(g.Aviso))
+	}
+	ids := map[string]bool{}
+	for _, id := range g.Libretas {
+		ids[id] = true
+	}
+	for _, b := range p.Libretas {
+		if !ids[b.ID] {
+			continue
+		}
+		f := p.filaLibreta(b, v)
+		if g.SoloLectura[b.ID] && g.RotuloSoloLectura != "" {
+			f.Cola = ui.Texto(g.RotuloSoloLectura, tema.TextoXS, ui.Normal, tema.Color("sidebar-fg-muted", v))
+		}
+		s.Filas = append(s.Filas, f)
+	}
+	return s
+}
+
+// filaLibreta es la fila de una libreta, que la abre al pulsarla.
+func (p *Pantalla) filaLibreta(b api.AddressBook, v tema.Variante) *ui.FilaLateral {
+	{
 		libro := b
 		f := ui.NuevaFilaLateral(nombreLibreta(libro),
 			iconos.Trazo(iconos.Usuario, ui.GlifoMenu, "sidebar-fg-muted", v).Objeto(),
@@ -507,13 +643,8 @@ func (p *Pantalla) seccionLibretas() *ui.SeccionLateral {
 				}
 			}))
 		f.Activa = p.Activa != nil && p.Activa.ID == libro.ID
-		s.Filas = append(s.Filas, f)
+		return f
 	}
-	if !p.SinConexion {
-		s.Filas = append(s.Filas, ui.NuevaFilaLateral(p.t("nav.newAddressBook", nil),
-			iconos.Trazo(iconos.Mas, ui.GlifoMenu, "sidebar-fg-muted", v).Objeto(), p.enMenu(p.AlCrearLibreta)))
-	}
-	return s
 }
 
 // nombreLibreta es el nombre que se enseña, con el mismo criterio que el servicio.
@@ -551,7 +682,7 @@ func (p *Pantalla) seccionEtiquetas() *ui.SeccionLateral {
 		f.Contador = entero(len(grupo.Members))
 		s.Filas = append(s.Filas, f)
 	}
-	if !p.SinConexion {
+	if p.escribe() {
 		s.Filas = append(s.Filas, ui.NuevaFilaLateral(p.t("nav.newLabel", nil),
 			iconos.Trazo(iconos.Mas, ui.GlifoMenu, "sidebar-fg-muted", v).Objeto(), p.enMenu(p.AlCrearEtiqueta)))
 	}

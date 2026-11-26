@@ -1,0 +1,52 @@
+{
+  "nombre": "libro",
+  "descripcion": "Facturas de venta con líneas y sin ellas, una de compra y una rectificativa: numeración, cuadre al emitir, asientos por partida doble, «una vez» y sumas y saldos.",
+  "pasos": [
+    {"crear": "contacto", "como": "cli", "data": {"nombre": "Ferretería Óscar", "tipo": "organizacion", "nif": "B12345678"}},
+    {"crear": "contacto", "como": "prov", "data": {"nombre": "Papelera Sur", "tipo": "organizacion"}},
+
+    {"crear": "factura_venta", "como": "f1", "ref": "FV-2026-00001",
+     "data": {"cliente": "$cli", "fecha": "2026-03-04", "base": 3000, "iva": 460, "total": 3460}},
+    {"crear": "linea_factura", "data": {"factura": "$f1", "descripcion": "Corte", "cantidad": "2", "precio_con_iva": 1210, "tipo_iva": "21"}},
+    {"crear": "linea_factura", "data": {"factura": "$f1", "descripcion": "Libro", "cantidad": "1", "precio_con_iva": 1040, "tipo_iva": "4"}},
+
+    {"crear": "factura_venta", "como": "f2", "ref": "FV-2026-00002",
+     "data": {"cliente": "$cli", "fecha": "2026-03-10", "base": 10000, "iva": 2100, "total": 12100}},
+    {"crear": "factura_compra", "como": "c1", "ref": "FC-2026-00001",
+     "data": {"proveedor": "$prov", "fecha": "2026-03-05", "base": 5000, "iva": 1050, "total": 6050}},
+
+    {"crear": "factura_venta", "como": "f3", "ref": "FV-2026-00003",
+     "data": {"cliente": "$cli", "fecha": "2026-03-11", "base": 1000, "iva": 300, "total": 1300}},
+    {"crear": "linea_factura", "data": {"factura": "$f3", "descripcion": "Mal", "cantidad": "1", "precio_con_iva": 1210, "tipo_iva": "21"}},
+
+    {"crear": "factura_venta", "como": "r1", "ref": "FV-2026-00004",
+     "data": {"cliente": "$cli", "fecha": "2026-03-20", "base": -1000, "iva": -210, "total": -1210, "rectifica": "$f2"}},
+
+    {"asentar": "f1", "diario": "ventas", "ref": "VENTAS-2026-00001", "estado": "confirmado", "apuntes": [
+      {"cuenta": "430000", "debe": 3460, "tercero": "$cli"},
+      {"cuenta": "700000", "haber": 3000},
+      {"cuenta": "477000", "haber": 460}]},
+    {"asentar": "f1", "error": "ya_asentado"},
+    {"asentar": "f3", "error": "datos"},
+    {"asentar": "c1", "diario": "compras", "ref": "COMPRA-2026-00001", "estado": "confirmado", "apuntes": [
+      {"cuenta": "600000", "debe": 5000},
+      {"cuenta": "472000", "debe": 1050},
+      {"cuenta": "400000", "haber": 6050, "tercero": "$prov"}]},
+    {"asentar": "f2", "diario": "ventas", "ref": "VENTAS-2026-00002", "estado": "confirmado", "apuntes": [
+      {"cuenta": "430000", "debe": 12100, "tercero": "$cli"},
+      {"cuenta": "700000", "haber": 10000},
+      {"cuenta": "477000", "haber": 2100}]},
+    {"asentar": "r1", "diario": "ventas", "ref": "VENTAS-2026-00003", "estado": "confirmado", "apuntes": [
+      {"cuenta": "430000", "haber": 1210, "tercero": "$cli"},
+      {"cuenta": "700000", "debe": 1000},
+      {"cuenta": "477000", "debe": 210}]}
+  ],
+  "balance": [
+    {"cuenta": "400000", "debe": 0, "haber": 6050, "saldo": -6050},
+    {"cuenta": "430000", "debe": 15560, "haber": 1210, "saldo": 14350},
+    {"cuenta": "472000", "debe": 1050, "haber": 0, "saldo": 1050},
+    {"cuenta": "477000", "debe": 210, "haber": 2560, "saldo": -2350},
+    {"cuenta": "600000", "debe": 5000, "haber": 0, "saldo": 5000},
+    {"cuenta": "700000", "debe": 1000, "haber": 13000, "saldo": -12000}
+  ]
+}

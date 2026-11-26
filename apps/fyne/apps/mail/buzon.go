@@ -149,6 +149,10 @@ type Buzon struct {
 	// pública, con la que se escribe el enlace. Llegan con ConDrive.
 	Explorador ExploradorDrive
 	URLDrive   string
+	// Invitaciones lee y contesta las invitaciones de calendario del lector, y fmto es
+	// el estado del lector con formato (formato_lector.go). Nil: como siempre.
+	Invitaciones Invitaciones
+	fmto         *estadoFormato
 	// Contactos sugiere direcciones al escribir en Para, CC y CCO. Sin él, se escriben
 	// a mano. Libreta es «Elegir de Contactos», y URLContactos, la de la app.
 	Contactos    Buscador
@@ -274,6 +278,15 @@ type Buzon struct {
 	// respuestas son los envíos retenidos en la ventana de deshacer que contestan a un
 	// correo, por id del envío: el original se marca respondido al cumplirse el plazo.
 	respuestas map[string]*respuestaRetenida
+	// AjustesOcultos son las filas de la página de ajustes que no se ofrecen, por su
+	// clave (PaginaAjustes.Ocultas). Nil: todas.
+	AjustesOcultos map[string]bool
+	// autorespuestas es lo que contestó el servidor de cada cuenta sobre su respuesta
+	// automática la última vez que se abrieron los Ajustes, por cuenta; solo con un
+	// servicio que cumple api.MailRespuestas (la edición local, respuesta_cuenta.go).
+	// vueltaAutorespuestas descarta lo que llega de una pregunta anterior.
+	autorespuestas       map[string]autorespuesta
+	vueltaAutorespuestas int
 	// URLCuenta es «Clientes de correo»: dónde se crean las contraseñas de aplicación,
 	// en Sytue ID (`${idBaseUrl}/account#app-passwords`). Vacía, no se ofrece.
 	URLCuenta string
@@ -298,6 +311,9 @@ type Cuerpo struct {
 	ConFormato bool
 	// Fallo dice que el .eml no se pudo bajar: se queda el extracto del sobre.
 	Fallo bool
+	// HTML es el cuerpo con formato ya saneado (`SanearHTML`), solo cuando el lector
+	// pinta formato (ConFormato, formato_lector.go). Vacío: se pinta Texto, como siempre.
+	HTML string
 	// Adjuntos son las partes que no son el cuerpo, con sus bytes: salen del mismo
 	// .eml, así que descargarlos o guardarlos en Drive no pide nada más al servidor.
 	Adjuntos []eml.Adjunto
@@ -1159,7 +1175,11 @@ func (b *Buzon) pedirCuerpo(id string) {
 		defer r.Close()
 		return leerMIME(ctx, b.S, r)
 	}, func(m eml.Mensaje, err error) {
-		b.cuerpos[id] = CuerpoDe(m, err)
+		c := CuerpoDe(m, err)
+		if b.fmto != nil {
+			c = b.conFormatoCuerpo(id, c, m.HTML)
+		}
+		b.cuerpos[id] = c
 		b.P.Lector.Refresh()
 	})
 }

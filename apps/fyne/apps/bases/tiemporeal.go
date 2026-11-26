@@ -223,8 +223,10 @@ func (p *Pantalla) latidoDe(b *Base) api.BasesLatido {
 }
 
 // seguir abre el flujo de la base y empieza a latir. Se para con dejarDeSeguir.
+//
+//nolint:gocognit // El flujo, su reconexión y qué hacer al perder el acceso van juntos: partirlo separa el cursor de quien lo avanza.
 func (p *Pantalla) seguir(b *Base) {
-	if p.svc == nil {
+	if p.svc == nil || p.SinServidor {
 		return
 	}
 	ctx, parar := context.WithCancel(context.Background())

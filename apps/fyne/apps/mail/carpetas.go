@@ -37,6 +37,15 @@ type GestorCarpetas interface {
 
 var _ GestorCarpetas = (*api.Mail)(nil)
 
+// CarpetasPorCuenta es lo que ofrece un servicio con varias cuentas a la vez (Sytue
+// Office): en cuál de ellas se crea la carpeta nueva. Sin él, o con una sola cuenta, no
+// se pregunta y se llama a CreateMailbox, como siempre.
+type CarpetasPorCuenta interface {
+	// CuentasCarpetas son las cuentas, con su id y su dirección (`Address`).
+	CuentasCarpetas() []api.MailAlias
+	CreateMailboxIn(ctx context.Context, cuenta, nombre string) (api.Mailbox, error)
+}
+
 // ClaveRechazoCarpeta es `FAIL_KEYS`: el motivo del servidor, en palabras. Vacío si el
 // motivo no es de los que se explican (una avería), que se avisa como fallo.
 func ClaveRechazoCarpeta(m api.MailboxSetError) string {
@@ -60,6 +69,11 @@ type gestorCarpetas struct {
 	ancho   float32
 	nombre  *ui.Entrada
 	creando bool
+	// cuentas y cuenta son las cuentas donde se puede crear (CarpetasPorCuenta, con más
+	// de una) y la elegida; selCuenta, su selector. Vacías: no se pregunta.
+	cuentas   []api.MailAlias
+	cuenta    string
+	selCuenta *ui.Selector
 	// borrando es la carpeta que pregunta «¿Borrar carpeta?»; ocupada, la que espera
 	// al servidor.
 	borrando, ocupada string
@@ -82,6 +96,17 @@ func (b *Buzon) verCarpetas() *gestorCarpetas {
 			return true
 		}
 		return false
+	}
+	if pc, ok := b.S.(CarpetasPorCuenta); ok {
+		if cs := pc.CuentasCarpetas(); len(cs) > 1 {
+			g.cuentas, g.cuenta = cs, cs[0].ID
+			nombres := make([]string, len(cs))
+			for i, c := range cs {
+				nombres[i] = c.Address
+			}
+			g.selCuenta = ui.NuevoSelector(nombres, func(i int) { g.cuenta = g.cuentas[i].ID })
+			g.selCuenta.Elegida = 0
+		}
 	}
 	g.caja = container.New(ui.Columna{Hueco: huecoSeccionesEtiq})
 	cerrar := ui.NuevoBoton(t.T("common.close", nil), nil).Con(ui.Secundario, ui.TallaMD)
@@ -151,8 +176,11 @@ func (g *gestorCarpetas) pintar() {
 	crear := ui.NuevoBoton(t.T("folderNew.create", nil), g.crear)
 	crear.Icono, crear.Cargando = iconos.Mas, g.creando
 	crear.Inerte = strings.TrimSpace(g.nombre.Texto()) == "" || dup
-	nueva := seccion(t.T("folders.newTitle", nil), t.T("folders.newDescription", nil), g.ancho,
-		campo, container.New(&extremos{}, canvas.NewRectangle(color.NRGBA{}), crear))
+	filas := []fyne.CanvasObject{campo, container.New(&extremos{}, canvas.NewRectangle(color.NRGBA{}), crear)}
+	if g.selCuenta != nil {
+		filas = append([]fyne.CanvasObject{ui.GrupoCampo(t.T("externalMail.account", nil), false, g.selCuenta, "", "")}, filas...)
+	}
+	nueva := seccion(t.T("folders.newTitle", nil), t.T("folders.newDescription", nil), g.ancho, filas...)
 
 	g.caja.Objects = []fyne.CanvasObject{
 		ayuda,
@@ -231,7 +259,11 @@ func (g *gestorCarpetas) crear() {
 	}
 	g.creando = true
 	g.pintar()
+	cuenta := g.cuenta
 	pedir(g.b, func(ctx context.Context) (api.Mailbox, error) {
+		if pc, ok := g.b.S.(CarpetasPorCuenta); ok && cuenta != "" {
+			return pc.CreateMailboxIn(ctx, cuenta, nombre)
+		}
 		return g.b.S.CreateMailbox(ctx, nombre)
 	}, func(_ api.Mailbox, err error) {
 		g.creando = false

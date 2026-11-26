@@ -76,6 +76,18 @@ type estadoVisor struct {
 	// original es la foto entera para el tamaño real, de `pidiendo` mientras llega.
 	original *fotoOriginal
 	pidiendo string
+	// medio es el reproductor del vídeo `medioID` (App.Reproductor), y pararMedio lo para.
+	medio      fyne.CanvasObject
+	medioID    string
+	pararMedio func()
+}
+
+// soltarMedio para el reproductor del vídeo, si lo hay.
+func (e *estadoVisor) soltarMedio() {
+	if e.pararMedio != nil {
+		e.pararMedio()
+	}
+	e.medio, e.medioID, e.pararMedio = nil, "", nil
 }
 
 // fotoOriginal es la foto a su tamaño, decodificada, con la huella de la receta con la
@@ -197,6 +209,7 @@ func (a *App) cerrarVisor() {
 	if g := a.v.TecaGrande; g != nil && g != a.v.Teca {
 		g.Cancelar()
 	}
+	e.soltarMedio()
 	a.vis = nil
 	if a.w != nil {
 		a.w.Canvas().Overlays().Remove(e.capa)
@@ -289,6 +302,21 @@ func (a *App) datosVisor(e *estadoVisor, f api.Photo) Visor {
 		d.AlMapa = func() {
 			a.AbrirWeb("https://www.openstreetmap.org/?mlat=" + lat + "&mlon=" + lon + "#map=15/" + lat + "/" + lon)
 		}
+	}
+	if f.EsVideo() && a.Reproductor != nil {
+		// Un vídeo (FO-09): su reproductor en vez de la foto; se monta una vez por vídeo
+		// y vive mientras se mira, aunque el visor se rehaga.
+		if e.medioID != f.ID {
+			e.soltarMedio()
+			e.medio, e.pararMedio = a.Reproductor(f)
+			e.medioID = f.ID
+		}
+		d.Medio = e.medio
+	} else if e.medioID != "" {
+		e.soltarMedio()
+	}
+	if d.Aviso == "" && a.AvisoDeFoto != nil {
+		d.Aviso = a.AvisoDeFoto(f)
 	}
 	if e.origen == desdeAlbum {
 		// Los dos mandos del álbum, como el fragmento que AlbumView.tsx le pasa al visor:
@@ -413,6 +441,11 @@ func (a *App) runaVisor(r rune) {
 	e := a.vis
 	switch accionDe(atajosVisor, teclaDeRuna(r)) {
 	case atajoPase:
+		// En un vídeo, el Espacio es reproducir y pausar, como en cualquier reproductor.
+		if m, ok := e.medio.(interface{ Alternar() }); ok {
+			m.Alternar()
+			return
+		}
 		a.alternarPase()
 	case atajoFicha:
 		e.conFicha = !e.conFicha

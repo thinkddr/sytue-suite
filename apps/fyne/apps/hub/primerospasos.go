@@ -19,7 +19,7 @@ import (
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/ajustes"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
-	"git.sytue.eu/sytue/one/apps/nucleo/auth"
+	"git.sytue.eu/sytue/one/apps/nucleo/autorizacion"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 )
 
@@ -372,7 +372,7 @@ func (v *Vista) ConPrimerosPasos(idBase string, cargar func(context.Context) ([]
 
 // cargarPrimerosPasos pide los pasos de quien ha entrado, salvo que los ocultara en esta
 // organización. Lo que no llega deja la portada sin tarjeta, como en la web.
-func (v *Vista) cargarPrimerosPasos(ctx context.Context, r auth.Reclamos) {
+func (v *Vista) cargarPrimerosPasos(ctx context.Context, r autorizacion.Reclamos) {
 	huella := ajustes.HuellaPrimerosPasos(r.Iss, r.Sub, r.Tenant)
 	var pasos []api.PasoPendiente
 	if v.primerosPasos != nil && huella != "" && !v.pasosOcultos(huella) {

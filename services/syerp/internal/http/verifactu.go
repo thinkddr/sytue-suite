@@ -13,8 +13,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	domain "git.sytue.eu/sytue/one/apps/nucleo/erp/dominio"
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
-	"git.sytue.eu/sytue/one/services/syerp/internal/domain"
 	"git.sytue.eu/sytue/one/services/syerp/internal/store"
 	"git.sytue.eu/sytue/one/services/syerp/internal/verifactu"
 )

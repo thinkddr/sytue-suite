@@ -104,6 +104,14 @@ type Lienzo struct {
 	AlEnsanchar     func()
 	Imagen          func(url string) imagenRemota
 	Documento       func(id string) docRemoto
+	// ImagenAdjunta es la imagen que una nota de imagen lleva dentro (Sytue Office,
+	// N-06). Nil: no se busca.
+	ImagenAdjunta func(Adjunto) imagenRemota
+	// SinBajar: la imagen de una dirección no se pide sola (Sytue Office); la tarjeta
+	// ofrece CargarImagen, si lo hay, y CargandoImagen dice si ya se está bajando.
+	SinBajar       bool
+	CargarImagen   func(Nota)
+	CargandoImagen func(id string) bool
 	// vivas son las tarjetas del último repintado, por nota: a las que llevar la vista.
 	// previas son las del repintado anterior mientras se reparte el nuevo: una tarjeta
 	// cuya nota y forma no han cambiado (`claveTarjeta`) se REUTILIZA, con su renderer,
@@ -527,6 +535,13 @@ func (l *Lienzo) tarjetaNueva(n Nota, clave claveTarjeta, reutilizable bool) *Ta
 	t.Previa, t.portal = l.Previa, l.portal
 	t.AlPlegar = func(i int) { llamar2(l.AlPlegarLista, n, i) }
 	t.AlDescargar, t.Imagen, t.Documento = l.AlDescargar, l.Imagen, l.Documento
+	t.ImagenAdjunta, t.SinBajar = l.ImagenAdjunta, l.SinBajar
+	// Cargarla es guardar un adjunto: no en un cuaderno de solo lectura ni cerrado. (La
+	// nota de imagen no se «edita» como un texto: Editable no vale aquí.)
+	if l.CargarImagen != nil && n.Tipo == "image" && !l.SoloLectura && !l.Bloqueado && !n.Cifrada {
+		t.CargarImagen = func() { l.CargarImagen(n) }
+		t.CargandoImagen = l.CargandoImagen != nil && l.CargandoImagen(n.ID)
+	}
 	t.AlQuitarAdjunto = func(a Adjunto) { llamar2(l.AlQuitarAdjunto, n, a) }
 	if n.ID == l.Renombrando {
 		t.Renombrar = l.CampoTitulo

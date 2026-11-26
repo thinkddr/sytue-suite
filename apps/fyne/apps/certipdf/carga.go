@@ -515,7 +515,11 @@ func (p *Pantalla) MostrarPortada(pdf *api.PDF, loc i18n.Locale) {
 	po.AlCrear, po.AlElegir, po.AlEscanear = p.AlCrear, p.AlElegir, p.AlEscanear
 	po.AlAbrir = func(f api.File) {
 		if p.AlAbrirRuta != nil {
-			p.AlAbrirRuta("/" + api.PDFCarpeta + "/" + f.Name)
+			ruta := "/" + api.PDFCarpeta + "/" + f.Name
+			if p.RutaDeReciente != nil {
+				ruta = p.RutaDeReciente(f)
+			}
+			p.AlAbrirRuta(ruta)
 		}
 	}
 	po.AlPeticion = func(x api.PDFPeticionFirma, recibida bool) { p.abrirPeticion(pdf, x, recibida) }

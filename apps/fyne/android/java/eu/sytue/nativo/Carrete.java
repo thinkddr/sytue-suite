@@ -114,8 +114,10 @@ public final class Carrete {
 
     /**
      * Las fotos y los vídeos de la galería, uno por línea:
-     * «id\tnombre\ttipo\tmilisegundos\tbytes[\tv]», con la «v» final y el id con «v»
-     * delante en los vídeos (los ids de MediaStore son de cada tabla). Sin lo que guardó
+     * «id\tnombre\ttipo\tmilisegundos\tbytes» en las fotos y
+     * «vid\tnombre\ttipo\tmilisegundos\tbytes\tv\tduración\tancho\talto» en los vídeos:
+     * el id con «v» delante (los ids de MediaStore son de cada tabla), la «v» que los marca y
+     * su duración en milisegundos y sus lados, 0 si MediaStore no los sabe. Sin lo que guardó
      * Sytue («Pictures/Sytue Photos»). La fecha es la de la toma ({@code DATE_TAKEN}) y, si
      * no la hay, la de llegada ({@code DATE_ADDED}, en segundos).
      */
@@ -129,9 +131,23 @@ public final class Carrete {
         return s.toString();
     }
 
-    /** Una tabla de MediaStore. Las columnas se llaman igual en la de fotos y la de vídeos. */
+    /**
+     * Una tabla de MediaStore. Las columnas se llaman igual en la de fotos y la de vídeos; la
+     * de vídeos trae además la duración y los lados.
+     */
     private static void listar(Context ctx, StringBuilder s, Uri origen, String marca) {
-        String[] columnas = {
+        boolean video = !marca.isEmpty();
+        String[] columnas = video ? new String[] {
+            MediaStore.MediaColumns._ID,
+            MediaStore.MediaColumns.DISPLAY_NAME,
+            MediaStore.MediaColumns.MIME_TYPE,
+            MediaStore.Video.Media.DATE_TAKEN,
+            MediaStore.MediaColumns.DATE_ADDED,
+            MediaStore.MediaColumns.SIZE,
+            MediaStore.Video.Media.DURATION,
+            MediaStore.MediaColumns.WIDTH,
+            MediaStore.MediaColumns.HEIGHT,
+        } : new String[] {
             MediaStore.MediaColumns._ID,
             MediaStore.MediaColumns.DISPLAY_NAME,
             MediaStore.MediaColumns.MIME_TYPE,
@@ -160,14 +176,25 @@ public final class Carrete {
                         .append(limpio(c.getString(2))).append('\t')
                         .append(tomada).append('\t')
                         .append(c.isNull(5) ? -1 : c.getLong(5));
-                if (!marca.isEmpty()) {
-                    s.append("\tv");
+                if (video) {
+                    s.append("\tv\t").append(positivo(c, 6))
+                            .append('\t').append(positivo(c, 7))
+                            .append('\t').append(positivo(c, 8));
                 }
                 s.append('\n');
             }
         } catch (SecurityException e) {
             // Sin permiso para esa tabla (los vídeos, si solo se dieron las fotos): sin ella.
         }
+    }
+
+    /** La columna i como número, o 0 si está vacía o no es positiva. */
+    private static long positivo(Cursor c, int i) {
+        if (c.isNull(i)) {
+            return 0;
+        }
+        long n = c.getLong(i);
+        return n > 0 ? n : 0;
     }
 
     /**

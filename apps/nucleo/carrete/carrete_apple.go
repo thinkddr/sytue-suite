@@ -107,9 +107,9 @@ static PHAssetResource *sytue_carrete_original(PHAsset *a) {
 }
 
 // Las fotos y los vídeos, del más antiguo al más reciente, uno por línea:
-// «id\tnombre\t\tmilisegundos\t-1[\tv]», sin los del álbum de Sytue. El tipo va vacío
-// (Go lo saca del nombre), el tamaño no se sabe sin leer el recurso y la «v» del final
-// marca un vídeo.
+// «id\tnombre\t\tmilisegundos\t-1» y, en un vídeo, detrás «\tv\tduración\tancho\talto»
+// (la duración en milisegundos), sin los del álbum de Sytue. El tipo va vacío (Go lo saca
+// del nombre) y el tamaño no se sabe sin leer el recurso.
 static char *sytue_carrete_listar(const char *propio) {
 	@autoreleasepool {
 		NSMutableSet<NSString *> *saltar = [NSMutableSet set];
@@ -131,10 +131,15 @@ static char *sytue_carrete_listar(const char *propio) {
 				if ([saltar containsObject:a.localIdentifier]) return;
 				PHAssetResource *r = sytue_carrete_original(a);
 				NSDate *f = a.creationDate ?: a.modificationDate;
+				NSString *video = @"";
+				if (a.mediaType == PHAssetMediaTypeVideo) {
+					video = [NSString stringWithFormat:@"\tv\t%lld\t%lu\t%lu",
+					                                   (long long)(a.duration > 0 ? a.duration * 1000.0 : 0),
+					                                   (unsigned long)a.pixelWidth, (unsigned long)a.pixelHeight];
+				}
 				[s appendFormat:@"%@\t%@\t\t%lld\t-1%@\n", a.localIdentifier,
 				               sytue_carrete_limpio(r.originalFilename),
-				               (long long)(f ? f.timeIntervalSince1970 * 1000.0 : 0),
-				               a.mediaType == PHAssetMediaTypeVideo ? @"\tv" : @""];
+				               (long long)(f ? f.timeIntervalSince1970 * 1000.0 : 0), video];
 			}
 		}];
 		return sytue_carrete_copia(s);

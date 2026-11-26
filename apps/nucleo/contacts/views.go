@@ -35,7 +35,7 @@ type GroupView struct {
 	BookDeleted bool
 }
 
-func (s *Snapshot) Books() ([]BookView, error) {
+func (s *Snapshot) calcularLibros() ([]BookView, error) {
 	books := make([]BookView, 0)
 	for _, row := range s.Rows() {
 		if row.Kind != "book" {
@@ -47,19 +47,22 @@ func (s *Snapshot) Books() ([]BookView, error) {
 		}
 		books = append(books, book)
 	}
-	slices.SortFunc(books, func(a, b BookView) int {
-		if a.IsDefault != b.IsDefault {
-			if a.IsDefault {
-				return -1
-			}
-			return 1
-		}
-		if n := strings.Compare(strings.ToLower(a.DisplayName), strings.ToLower(b.DisplayName)); n != 0 {
+	slices.SortFunc(books, compararLibros)
+	return books, nil
+}
+
+func compararLibros(a, b BookView) int {
+	return compararClaves(ClaveDeLibreta(a.AddressBook), ClaveDeLibreta(b.AddressBook))
+}
+
+// compararClaves compara dos claves de orden campo a campo.
+func compararClaves[K ~[2]string | ~[3]string | ~[4]string](a, b K) int {
+	for i := range len(a) {
+		if n := strings.Compare(a[i], b[i]); n != 0 {
 			return n
 		}
-		return strings.Compare(a.ID, b.ID)
-	})
-	return books, nil
+	}
+	return 0
 }
 
 type sourceCard struct {
@@ -96,7 +99,7 @@ type sourcePhone struct {
 }
 
 func (s *Snapshot) deletedBooks() (map[string]bool, error) {
-	books, err := s.Books()
+	books, err := s.calcularLibros()
 	if err != nil {
 		return nil, err
 	}
@@ -122,7 +125,7 @@ func (s *Snapshot) cards() (map[string]sourceCard, error) {
 	return cards, nil
 }
 
-func (s *Snapshot) Contacts() ([]ContactView, error) {
+func (s *Snapshot) calcularContactos() ([]ContactView, error) {
 	books, err := s.deletedBooks()
 	if err != nil {
 		return nil, err
@@ -146,15 +149,31 @@ func (s *Snapshot) Contacts() ([]ContactView, error) {
 		}
 		contacts = append(contacts, value)
 	}
-	slices.SortFunc(contacts, func(a, b ContactView) int {
-		for _, pair := range [][2]string{{a.FamilyName, b.FamilyName}, {a.GivenName, b.GivenName}, {a.FormattedName, b.FormattedName}, {a.ID, b.ID}} {
-			if n := strings.Compare(strings.ToLower(pair[0]), strings.ToLower(pair[1])); n != 0 {
-				return n
-			}
-		}
-		return 0
-	})
-	return contacts, nil
+	claves := make([]claveContacto, len(contacts))
+	for i := range contacts {
+		claves[i] = claveDe(&contacts[i])
+	}
+	return ordenarContactos(contacts, claves), nil
+}
+
+// claveContacto es por lo que se ordenan los contactos: apellidos, nombre, nombre
+// completo e identificador, sin mayúsculas.
+type claveContacto [4]string
+
+func claveDe(c *ContactView) claveContacto { return ClaveDeOrden(&c.Contact) }
+
+// ordenarContactos ordena contacts por sus claves (claves[i] es la de contacts[i]).
+func ordenarContactos(contacts []ContactView, claves []claveContacto) []ContactView {
+	orden := make([]int, len(contacts))
+	for i := range orden {
+		orden[i] = i
+	}
+	slices.SortFunc(orden, func(a, b int) int { return compararClaves(claves[a], claves[b]) })
+	out := make([]ContactView, len(contacts))
+	for i, j := range orden {
+		out[i] = contacts[j]
+	}
+	return out
 }
 
 func projectContact(raw []byte, cards map[string]sourceCard, emails map[string][]api.ContactEmail, phones map[string][]api.ContactPhone, books map[string]bool) (ContactView, error) {
@@ -236,29 +255,40 @@ func (s *Snapshot) channels() (map[string][]api.ContactEmail, map[string][]api.C
 			phones = append(phones, value)
 		}
 	}
+	return agruparCorreos(emails), agruparTelefonos(phones), nil
+}
+
+// agruparCorreos son los correos de cada contacto, por posición y, a igualdad, por id.
+func agruparCorreos(emails []sourceEmail) map[string][]api.ContactEmail {
 	slices.SortFunc(emails, func(a, b sourceEmail) int {
 		if a.Position != b.Position {
 			return a.Position - b.Position
 		}
 		return strings.Compare(a.ID, b.ID)
 	})
+	byEmail := map[string][]api.ContactEmail{}
+	for _, value := range emails {
+		byEmail[value.ContactID] = append(byEmail[value.ContactID], api.ContactEmail{Email: value.Email, Type: value.Type, IsPrimary: value.IsPrimary})
+	}
+	return byEmail
+}
+
+// agruparTelefonos son los teléfonos de cada contacto, por posición y, a igualdad, por id.
+func agruparTelefonos(phones []sourcePhone) map[string][]api.ContactPhone {
 	slices.SortFunc(phones, func(a, b sourcePhone) int {
 		if a.Position != b.Position {
 			return a.Position - b.Position
 		}
 		return strings.Compare(a.ID, b.ID)
 	})
-	byEmail, byPhone := map[string][]api.ContactEmail{}, map[string][]api.ContactPhone{}
-	for _, value := range emails {
-		byEmail[value.ContactID] = append(byEmail[value.ContactID], api.ContactEmail{Email: value.Email, Type: value.Type, IsPrimary: value.IsPrimary})
-	}
+	byPhone := map[string][]api.ContactPhone{}
 	for _, value := range phones {
 		byPhone[value.ContactID] = append(byPhone[value.ContactID], api.ContactPhone{Phone: value.Phone, Type: value.Type, IsPrimary: value.IsPrimary})
 	}
-	return byEmail, byPhone, nil
+	return byPhone
 }
 
-func (s *Snapshot) Groups() ([]GroupView, error) {
+func (s *Snapshot) calcularGrupos() ([]GroupView, error) {
 	books, err := s.deletedBooks()
 	if err != nil {
 		return nil, err
@@ -272,10 +302,7 @@ func (s *Snapshot) Groups() ([]GroupView, error) {
 		if row.Kind != "member" {
 			continue
 		}
-		var value struct {
-			GroupID string `json:"group_id"`
-			UID     string `json:"contact_uid"`
-		}
+		var value sourceMember
 		if json.Unmarshal(row.JSON, &value) != nil {
 			return nil, ErrSnapshot
 		}
@@ -286,31 +313,46 @@ func (s *Snapshot) Groups() ([]GroupView, error) {
 		if row.Kind != "group" {
 			continue
 		}
-		var value struct {
-			api.ContactGroup
-			ObjectID  string     `json:"object_id"`
-			DeletedAt *time.Time `json:"deleted_at"`
-		}
+		var value sourceGroup
 		if json.Unmarshal(row.JSON, &value) != nil {
 			return nil, ErrSnapshot
 		}
-		object, found := cards[value.ObjectID]
+		group, found := projectGroup(value, cards, members, books)
 		if !found {
 			return nil, ErrSnapshot
 		}
-		uids := slices.Clone(members[value.ID])
-		slices.Sort(uids)
-		value.Members = uids
-		if value.DeletedAt == nil {
-			value.DeletedAt = object.DeletedAt
-		}
-		groups = append(groups, GroupView{ContactGroup: value.ContactGroup, ObjectID: value.ObjectID, VCard: object.Data, DeletedAt: value.DeletedAt, BookDeleted: books[value.AddressBookID]})
+		groups = append(groups, group)
 	}
-	slices.SortFunc(groups, func(a, b GroupView) int {
-		if n := strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name)); n != 0 {
-			return n
-		}
-		return strings.Compare(a.ID, b.ID)
-	})
+	slices.SortFunc(groups, compararGrupos)
 	return groups, nil
+}
+
+type sourceMember struct {
+	GroupID string `json:"group_id"`
+	UID     string `json:"contact_uid"`
+}
+
+type sourceGroup struct {
+	api.ContactGroup
+	ObjectID  string     `json:"object_id"`
+	DeletedAt *time.Time `json:"deleted_at"`
+}
+
+// projectGroup es la vista de un grupo; false si no está su tarjeta.
+func projectGroup(value sourceGroup, cards map[string]sourceCard, members map[string][]string, books map[string]bool) (GroupView, bool) {
+	object, found := cards[value.ObjectID]
+	if !found {
+		return GroupView{}, false
+	}
+	uids := slices.Clone(members[value.ID])
+	slices.Sort(uids)
+	value.Members = uids
+	if value.DeletedAt == nil {
+		value.DeletedAt = object.DeletedAt
+	}
+	return GroupView{ContactGroup: value.ContactGroup, ObjectID: value.ObjectID, VCard: object.Data, DeletedAt: value.DeletedAt, BookDeleted: books[value.AddressBookID]}, true
+}
+
+func compararGrupos(a, b GroupView) int {
+	return compararClaves(ClaveDeGrupo(a.ContactGroup), ClaveDeGrupo(b.ContactGroup))
 }

@@ -11,6 +11,8 @@ import (
 	"slices"
 	"strings"
 	"time"
+
+	domain "git.sytue.eu/sytue/one/apps/nucleo/erp/dominio"
 )
 
 // Espacios de nombres de los esquemas de la AEAT (servicio web v1.0.3).
@@ -135,31 +137,11 @@ func errDatos(formato string, args ...any) error {
 	return fmt.Errorf("%w: %s", ErrDatos, fmt.Sprintf(formato, args...))
 }
 
-// tiposIVA son los tipos de IVA que ha habido desde 2023, en centésimas de punto.
-var tiposIVA = []int64{2100, 1000, 750, 500, 400, 200}
-
-// TipoIVA deduce el tipo de IVA de una base y su cuota. La AEAT admite 10
-// céntimos de diferencia entre la cuota y base × tipo, por redondeos; más allá, la
-// cuota no corresponde a ningún tipo y el registro se rechazaría.
-func TipoIVA(base, cuota int64) (int64, bool) {
-	mejor, dif := int64(0), int64(-1)
-	for _, t := range tiposIVA {
-		esperada := redondear(base*t, 10000)
-		d := max(esperada-cuota, cuota-esperada)
-		if dif < 0 || d < dif {
-			mejor, dif = t, d
-		}
-	}
-	return mejor, dif >= 0 && dif <= 10
-}
-
-// redondear divide redondeando al entero más cercano, también con negativos.
-func redondear(n, d int64) int64 {
-	if n < 0 {
-		return -((-n + d/2) / d)
-	}
-	return (n + d/2) / d
-}
+// TipoIVA deduce el tipo de IVA de una base y su cuota (dominio.TipoDeCuota). La
+// AEAT admite 10 céntimos de diferencia entre la cuota y base × tipo, por
+// redondeos; más allá, la cuota no corresponde a ningún tipo y el registro se
+// rechazaría.
+func TipoIVA(base, cuota int64) (int64, bool) { return domain.TipoDeCuota(base, cuota) }
 
 // validarID comprueba lo que la AEAT rechaza de un identificador de factura.
 func validarID(id IDFactura) error {

@@ -25,6 +25,7 @@ package photos
 
 import (
 	"fmt"
+	"strings"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -95,10 +96,28 @@ type Vista struct {
 	// Desplaza es el desplazamiento de la página: las flechas lo mueven para que se vea
 	// la tesela enfocada (el `scrollIntoView` de la web). nil, no se mueve nada.
 	Desplaza *container.Scroll
+	// SinServidor es la edición local (Sytue Office): no hay servicio que comparta, así
+	// que la nav no ofrece «Compartido conmigo» y un álbum no ofrece enlace público. Las
+	// repetidas las calcula el repositorio local (por la huella del original). Falso,
+	// como siempre.
+	SinServidor bool
+	// Textos son textos que sustituyen, en esta edición, a los del catálogo: la clave del
+	// catálogo y el texto ya traducido, con sus `{variables}` (sin plurales). Sytue Office
+	// los usa para no decir «Sytue Drive» donde no lo hay. nil: los del catálogo, como
+	// siempre.
+	Textos map[string]string
 }
 
 // Traduce es el `t()` de la web.
 func (v Vista) Traduce(clave string, vars ...i18n.Vars) string {
+	if propio, ok := v.Textos[clave]; ok {
+		if len(vars) > 0 {
+			for k, valor := range vars[0] {
+				propio = strings.ReplaceAll(propio, "{"+k+"}", fmt.Sprint(valor))
+			}
+		}
+		return propio
+	}
 	if len(vars) > 0 {
 		return v.T.T(clave, vars[0])
 	}

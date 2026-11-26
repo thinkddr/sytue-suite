@@ -8,7 +8,6 @@ import (
 
 	"fyne.io/fyne/v2"
 
-	"git.sytue.eu/sytue/one/apps/fyne/sesion"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/sistema/escritorio"
 )
@@ -177,7 +176,7 @@ func (a *avisosBarra) anunciar(n api.HubNotification) {
 		Destino:  escritorio.DestinoDe(n.ID, n.Source, n.URL),
 		AlPulsar: func() { fyne.Do(func() { a.pulsar(n) }) },
 	}); err != nil {
-		sesion.AvisoDeRespaldo(app, titulo, cuerpo)
+		avisoDeRespaldo(app, titulo, cuerpo)
 	}
 }
 
@@ -191,5 +190,5 @@ func abiertaEn(app fyne.App) func(string) bool {
 	if app.Driver().Device().IsMobile() {
 		return func(string) bool { return false } // el Hub avisa de todo (regla 4)
 	}
-	return func(origen string) bool { return sesion.Abierta(idDeProducto(origen)) }
+	return func(origen string) bool { return appAbierta(idDeProducto(origen)) }
 }

@@ -13,10 +13,10 @@ import (
 	"testing"
 	"time"
 
+	provider "git.sytue.eu/sytue/one/apps/nucleo/ia/proveedor"
 	"git.sytue.eu/sytue/one/platform/pkg/authn"
 	"git.sytue.eu/sytue/one/services/ai/internal/config"
 	"git.sytue.eu/sytue/one/services/ai/internal/presupuesto"
-	"git.sytue.eu/sytue/one/services/ai/internal/provider"
 )
 
 // fakeProvider implementa provider.Provider con una respuesta fija (o error).

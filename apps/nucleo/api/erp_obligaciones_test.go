@@ -94,14 +94,16 @@ func TestERPObligacionesPideLoQueLaWeb(t *testing.T) {
 // cambian allí, esto se pone en rojo aquí y no en producción.
 func TestERPObligacionesHablaElIdiomaDelServicio(t *testing.T) {
 	for fichero, literales := range map[string][]string{
-		"services/syerp/internal/obligaciones/obligaciones.go": {
+		"apps/nucleo/erp/obligaciones/obligaciones.go": {
 			`json:"recomendada"`, `json:"limite_domiciliacion,omitempty"`, `json:"calendario_provisional,omitempty"`,
 			`json:"con_requerimiento_pct,omitempty"`, `json:"fija_centimos,omitempty"`, `json:"si_no"`, `json:"requisitos"`,
 		},
 		"services/syerp/internal/http/handlers_organizacion.go": {
 			`json:"concepto_rotulo"`, `json:"ambito_rotulo"`, `json:"pendientes,omitempty"`, `"territorio"`,
-			`"resultado_centimos"`, `"asentado"`, `Get("anio")`, `json:"formas"`, `json:"obligaciones"`,
+			`Get("anio")`, `json:"formas"`, `json:"obligaciones"`, `Calculo.Calcular(`,
 		},
+		// El cálculo desde el libro vive en el núcleo y el servicio lo usa.
+		"apps/nucleo/erp/obligaciones/calculo.go": {`json:"resultado_centimos"`, `json:"asentado"`},
 		"services/syerp/internal/store/organizacion.go": {
 			`json:"direccion"`, `json:"cp"`, `json:"ciudad"`, `json:"condiciones"`,
 		},

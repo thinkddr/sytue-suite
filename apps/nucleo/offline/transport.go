@@ -14,7 +14,7 @@ import (
 	"regexp"
 	"strings"
 
-	"git.sytue.eu/sytue/one/apps/nucleo/auth"
+	"git.sytue.eu/sytue/one/apps/nucleo/autorizacion"
 )
 
 // En GOOS=js este fichero no existe a propósito: ahí net/http es fetch(), y fetch ya
@@ -148,7 +148,7 @@ func (t *Transport) validScope(req *http.Request, owner, scope string) bool {
 	}
 	// Authenticated responses must belong to the authorization actually acquired
 	// by the API client, not just to whoever is current when RoundTrip starts.
-	if bound := auth.RequestAuthorizationScope(req.Context()); bound != nil {
+	if bound := autorizacion.RequestAuthorizationScope(req.Context()); bound != nil {
 		return bound.Current(req.Header.Get("Authorization"))
 	}
 	return req.Header.Get("Authorization") == ""

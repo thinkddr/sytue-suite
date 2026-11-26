@@ -96,11 +96,13 @@ func TestERPCobrarTPVReintentaSinDuplicar(t *testing.T) {
 // TestERPTPVHablaElIdiomaDelServicio lee el servicio: los nombres del cuerpo y la ruta.
 func TestERPTPVHablaElIdiomaDelServicio(t *testing.T) {
 	for fichero, literales := range map[string][]string{
-		"services/syerp/internal/store/tpv.go": {
+		// Las reglas del cobro viven en el núcleo y el servicio las usa por alias.
+		"apps/nucleo/erp/tpv/tpv.go": {
 			`json:"operacion"`, `json:"sesion"`, `json:"cliente"`, `json:"medio"`, `json:"recibido"`, `json:"lineas"`,
-			`json:"producto"`, `json:"cantidad"`, `json:"precio"`, `json:"tipo_iva"`, `json:"factura"`, `json:"cambio"`,
-			`c.Medio != "efectivo" && c.Medio != "tarjeta"`,
+			`json:"producto"`, `json:"cantidad"`, `json:"precio"`, `json:"tipo_iva"`,
+			`Efectivo = "efectivo"`, `Tarjeta  = "tarjeta"`, `c.Medio != Efectivo && c.Medio != Tarjeta`,
 		},
+		"services/syerp/internal/store/tpv.go":   {`json:"factura"`, `json:"cambio"`, `tpv.`},
 		"services/syerp/internal/http/server.go": {`Post("/tpv/cobrar"`},
 	} {
 		codigo := webref.Read(t, fichero)

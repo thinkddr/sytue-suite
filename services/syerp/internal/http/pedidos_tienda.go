@@ -266,7 +266,7 @@ func (h *Handlers) handlePedidosTiendaFactura(w http.ResponseWriter, r *http.Req
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
-	if err := plantillaFactura.Execute(w, f); err != nil {
+	if err := f.HTML(w); err != nil {
 		httpx.Fail(w, r, err)
 	}
 }

@@ -122,6 +122,15 @@ type Tarjeta struct {
 	// Documento el HTML de un documento de Docs (la vista previa de una nota `doc`).
 	Imagen    func(url string) imagenRemota
 	Documento func(id string) docRemoto
+	// ImagenAdjunta es la imagen que la nota de imagen lleva dentro (N-06), tal como
+	// vaya. Nil: no se busca.
+	ImagenAdjunta func(Adjunto) imagenRemota
+	// SinBajar: la imagen de su dirección no se pide sola (Sytue Office, imagen_url.go);
+	// sin ella dentro, la tarjeta lo dice y ofrece CargarImagen (nil: no se puede), que da
+	// vueltas mientras CargandoImagen.
+	SinBajar       bool
+	CargarImagen   func()
+	CargandoImagen bool
 	// AlDescargar y AlQuitarAdjunto son los dos botones de cada adjunto.
 	AlDescargar     func(Adjunto)
 	AlQuitarAdjunto func(Adjunto)

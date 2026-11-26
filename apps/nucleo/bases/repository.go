@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"io"
 	"slices"
 	"strings"
 	"time"
@@ -13,6 +12,7 @@ import (
 	"github.com/google/uuid"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
+	"git.sytue.eu/sytue/one/apps/nucleo/bases/dominio"
 	"git.sytue.eu/sytue/one/apps/nucleo/offline"
 	"git.sytue.eu/sytue/one/apps/nucleo/storage"
 	"git.sytue.eu/sytue/one/apps/nucleo/storage/records"
@@ -28,11 +28,20 @@ type Config = records.Config
 type Repository struct {
 	core  *records.Repository
 	scope storage.Scope
+	// Actividad es el registro de actividad local (B-06, actividad.go). nil, lo de
+	// siempre: no se anota nada y ListAudit falla cerrado.
+	Actividad *Actividad
+	// SoltarAdjuntos: borrar un adjunto suelta además su fichero (la ficha queda en la
+	// papelera sin él), y la próxima compactación del almacén lo quita del disco. Es
+	// para Sytue Office, donde un adjunto borrado no se recupera. Falso, lo de siempre.
+	SoltarAdjuntos bool
 }
 
 func SourceKind(kind string) bool {
 	switch kind {
-	case "base", "table", "field", "view", "record":
+	// comment y file son los comentarios y las fichas de adjunto de un registro
+	// (B-04); la fuente del servicio no los trae, el dispositivo los escribe.
+	case "base", "table", "field", "view", "record", "comment", "file":
 		return true
 	default:
 		return false
@@ -47,7 +56,14 @@ func recordsConfiguration(cfg Config) (Config, error) {
 	cfg.Product = "bases"
 	cfg.EntityKind = "org.sytue.bases.entity.v1"
 	cfg.ReceiptKind = "org.sytue.bases.snapshot.v1"
-	cfg.BinaryKind, cfg.ValidateBinary = nil, nil
+	// Los bytes de un adjunto son un fichero retenido del motor, citado desde su ficha.
+	cfg.BinaryKind = func(kind string) bool { return kind == binarioAdjunto }
+	cfg.ValidateBinary = func(_ context.Context, row records.SnapshotRow) error {
+		if row.Kind != binarioAdjunto || row.Size > dominio.MaxBytesAdjunto {
+			return ErrBases
+		}
+		return row.Validate()
+	}
 	cfg.ValidateRow = func(_ context.Context, kind, id string, raw []byte) error {
 		if !SourceKind(kind) || !storage.Identifier(id) || !json.Valid(raw) {
 			return ErrBases
@@ -165,24 +181,25 @@ func (r *Repository) ListBases(ctx context.Context) ([]api.BasesBase, error) {
 }
 
 func (r *Repository) CreateBase(ctx context.Context, nombre string) (api.BasesBase, error) {
-	now := time.Now().UTC()
-	b := api.BasesBase{
-		ID:        uuid.NewString(),
-		Name:      strings.TrimSpace(nombre),
-		OwnerSub:  r.scope.Subject,
-		Role:      api.BasesOwner,
-		CreatedAt: now,
-		UpdatedAt: now,
-	}
-	if b.Name == "" {
+	nombre = strings.TrimSpace(nombre)
+	if nombre == "" {
 		return api.BasesBase{}, ErrBases
 	}
-	raw, err := r.core.Mutate(ctx, "base-create", b, func(_ context.Context) (string, string, string, []byte, error) {
-		val, err := json.Marshal(b)
-		return "base", b.ID, "live", val, err
+	entrada := struct {
+		Nombre string `json:"name"`
+	}{nombre}
+	return crear(ctx, r, "base-create", "base", entrada, func(context.Context) (string, api.BasesBase, error) {
+		now := time.Now().UTC()
+		b := api.BasesBase{
+			ID:        uuid.NewString(),
+			Name:      nombre,
+			OwnerSub:  r.scope.Subject,
+			Role:      api.BasesOwner,
+			CreatedAt: now,
+			UpdatedAt: now,
+		}
+		return b.ID, b, nil
 	})
-	clear(raw)
-	return b, err
 }
 
 func (r *Repository) GetBase(ctx context.Context, id string) (api.BasesBase, error) {
@@ -201,8 +218,12 @@ func (r *Repository) GetBase(ctx context.Context, id string) (api.BasesBase, err
 	return b, nil
 }
 
+// UpdateBase, RenameTable y RenameField llevan en la entrada lo que escriben: con solo
+// el id, un cambio cortado dejaba pendiente esa entrada y el siguiente cambio del mismo
+// objeto retomaba el cortado y se perdía (ver «Repetir una operación», esquema.go).
 func (r *Repository) UpdateBase(ctx context.Context, id, nombre, descripcion string) error {
-	raw, err := r.core.Mutate(ctx, "base-update", id, func(ctx context.Context) (string, string, string, []byte, error) {
+	entrada := []string{id, nombre, descripcion}
+	raw, err := r.mutar(ctx, "base-update", entrada, func(ctx context.Context) (string, string, string, []byte, error) {
 		existing, err := r.core.ReadRaw(ctx, "base", id)
 		if err != nil {
 			return "", "", "", nil, err
@@ -222,8 +243,8 @@ func (r *Repository) UpdateBase(ctx context.Context, id, nombre, descripcion str
 	return err
 }
 
-func (r *Repository) trashRow(ctx context.Context, op, kind, id string) error {
-	raw, err := r.core.Mutate(ctx, op, id, func(ctx context.Context) (string, string, string, []byte, error) {
+func (r *Repository) trashRow(ctx context.Context, op, kind, id string, quitar ...string) error {
+	raw, err := r.mutar(ctx, op, id, func(ctx context.Context) (string, string, string, []byte, error) {
 		existing, err := r.core.ReadRaw(ctx, kind, id)
 		if err != nil {
 			return "", "", "", nil, err
@@ -234,6 +255,9 @@ func (r *Repository) trashRow(ctx context.Context, op, kind, id string) error {
 			return "", "", "", nil, ErrBases
 		}
 		rawMap["deleted_at"] = time.Now().UTC()
+		for _, k := range quitar {
+			delete(rawMap, k)
+		}
 		encoded, err := json.Marshal(rawMap)
 		return kind, id, "trash", encoded, err
 	})
@@ -286,27 +310,8 @@ func (r *Repository) ListTables(ctx context.Context, base string) ([]api.BasesTa
 	return out, nil
 }
 
-func (r *Repository) CreateTable(ctx context.Context, base, nombre string) (api.BasesTable, error) {
-	t := api.BasesTable{
-		ID:     uuid.NewString(),
-		BaseID: base,
-		Name:   strings.TrimSpace(nombre),
-		Role:   api.BasesOwner,
-		Fields: []api.BasesField{},
-	}
-	if t.Name == "" {
-		return api.BasesTable{}, ErrBases
-	}
-	raw, err := r.core.Mutate(ctx, "table-create", t, func(_ context.Context) (string, string, string, []byte, error) {
-		val, err := json.Marshal(t)
-		return "table", t.ID, "live", val, err
-	})
-	clear(raw)
-	return t, err
-}
-
 func (r *Repository) RenameTable(ctx context.Context, tabla, nombre string) error {
-	raw, err := r.core.Mutate(ctx, "table-rename", tabla, func(ctx context.Context) (string, string, string, []byte, error) {
+	raw, err := r.mutar(ctx, "table-rename", []string{tabla, nombre}, func(ctx context.Context) (string, string, string, []byte, error) {
 		existing, err := r.core.ReadRaw(ctx, "table", tabla)
 		if err != nil {
 			return "", "", "", nil, err
@@ -328,27 +333,8 @@ func (r *Repository) DeleteTable(ctx context.Context, tabla string) error {
 	return r.trashRow(ctx, "table-delete", "table", tabla)
 }
 
-func (r *Repository) CreateField(ctx context.Context, tabla string, campo api.BasesNewField) (api.BasesField, error) {
-	f := api.BasesField{
-		ID:          uuid.NewString(),
-		TableID:     tabla,
-		Name:        strings.TrimSpace(campo.Name),
-		Kind:        campo.Kind,
-		Choices:     campo.Choices,
-		LinkTableID: campo.LinkTableID,
-		Formula:     campo.Formula,
-		Result:      campo.Result,
-	}
-	raw, err := r.core.Mutate(ctx, "field-create", f, func(_ context.Context) (string, string, string, []byte, error) {
-		val, err := json.Marshal(f)
-		return "field", f.ID, "live", val, err
-	})
-	clear(raw)
-	return f, err
-}
-
 func (r *Repository) RenameField(ctx context.Context, campo, nombre string) error {
-	raw, err := r.core.Mutate(ctx, "field-rename", campo, func(ctx context.Context) (string, string, string, []byte, error) {
+	raw, err := r.mutar(ctx, "field-rename", []string{campo, nombre}, func(ctx context.Context) (string, string, string, []byte, error) {
 		existing, err := r.core.ReadRaw(ctx, "field", campo)
 		if err != nil {
 			return "", "", "", nil, err
@@ -370,128 +356,6 @@ func (r *Repository) DeleteField(ctx context.Context, campo string) error {
 	return r.trashRow(ctx, "field-delete", "field", campo)
 }
 
-func (r *Repository) ListRecords(ctx context.Context, tabla, _, _ string, limite int) (api.BasesRecordPage, error) {
-	fieldRaws, err := r.readByKind(ctx, "field")
-	if err != nil {
-		return api.BasesRecordPage{}, err
-	}
-	var fields []api.BasesField
-	for _, fRaw := range fieldRaws {
-		var f api.BasesField
-		err := json.Unmarshal(fRaw, &f)
-		clear(fRaw)
-		if err != nil {
-			return api.BasesRecordPage{}, ErrBases
-		}
-		if f.TableID == tabla {
-			fields = append(fields, f)
-		}
-	}
-	slices.SortFunc(fields, func(a, b api.BasesField) int { return a.Position - b.Position })
-
-	recRaws, err := r.readByKind(ctx, "record")
-	if err != nil {
-		return api.BasesRecordPage{}, err
-	}
-	var recs []api.BasesRecord
-	for _, rRaw := range recRaws {
-		var rec api.BasesRecord
-		err := json.Unmarshal(rRaw, &rec)
-		clear(rRaw)
-		if err != nil {
-			return api.BasesRecordPage{}, ErrBases
-		}
-		if rec.TableID == tabla {
-			recs = append(recs, rec)
-		}
-	}
-	slices.SortFunc(recs, func(a, b api.BasesRecord) int { return strings.Compare(a.ID, b.ID) })
-	if limite > 0 && len(recs) > limite {
-		recs = recs[:limite]
-	}
-	return api.BasesRecordPage{
-		Fields:  fields,
-		Records: recs,
-		Role:    api.BasesOwner,
-	}, nil
-}
-
-func (r *Repository) CreateRecord(ctx context.Context, tabla string, datos map[string]any, enlaces map[string][]string) (api.BasesRecord, error) {
-	if datos == nil {
-		datos = map[string]any{}
-	}
-	if enlaces == nil {
-		enlaces = map[string][]string{}
-	}
-	now := time.Now().UTC()
-	rec := api.BasesRecord{
-		ID:        uuid.NewString(),
-		TableID:   tabla,
-		Data:      datos,
-		Links:     enlaces,
-		Rev:       1,
-		CreatedBy: r.scope.Subject,
-		UpdatedBy: r.scope.Subject,
-		CreatedAt: now,
-		UpdatedAt: now,
-	}
-	raw, err := r.core.Mutate(ctx, "record-create", rec, func(_ context.Context) (string, string, string, []byte, error) {
-		val, err := json.Marshal(rec)
-		return "record", rec.ID, "live", val, err
-	})
-	clear(raw)
-	return rec, err
-}
-
-func (r *Repository) GetRecord(ctx context.Context, registro string) (api.BasesRecord, error) {
-	raw, err := r.core.ReadRaw(ctx, "record", registro)
-	if err != nil {
-		return api.BasesRecord{}, err
-	}
-	defer clear(raw)
-	var rec api.BasesRecord
-	if err := json.Unmarshal(raw, &rec); err != nil {
-		return api.BasesRecord{}, ErrBases
-	}
-	return rec, nil
-}
-
-func (r *Repository) WriteCell(ctx context.Context, registro, campo string, celda api.BasesCell, _ string) (api.BasesCellResult, error) {
-	var updated api.BasesRecord
-	raw, err := r.core.Mutate(ctx, "record-cell", registro, func(ctx context.Context) (string, string, string, []byte, error) {
-		existing, err := r.core.ReadRaw(ctx, "record", registro)
-		if err != nil {
-			return "", "", "", nil, err
-		}
-		defer clear(existing)
-		if err := json.Unmarshal(existing, &updated); err != nil {
-			return "", "", "", nil, ErrBases
-		}
-		if updated.Data == nil {
-			updated.Data = map[string]any{}
-		}
-		if updated.Links == nil {
-			updated.Links = map[string][]string{}
-		}
-		if celda.Links != nil {
-			updated.Links[campo] = celda.Links
-		} else {
-			updated.Data[campo] = celda.Value
-		}
-		updated.Rev++
-		updated.UpdatedBy = r.scope.Subject
-		updated.UpdatedAt = time.Now().UTC()
-		val, err := json.Marshal(updated)
-		return "record", registro, "live", val, err
-	})
-	clear(raw)
-	return api.BasesCellResult{Record: updated}, err
-}
-
-func (r *Repository) DeleteRecord(ctx context.Context, registro string, _ bool) error {
-	return r.trashRow(ctx, "record-delete", "record", registro)
-}
-
 func (r *Repository) ListViews(ctx context.Context, tabla string) ([]api.BasesView, error) {
 	raws, err := r.readByKind(ctx, "view")
 	if err != nil {
@@ -511,23 +375,6 @@ func (r *Repository) ListViews(ctx context.Context, tabla string) ([]api.BasesVi
 	}
 	slices.SortFunc(out, func(a, b api.BasesView) int { return strings.Compare(a.ID, b.ID) })
 	return out, nil
-}
-
-func (r *Repository) CreateView(ctx context.Context, tabla, nombre, tipo string, cfg api.BasesViewConfig) (api.BasesView, error) {
-	v := api.BasesView{
-		ID:        uuid.NewString(),
-		TableID:   tabla,
-		Name:      strings.TrimSpace(nombre),
-		Kind:      tipo,
-		Config:    cfg,
-		CreatedBy: r.scope.Subject,
-	}
-	raw, err := r.core.Mutate(ctx, "view-create", v, func(_ context.Context) (string, string, string, []byte, error) {
-		val, err := json.Marshal(v)
-		return "view", v.ID, "live", val, err
-	})
-	clear(raw)
-	return v, err
 }
 
 func (r *Repository) DeleteView(ctx context.Context, vista string) error {
@@ -564,8 +411,4 @@ func (r *Repository) MyGroups(context.Context) ([]string, error) {
 
 func (r *Repository) TransferBase(context.Context, string, string) error {
 	return ErrUnsupported
-}
-
-func (r *Repository) Export(context.Context, string, string) (io.ReadCloser, error) {
-	return nil, ErrUnsupported
 }

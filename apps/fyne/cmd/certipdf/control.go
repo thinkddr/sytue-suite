@@ -166,7 +166,7 @@ func (c *control) crear() {
 // fichero de otra app de la suite se lo pasa al sistema, que lo abre en SU app (§13.6).
 //
 // En el móvil `ficheros.Elegir` es el selector del sistema que pone la sesión
-// (`sesion/elegir_movil.go`): uno cada vez, ya copiado a una ruta.
+// (`anfitrion/elegir_movil.go`): uno cada vez, ya copiado a una ruta.
 func (c *control) elegir() {
 	go func() {
 		rutas, err := ficheros.Elegir()

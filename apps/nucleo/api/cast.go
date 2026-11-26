@@ -703,6 +703,9 @@ func (ch *CastChat) Close() { _ = ch.conn.Close(websocket.StatusNormalClosure, "
 
 // Explore es la portada pública: directos en curso y vídeos públicos de toda Sytue.
 func (c *Cast) Explore(ctx context.Context, cursor string, limite int) (CastExplore, error) {
+	if d, ok := c.data.(CastExploreData); ok {
+		return d.Explore(ctx, cursor, limite)
+	}
 	v := url.Values{}
 	poner(v, "cursor", cursor)
 	if limite > 0 {
@@ -713,6 +716,9 @@ func (c *Cast) Explore(ctx context.Context, cursor string, limite int) (CastExpl
 
 // Channel es el canal público de una organización.
 func (c *Cast) Channel(ctx context.Context, org, cursor string) (CastChannel, error) {
+	if d, ok := c.data.(CastExploreData); ok {
+		return d.Channel(ctx, org, cursor)
+	}
 	v := url.Values{}
 	poner(v, "cursor", cursor)
 	return JSON[CastChannel](ctx, c.pub, Request{Path: "/c/" + url.PathEscape(org), Query: v, Anonymous: true})

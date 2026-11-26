@@ -173,7 +173,7 @@ func TestERPPermisosAlcanza(t *testing.T) {
 }
 
 func TestLosCamposDelERPSonLosDelServicio(t *testing.T) {
-	catalogo := webref.Read(t, "services/syerp/internal/catalogo/catalogo.go")
+	catalogo := webref.Read(t, "apps/nucleo/erp/catalogo/catalogo.go")
 	for _, literal := range []string{
 		`json:"modelos"`, `json:"campos"`, `json:"lista"`, `json:"estados,omitempty"`, `json:"valor"`, `json:"opciones,omitempty"`,
 		`TipoDinero     = "` + ERPDinero + `"`, `TipoFecha      = "` + ERPFecha + `"`, `TipoFechaHora  = "` + ERPFechaHora + `"`,
@@ -184,7 +184,7 @@ func TestLosCamposDelERPSonLosDelServicio(t *testing.T) {
 		`json:"requerido,omitempty"`, `json:"modelo,omitempty"`, `json:"numerado"`, `json:"contable"`,
 	} {
 		if !strings.Contains(catalogo, literal) {
-			t.Errorf("services/syerp/internal/catalogo ya no dice %s", literal)
+			t.Errorf("apps/nucleo/erp/catalogo ya no dice %s", literal)
 		}
 	}
 	almacen := webref.Read(t, "services/syerp/internal/store/store.go")
@@ -248,7 +248,7 @@ func TestLosCamposDelERPSonLosDelServicio(t *testing.T) {
 		t.Error("services/syerp ya no sirve la factura impresa como HTML: revisar la extensión con que se guarda")
 	}
 	// Facturae y UBL, solo de lo que se EMITE: el catálogo lo dice en `cobro`.
-	if !strings.Contains(webref.Read(t, "services/syerp/internal/catalogo/catalogo.go"), "Cobro bool `json:\"cobro,omitempty\"`") {
+	if !strings.Contains(webref.Read(t, "apps/nucleo/erp/catalogo/catalogo.go"), "Cobro bool `json:\"cobro,omitempty\"`") {
 		t.Error("el catálogo de services/syerp ya no publica `cobro`: revisar ERPModelo.Cobro")
 	}
 	estados := webref.Read(t, "apps/frontend/apps/erp/src/components/Verifactu.tsx")

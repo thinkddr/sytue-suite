@@ -95,13 +95,13 @@ func (s *Snapshot) ChangeFavorites(current FavoriteIndex, uids []string, on, str
 	if current.Validate(s.Scope()) != nil {
 		return FavoriteIndex{}, ErrSnapshot
 	}
-	people, err := s.visiblePeople()
+	present := map[string]bool{}
+	err := s.cadaVisible(func(person *ContactView) bool {
+		present[person.UID] = true
+		return true
+	})
 	if err != nil {
 		return FavoriteIndex{}, err
-	}
-	present := map[string]bool{}
-	for _, person := range people {
-		present[person.UID] = true
 	}
 	state := current
 	state.Values = make(map[string]bool, len(current.Values)+len(uids))
@@ -178,7 +178,8 @@ func (s *Snapshot) ChangeTrash(current TrashIndex, operation string, ids []strin
 	if operation != "delete" && operation != "batch-trash" && operation != "restore" && operation != "purge" {
 		return TrashIndex{}, ErrSnapshot
 	}
-	people, err := s.Contacts()
+	// Los guardados, solo para leer.
+	people, err := s.contactos()
 	if err != nil {
 		return TrashIndex{}, err
 	}
@@ -214,4 +215,11 @@ func (s *Snapshot) ChangeTrash(current TrashIndex, operation string, ids []strin
 		return TrashIndex{}, queryError(http.StatusNotFound, "private_contact_not_found")
 	}
 	return state, state.Validate(s.Scope())
+}
+
+// IndiceDeFavoritos es el índice de favoritos guardado, por UID (vacío si no hay): la
+// libreta SQLite de Sytue Office se lo lleva al pasar a ella (`local/libreta`), y así un
+// UID destacado lo sigue estando en los contactos que lleguen después con él.
+func (r *Repository) IndiceDeFavoritos(ctx context.Context) (FavoriteIndex, error) {
+	return r.favoriteIndex(ctx)
 }

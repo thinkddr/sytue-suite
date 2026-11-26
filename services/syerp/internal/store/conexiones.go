@@ -12,9 +12,9 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"git.sytue.eu/sytue/one/apps/nucleo/erp/catalogo"
+	domain "git.sytue.eu/sytue/one/apps/nucleo/erp/dominio"
 	"git.sytue.eu/sytue/one/platform/pkg/keycrypto"
-	"git.sytue.eu/sytue/one/services/syerp/internal/catalogo"
-	"git.sytue.eu/sytue/one/services/syerp/internal/domain"
 )
 
 // Conexion es la configuración de un tercero para una organización. El secreto

@@ -100,7 +100,17 @@ type AbrirArchivo struct {
 	// no las tiene— y que esta importa igual, porque el `accept` de la portada de la web
 	// las admite: `csv` en Calcus; `txt`, `md` o `html` en Docus.
 	Importa []string
+	// AbrirLocal, si está, trae un fichero de la máquina (`Apertura.Local`) él mismo en
+	// vez de importarlo como documento nuevo: la edición local lo ancla al fichero, así
+	// que abrirlo dos veces da el mismo documento y se puede guardar de vuelta
+	// (`biblioteca.AbrirFichero`). Si devuelve [ErrSeguirImportando], se importa como
+	// siempre. nil, la edición conectada: lo de siempre.
+	AbrirLocal func(ctx context.Context, ap api.Apertura) (api.Document, error)
 }
+
+// ErrSeguirImportando lo devuelve [AbrirArchivo.AbrirLocal] para un fichero que no sabe
+// anclar (un `content://` de Android): se importa como documento nuevo, como siempre.
+var ErrSeguirImportando = errors.New("editor: el fichero se importa como documento nuevo")
 
 // PlazoAbrir es cuánto se espera a que el servicio convierta el fichero.
 const PlazoAbrir = 2 * time.Minute
@@ -223,6 +233,11 @@ func (a *AbrirArchivo) lanzar(f func()) {
 // libro recortado, que son siempre uno nuevo. Si el anclado ya existía con contenido, se
 // abre tal cual: sembrarlo pisaría lo que lleve escrito.
 func (a *AbrirArchivo) importar(ctx context.Context, ap api.Apertura, fuente string) (api.Document, error) {
+	if a.AbrirLocal != nil && ap.Local != "" {
+		if doc, err := a.AbrirLocal(ctx, ap); !errors.Is(err, ErrSeguirImportando) {
+			return doc, err
+		}
+	}
 	importar := a.Importar
 	if a.ImportarGuardando != nil {
 		importar = a.ImportarGuardando

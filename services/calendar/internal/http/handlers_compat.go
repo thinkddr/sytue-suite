@@ -45,7 +45,7 @@ import (
 // compat nunca se ve ni más ni menos que por la nativa.
 //
 // Lo que NO está implementado responde 501 con mensaje claro (nunca un 200 vacío):
-// el resto de Google Calendar v3 (events.patch/update/delete/move/instances,
+// el resto de Google Calendar v3 (events.delete/move/instances,
 // calendars.*, acl, freebusy, colors, settings, channels/watch, sincronización por
 // syncToken) y el resto de Graph (calendarView, eventos con recurrencia
 // estructurada, escritura, delta, subscriptions, /users/{id}/…).
@@ -509,7 +509,8 @@ func (h *compatHandlers) googlePatchEvent(w http.ResponseWriter, r *http.Request
 
 // googleWriteEvent es update y patch sobre el MISMO UpdateEvent de la API nativa
 // (verja de escritura, SEQUENCE y iTIP incluidos). El UID no cambia nunca: es la
-// identidad del evento para CalDAV y para los invitados.
+// identidad del evento para CalDAV y para los invitados. Las RDATE y EXDATE de la serie,
+// que el cliente no ve, siguen con ella (compat.FechasDeLaSerie).
 //
 // ponytail: una ocurrencia suelta de una serie (`{id}_{instante}`) no se edita por
 // aquí: exige crear la excepción con RECURRENCE-ID, que la API nativa hace por
@@ -560,6 +561,7 @@ func (h *compatHandlers) googleWriteEvent(w http.ResponseWriter, r *http.Request
 		AllDay: f.AllDay, Status: f.Status, Classification: f.Classification, Transparency: f.Transparency,
 		RRule: f.RRule, Attendees: f.Attendees, Send: send,
 	}
+	in.RDate, in.ExDate = compat.FechasDeLaSerie(actual, f)
 	if in.Organizer == "" {
 		in.Organizer = actual.Organizer
 	}

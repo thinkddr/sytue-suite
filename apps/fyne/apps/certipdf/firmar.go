@@ -225,8 +225,12 @@ func (d *dialogoFirmar) elegir(f *ficheroElegido, titulo string, extensiones []s
 func (d *dialogoFirmar) conCertificado(ancho float32) fyne.CanvasObject {
 	a := d.a
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
+	ayuda := a.t("pdf.dialog.firmar.help")
+	if a.p.SelloDeTiempo != nil {
+		ayuda = a.p.propio("firmaAqui") // en la edición local no hay servidor que firme
+	}
 	partes := []fyne.CanvasObject{
-		ui.NuevoParrafo(a.t("pdf.dialog.firmar.help"), tema.TextoXS, ui.Normal, "text-muted", v).A(ancho),
+		ui.NuevoParrafo(ayuda, tema.TextoXS, ui.Normal, "text-muted", v).A(ancho),
 	}
 	// En la app nativa, lo primero es el certificado del SISTEMA: el navegador no llega,
 	// y es donde está el de casi todo el mundo.
@@ -255,6 +259,10 @@ func (d *dialogoFirmar) conCertificado(ancho float32) fyne.CanvasObject {
 		fila = container.New(ui.Columna{Hueco: tema.Espacio(2)}, motivo, lugar)
 	}
 	partes = append(partes, d.certificadoDelSistema(ancho), fila)
+	// La autoridad de sellado de la edición local vale para las dos firmas con certificado.
+	if a.p.SelloDeTiempo != nil {
+		partes = append(partes, d.selloLocal(ancho))
+	}
 	return container.New(ui.Columna{Hueco: tema.Espacio(3)}, partes...)
 }
 

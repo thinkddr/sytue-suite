@@ -36,6 +36,10 @@ type Config = records.Config
 type Repository struct {
 	core  *records.Repository
 	scope storage.Scope
+	// Idioma es la lengua que se declara en el PDF accesible exportado (PDF/UA pide el
+	// idioma del documento); vacío, «es», lo de siempre. Lo pone quien abre el repositorio
+	// con el idioma de la app (O-11).
+	Idioma string
 }
 
 var (
@@ -1342,7 +1346,7 @@ func (r *Repository) ExportDocument(ctx context.Context, id, formato string, pla
 	kind := model.Kind(doc.Kind)
 	format := model.BlobFormat(formato)
 	if format == model.FormatPDF && !plantilla && (accesible == nil || *accesible) {
-		data, _, err := model.ExportPDFAccesible(kind, doc.Title, "es", state)
+		data, _, err := model.ExportPDFAccesible(kind, doc.Title, cmp.Or(r.Idioma, "es"), state)
 		return data, err
 	}
 	comments, err := r.loadModelComments(ctx, id)

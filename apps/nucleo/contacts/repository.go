@@ -17,6 +17,9 @@ type Config = records.Config
 type Repository struct {
 	core  *records.Repository
 	scope storage.Scope
+	// fotos guarda la última instantánea con la revisión del catálogo de la que salió
+	// (foto.go): mientras no cambie, no se vuelve a leer el almacén.
+	fotos fotos
 }
 
 func New(cfg Config) (*Repository, error) {
@@ -25,11 +28,31 @@ func New(cfg Config) (*Repository, error) {
 		return nil, err
 	}
 
+	repo := &Repository{scope: cfg.Scope}
+	// Abrir ya lee y valida la libreta entera: lo leído es la primera instantánea
+	// guardada, y la primera consulta no vuelve a leerla (foto.go).
+	cfg.ValidateCatalog = func(ctx context.Context, catalog records.Catalog) error {
+		owner, ok := catalog.(records.CatalogOwner)
+		var core *records.Repository
+		var revision uint64
+		if ok {
+			core, revision = owner.CatalogOwner()
+		}
+		read, err := readCatalogIndexes(ctx, repo.scope, catalog)
+		if err != nil {
+			return err
+		}
+		if core != nil && core == repo.core {
+			repo.fotos.poner(&fotoGuardada{revision: revision, snapshot: read.snapshot, favorites: read.favorites, trash: read.trash})
+		}
+		return nil
+	}
 	core, err := records.New(cfg)
 	if err != nil {
 		return nil, err
 	}
-	return &Repository{core: core, scope: cfg.Scope}, nil
+	repo.core = core
+	return repo, nil
 }
 
 // recordsConfiguration is shared by private data and historical source
@@ -57,19 +80,21 @@ func (r *Repository) Initialize(ctx context.Context) error { return r.core.Initi
 func (r *Repository) ImportLegacySnapshot(ctx context.Context) error {
 	return r.core.ImportLegacySnapshot(ctx)
 }
-func (r *Repository) Close() { r.core.Close() }
 
+func (r *Repository) Close() {
+	r.core.Close()
+	r.fotos.olvidar()
+}
+
+// Snapshot es la libreta entera, validada. Es la guardada si el catálogo no ha cambiado
+// desde que se leyó (foto.go); si no, se lee. No se puede modificar: quien la recibe
+// la consulta o deriva otra (WithAggregates, WithIndexes).
 func (r *Repository) Snapshot(parent context.Context) (*Snapshot, error) {
-	ctx, done, err := r.core.Start(parent)
+	foto, err := r.foto(parent)
 	if err != nil {
 		return nil, err
 	}
-	defer done()
-	catalog, err := r.core.Catalog()
-	if err != nil {
-		return nil, err
-	}
-	return readCatalog(ctx, r.scope, catalog)
+	return foto.snapshot.copia(), nil
 }
 
 func validateEntity(scope storage.Scope, kind, id string, raw []byte) error {
@@ -98,9 +123,30 @@ func validateEntity(scope storage.Scope, kind, id string, raw []byte) error {
 }
 
 func readCatalog(ctx context.Context, scope storage.Scope, catalog records.Catalog) (*Snapshot, error) {
+	read, err := readCatalogIndexes(ctx, scope, catalog)
+	return read.snapshot, err
+}
+
+// lectura es una instantánea leída del catálogo con los índices de favoritos y de
+// papelera con que se compuso (nil los que no hay).
+type lectura struct {
+	snapshot  *Snapshot
+	favorites *FavoriteIndex
+	trash     *TrashIndex
+}
+
+func readCatalogIndexes(ctx context.Context, scope storage.Scope, catalog records.Catalog) (lectura, error) {
+	snapshot, projection, err := readCatalogProjection(ctx, scope, catalog)
+	if err != nil {
+		return lectura{}, err
+	}
+	return lectura{snapshot: snapshot, favorites: projection.favorites, trash: projection.trash}, nil
+}
+
+func readCatalogProjection(ctx context.Context, scope storage.Scope, catalog records.Catalog) (*Snapshot, catalogProjection, error) {
 	entries, err := catalog.Entries()
 	if err != nil {
-		return nil, err
+		return nil, catalogProjection{}, err
 	}
 	projection := catalogProjection{rows: make([]Row, 0, len(entries))}
 	buffers := [][]byte{}
@@ -112,45 +158,47 @@ func readCatalog(ctx context.Context, scope storage.Scope, catalog records.Catal
 	for _, entry := range entries {
 		raw, err := catalog.ReadJSON(ctx, entry)
 		if err != nil {
-			return nil, err
+			return nil, catalogProjection{}, err
 		}
 		buffers = append(buffers, raw)
 		if err := projection.add(scope, entry, raw); err != nil {
-			return nil, err
+			return nil, catalogProjection{}, err
 		}
 	}
 	snapshot, err := NewSnapshot(scope, projection.rows)
 	if err != nil {
-		return nil, err
+		return nil, catalogProjection{}, err
 	}
 	snapshot, err = snapshot.WithAggregates(projection.changes)
 	if err != nil {
-		return nil, err
+		return nil, catalogProjection{}, err
 	}
 	snapshot, err = snapshot.WithIndexes(projection.favorites, projection.trash)
 	if err != nil {
-		return nil, err
+		return nil, catalogProjection{}, err
 	}
 
 	if err := ctx.Err(); err != nil {
-		return nil, err
+		return nil, catalogProjection{}, err
 	}
 	// Completion requires renderable domain data too. No partially usable agenda
 	// can open after a malformed date, projection, card or group relationship.
 	if err := validateViews(snapshot); err != nil {
-		return nil, err
+		return nil, catalogProjection{}, err
 	}
-	return snapshot, nil
+	return snapshot, projection, nil
 }
 
+// validateViews proyecta la instantánea entera: lo proyectado se queda en ella
+// (vistas.go) para las consultas que vengan.
 func validateViews(snapshot *Snapshot) error {
-	if _, err := snapshot.Books(); err != nil {
+	if _, err := snapshot.libros(); err != nil {
 		return err
 	}
-	if _, err := snapshot.Contacts(); err != nil {
+	if _, err := snapshot.contactos(); err != nil {
 		return err
 	}
-	if _, err := snapshot.Groups(); err != nil {
+	if _, err := snapshot.grupos(); err != nil {
 		return err
 	}
 	return nil

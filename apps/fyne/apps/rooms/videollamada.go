@@ -59,8 +59,6 @@ type EnCurso interface {
 	Colgar()
 }
 
-var _ EnCurso = (*llamada.Llamada)(nil)
-
 // Llamador es lo que la llamada pide al servicio; lo cumple *api.Rooms. Es aparte de
 // Reunidor porque sin él la sala se abre en la web, como antes.
 type Llamador interface {
@@ -741,6 +739,11 @@ type Conector func(context.Context, api.RoomsCall, llamada.Opciones) (EnCurso, e
 // LlamarEnCanal es «Llamar» de la cabecera: la sala del canal (la crea o la reutiliza el
 // servicio) con su puerta, si la han echado.
 func (sa *Sala) LlamarEnCanal() {
+	if cr, ok := sa.S.(CreadorReuniones); ok {
+		// Sin llamadas propias: «Reunión de <proveedor>» (reunion_enlace.go).
+		sa.crearReunion(cr)
+		return
+	}
 	ll, ok := sa.S.(Llamador)
 	if !ok || sa.Conectar == nil || sa.abierto == "" {
 		return

@@ -23,7 +23,6 @@ import (
 	temafyne "fyne.io/fyne/v2/theme"
 
 	"git.sytue.eu/sytue/one/apps/fyne/iconos"
-	"git.sytue.eu/sytue/one/apps/fyne/sesion"
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
@@ -578,7 +577,7 @@ func TestElPuntoDeAvisoSaleSoloConAvisosSinLeer(t *testing.T) {
 // cuenta». Sin sesión no hay «Cerrar sesión», y eso también se vigila.
 func TestElMenuDeCuentaLlevaSusPartes(t *testing.T) {
 	b := barraPrueba(t)
-	b.cuenta.estado = sesion.Estado{Sujeto: "ada", Presencia: api.NoMolestar}
+	b.cuenta.estado = estadoSesion{Sujeto: "ada", Presencia: api.NoMolestar}
 	partes := b.cuenta.contenido()
 
 	var opciones, marcadas int
@@ -637,7 +636,7 @@ func rotulos(o fyne.CanvasObject) []string {
 func TestLaOrganizacionSaleDelTokenYNoDelCorreo(t *testing.T) {
 	b := barraPrueba(t)
 	b.cuenta.ficha = api.Profile{Name: "Ada Lovelace", Email: "ada@gmail.com", ActiveOrg: "acme"}
-	b.cuenta.estado = sesion.Estado{Sujeto: "ada"}
+	b.cuenta.estado = estadoSesion{Sujeto: "ada"}
 
 	dice := rotulos(b.cuenta.contenido()[0])
 	quiero := b.cuenta.t.T("account.organization", i18n.Vars{"tenant": "acme"})
@@ -661,7 +660,7 @@ func TestLaOrganizacionSaleDelTokenYNoDelCorreo(t *testing.T) {
 // conoce el `dnd` que manda la web.
 func TestLaMarcaDePresenciaSigueAlServidor(t *testing.T) {
 	b := barraPrueba(t)
-	b.cuenta.cambio(sesion.Estado{Sujeto: "ada", Presencia: api.NoMolestar})
+	b.cuenta.cambio(estadoSesion{Sujeto: "ada", Presencia: api.NoMolestar})
 	if b.cuenta.boton.avatar.Presencia != NoMolestar {
 		t.Errorf("el punto del avatar es %v y el servidor dice `busy`, que es No molestar",
 			b.cuenta.boton.avatar.Presencia)
@@ -764,7 +763,7 @@ func esperar(t *testing.T, listo func() bool) {
 func TestRetratoDeLaBarra(t *testing.T) {
 	b := NuevaBarraSuite(traductorPrueba(t), nil, iconos.Mail)
 	b.cuenta.ficha = api.Profile{Name: "Ada Lovelace", Email: "ada@sytue.eu", ActiveOrg: "corporate"}
-	b.cuenta.estado = sesion.Estado{Sujeto: "ada", Presencia: api.EnLinea}
+	b.cuenta.estado = estadoSesion{Sujeto: "ada", Presencia: api.EnLinea}
 	// Sin `sesion.Suite` no corre `pintar`, que es quien le pasa al avatar el nombre y
 	// la presencia; se le ponen a mano para que el retrato sea el de una app abierta y
 	// no el de una barra a medio arrancar —tal cual, salía con «?» y sin punto—.
@@ -795,7 +794,7 @@ func TestRetratoDeLaBarra(t *testing.T) {
 func TestRetratoDelMenuDeCuenta(t *testing.T) {
 	b := NuevaBarraSuite(traductorPrueba(t), nil, iconos.Mail)
 	b.cuenta.ficha = api.Profile{Name: "Ada Lovelace", Email: "ada@sytue.eu", ActiveOrg: "corporate"}
-	b.cuenta.estado = sesion.Estado{Sujeto: "ada", Presencia: api.NoMolestar}
+	b.cuenta.estado = estadoSesion{Sujeto: "ada", Presencia: api.NoMolestar}
 
 	m := NuevoMenu(b.cuenta.contenido()...)
 	tam := MedidaMenu(m, fyne.NewSize(400, 600))

@@ -288,6 +288,12 @@ func (m *Marco) atajoImprimir() {
 			}
 		})
 	}
+	// Ctrl/Cmd+S solo hace algo con un fichero que guardar (edición local, fichero.go).
+	c.AddShortcut(atajoGuardar, func(s fyne.Shortcut) {
+		if cs, ok := s.(*desktop.CustomShortcut); ok {
+			m.ctx.AtajoGuardarFichero(cs)
+		}
+	})
 }
 
 func (r *marcoRenderer) Layout(t fyne.Size) {

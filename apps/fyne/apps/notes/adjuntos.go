@@ -43,6 +43,10 @@ type Adjunto struct {
 	Size    int64  `json:"size"`
 	Type    string `json:"type"`
 	DataURL string `json:"dataUrl"` //nolint:tagliatelle // el nombre lo fija la web
+	// Origen es la dirección de la que se bajó, en la nota de imagen por URL de Sytue
+	// Office (imagen_url.go): la imagen de su `data.url`, guardada para verla sin red.
+	// Vacío en todo lo demás, y entonces no sale en el JSON.
+	Origen string `json:"source,omitempty"`
 }
 
 // MaxDatosNota es el tope del servicio para `data` (services/notes, domain.go): un
@@ -108,15 +112,25 @@ func leerAdjunto(ruta string, ahora time.Time) (Adjunto, error) {
 		return Adjunto{}, err
 	}
 	tipo, _, _ := mime.ParseMediaType(mime.TypeByExtension(filepath.Ext(ruta)))
-	enURL := tipo
-	if enURL == "" {
-		enURL = "application/octet-stream"
-	}
 	return Adjunto{
-		ID:   strconv.FormatInt(ahora.UnixMilli(), 10) + "-" + strings.ToLower(rand.Text()[:6]),
+		ID:   idAdjunto(ahora),
 		Name: filepath.Base(ruta), Size: int64(len(b)), Type: tipo,
-		DataURL: "data:" + enURL + ";base64," + base64.StdEncoding.EncodeToString(b),
+		DataURL: urlDeDatos(tipo, b),
 	}, nil
+}
+
+// idAdjunto es el `id` de un adjunto nuevo: `Date.now()` y seis letras al azar.
+func idAdjunto(ahora time.Time) string {
+	return strconv.FormatInt(ahora.UnixMilli(), 10) + "-" + strings.ToLower(rand.Text()[:6])
+}
+
+// urlDeDatos es la URL de datos en base64 de unos bytes; sin tipo, la URL dice
+// `application/octet-stream`.
+func urlDeDatos(tipo string, b []byte) string {
+	if tipo == "" {
+		tipo = "application/octet-stream"
+	}
+	return "data:" + tipo + ";base64," + base64.StdEncoding.EncodeToString(b)
 }
 
 // adjuntar es «Adjuntar archivos…»: el selector del sistema y, con lo elegido, los

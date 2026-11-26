@@ -114,6 +114,11 @@ type Menu struct {
 	// mientras la carpeta carga. Lo pone la pantalla al refrescar.
 	CargandoLista bool
 
+	// DesplazadorNuevo hace que cada Construir monte un desplazador nuevo (en la misma
+	// posición) en vez de cambiarle el contenido al de antes. Lo pide la edición local,
+	// que monta la pantalla antes de tener datos. Falso: como siempre.
+	DesplazadorNuevo bool
+
 	// desplaza es el del cuerpo, que dura lo que el menú (ver Construir).
 	desplaza *container.Scroll
 }
@@ -133,9 +138,17 @@ func (m *Menu) Construir() *ui.Lateral {
 	// menú con cada dato, y con uno nuevo cada vez plegar una cuenta al fondo del cajón
 	// del teléfono lo devolvía arriba del todo.
 	contenido := container.New(ui.Columna{}, m.secciones(v)...)
-	if m.desplaza == nil {
+	switch {
+	case m.desplaza == nil:
 		m.desplaza = container.NewVScroll(contenido)
-	} else {
+	case m.DesplazadorNuevo:
+		// Uno nuevo en la misma posición: el ya pintado no cambia de contenido sin un
+		// Refresh, y el lateral montado antes de los datos se quedaba en «No hay
+		// carpetas» (ui.Lateral le pone el canalón al contenido sin refrescarlo).
+		off := m.desplaza.Offset
+		m.desplaza = container.NewVScroll(contenido)
+		m.desplaza.Offset = off
+	default:
 		m.desplaza.Content = contenido
 	}
 	cuerpo := m.desplaza

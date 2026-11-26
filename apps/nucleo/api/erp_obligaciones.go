@@ -15,7 +15,7 @@ import (
 
 // # Obligaciones: el calendario fiscal, laboral y mercantil de la organización
 //
-// Las formas son las de `services/syerp/internal/obligaciones` (Instancia, Sancion,
+// Las formas son las de `apps/nucleo/erp/obligaciones` (Instancia, Sancion,
 // Guia, Documento) y la envoltura de `handlers_organizacion.go` (instanciaVista). La web
 // las lee en `Obligaciones.tsx`.
 

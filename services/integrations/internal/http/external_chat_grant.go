@@ -3,17 +3,16 @@ package integrationshttp
 
 import (
 	"context"
+	"errors"
 	"net/http"
-	"regexp"
 
 	"github.com/google/uuid"
 
+	cuentaschat "git.sytue.eu/sytue/one/apps/nucleo/cuentas/chat"
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/platform/pkg/log"
 	"git.sytue.eu/sytue/one/services/integrations/internal/connector"
 )
-
-var externalGoogleSubject = regexp.MustCompile(`^\d{1,40}$`)
 
 func (h *Handlers) applyPersonalChatConsent(ctx context.Context, conn connector.Instance, tok tokenResponse, cfg map[string]string, requested, legacy []string) error {
 	if conn.TemplateKey == tmplTeamsChat {
@@ -41,24 +40,22 @@ func (h *Handlers) applyExternalConsentMetadata(ctx context.Context, conn connec
 		var who struct {
 			ID string `json:"id"`
 		}
-		if err := roomsProviderJSON(ctx, rt, http.MethodGet, roomsGraphAPI+"/me?$select=id", nil, &who); err != nil {
-			return err
+		if err := roomsGraph(rt).Pedir(ctx, http.MethodGet, "/me?$select=id", nil, &who); err != nil {
+			return roomsProviderError(err)
 		}
 		if _, err := uuid.Parse(who.ID); err != nil {
 			return httpx.ErrUnavailable.WithCode("external_provider_identity")
 		}
 		cfg["_external_user_id"] = who.ID
 	case tmplGoogleConversations:
-		var who struct {
-			Subject string `json:"sub"`
-		}
-		if err := roomsProviderJSON(ctx, rt, http.MethodGet, "https://openidconnect.googleapis.com/v1/userinfo", nil, &who); err != nil {
-			return err
-		}
-		if !externalGoogleSubject.MatchString(who.Subject) {
+		who, err := cuentaschat.Usuario(ctx, rt.HTTP, nil, "https://openidconnect.googleapis.com/v1/userinfo")
+		if errors.Is(err, cuentaschat.ErrIdentidad) {
 			return httpx.ErrUnavailable.WithCode("external_provider_identity")
 		}
-		cfg["_external_user_id"] = "users/" + who.Subject
+		if err != nil {
+			return roomsProviderError(err)
+		}
+		cfg["_external_user_id"] = who.Recurso()
 	}
 	return nil
 }

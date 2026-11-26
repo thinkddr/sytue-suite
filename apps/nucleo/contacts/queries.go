@@ -2,7 +2,6 @@
 package contacts
 
 import (
-	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -25,7 +24,7 @@ func pageLimit(value, defaultValue int) int {
 }
 
 func (s *Snapshot) VisibleBooks() ([]api.AddressBook, error) {
-	books, err := s.Books()
+	books, err := s.libros()
 	if err != nil {
 		return nil, err
 	}
@@ -39,17 +38,32 @@ func (s *Snapshot) VisibleBooks() ([]api.AddressBook, error) {
 }
 
 func (s *Snapshot) visiblePeople() ([]ContactView, error) {
-	people, err := s.Contacts()
+	result := []ContactView{}
+	err := s.cadaVisible(func(person *ContactView) bool {
+		result = append(result, copiarContacto(*person))
+		return true
+	})
 	if err != nil {
 		return nil, err
 	}
-	result := make([]ContactView, 0, len(people))
-	for _, person := range people {
-		if !person.BookDeleted && person.DeletedAt == nil {
-			result = append(result, person)
+	return result, nil
+}
+
+// cadaVisible llama a fn con cada contacto que se ve (ni en la papelera ni en una
+// libreta borrada), en el orden de Contacts, hasta que fn devuelve false. Son los
+// guardados de la instantánea (vistas.go): SOLO para leer; lo que salga fuera, con
+// copiarContacto.
+func (s *Snapshot) cadaVisible(fn func(*ContactView) bool) error {
+	people, err := s.contactos()
+	if err != nil {
+		return err
+	}
+	for i := range people {
+		if !people[i].BookDeleted && people[i].DeletedAt == nil && !fn(&people[i]) {
+			break
 		}
 	}
-	return result, nil
+	return nil
 }
 
 // photoContact resolves the legacy UID-only photo API without selecting an
@@ -59,25 +73,29 @@ func (s *Snapshot) photoContact(uid string) (ContactView, error) {
 	if uid == "" {
 		return ContactView{}, queryError(http.StatusNotFound, "private_contact_not_found")
 	}
-	people, err := s.visiblePeople()
+	var found *ContactView
+	ambiguous := false
+	err := s.cadaVisible(func(person *ContactView) bool {
+		if card.CleanUID(person.UID) != uid {
+			return true
+		}
+		if found != nil {
+			ambiguous = true
+			return false
+		}
+		found = person
+		return true
+	})
 	if err != nil {
 		return ContactView{}, err
 	}
-	var found ContactView
-	matched := false
-	for _, person := range people {
-		if card.CleanUID(person.UID) != uid {
-			continue
-		}
-		if matched {
-			return ContactView{}, queryError(http.StatusConflict, "private_contact_uid_ambiguous")
-		}
-		found, matched = person, true
+	if ambiguous {
+		return ContactView{}, queryError(http.StatusConflict, "private_contact_uid_ambiguous")
 	}
-	if !matched {
+	if found == nil {
 		return ContactView{}, queryError(http.StatusNotFound, "private_contact_not_found")
 	}
-	return found, nil
+	return copiarContacto(*found), nil
 }
 
 func (s *Snapshot) QueryAll(limit, offset int) ([]api.Contact, int, error) {
@@ -85,56 +103,136 @@ func (s *Snapshot) QueryAll(limit, offset int) ([]api.Contact, int, error) {
 	if err != nil {
 		return nil, 0, err
 	}
+	result, next := paginar(people, contactoDeVista, limit, offset)
+	return result, next, nil
+}
+
+// ContactosVisibles son todos los contactos de QueryAll, en su orden, de una vez: para
+// quien lee la libreta entera (el lector entre apps). Por páginas, cada una rehace la
+// proyección de todos (descodificar cada vCard y ordenar), y con 20.000 contactos son
+// cuarenta veces.
+func (s *Snapshot) ContactosVisibles() ([]api.Contact, error) {
+	people, err := s.visiblePeople()
+	if err != nil {
+		return nil, err
+	}
+	out := make([]api.Contact, len(people))
+	for i := range people {
+		out[i] = people[i].Contact
+	}
+	return out, nil
+}
+
+// PaginarEn es la página de QueryAll (`All` del repositorio) sobre una lista ya leída,
+// en su orden: hasta limit desde offset (con los mismos topes) y el desplazamiento de la
+// siguiente, o 0 si no hay más. Es para quien lee la libreta entera una vez y la
+// recorre sin volver al almacén (el lector entre apps, Mail).
+func PaginarEn(lista []api.Contact, limit, offset int) ([]api.Contact, int) {
+	return paginar(lista, func(c *api.Contact) *api.Contact { return c }, limit, offset)
+}
+
+func contactoDeVista(v *ContactView) *api.Contact { return &v.Contact }
+
+func paginar[T any](lista []T, contacto func(*T) *api.Contact, limit, offset int) ([]api.Contact, int) {
 	limit = pageLimit(limit, 100)
 	offset = max(0, offset)
 	result := []api.Contact{}
-	if offset >= len(people) {
-		return result, 0, nil
+	if offset >= len(lista) {
+		return result, 0
 	}
-	end := min(len(people), offset+limit)
-	for _, person := range people[offset:end] {
-		result = append(result, person.Contact)
+	end := min(len(lista), offset+limit)
+	for i := offset; i < end; i++ {
+		result = append(result, *contacto(&lista[i]))
 	}
-	if end == len(people) {
+	if end == len(lista) {
 		end = 0
 	}
-	return result, end, nil
+	return result, end
 }
 
 func (s *Snapshot) FindContact(id string) (ContactView, error) {
-	people, err := s.visiblePeople()
+	var found *ContactView
+	err := s.cadaVisible(func(person *ContactView) bool {
+		if person.ID == id {
+			found = person
+		}
+		return found == nil
+	})
 	if err != nil {
 		return ContactView{}, err
 	}
-	for _, person := range people {
-		if person.ID == id {
-			return person, nil
-		}
+	if found == nil {
+		return ContactView{}, queryError(http.StatusNotFound, "private_contact_not_found")
 	}
-	return ContactView{}, queryError(http.StatusNotFound, "private_contact_not_found")
+	return copiarContacto(*found), nil
 }
 
 func (s *Snapshot) QuerySearch(text string, limit int) ([]api.Contact, error) {
-	query := buscar.Plegar(strings.TrimSpace(text))
-	if query == "" {
+	if buscar.Plegar(strings.TrimSpace(text)) == "" {
 		return nil, queryError(http.StatusBadRequest, "contact_query_required")
 	}
 	people, err := s.visiblePeople()
 	if err != nil {
 		return nil, err
 	}
+	return buscarEn(people, contactoDeVista, func(i int) string { return textoBuscable(&people[i].Contact) }, text, limit)
+}
+
+// BuscarEn es la búsqueda de QuerySearch (`Search` del repositorio) sobre una lista ya
+// leída, en su orden: nombre, apellidos, organización, apodo, nota, correos y teléfonos,
+// sin acentos ni mayúsculas, hasta limit (con los mismos topes). Un texto vacío es el
+// mismo error. Es para quien lee la libreta entera una vez y busca en ella sin volver al
+// almacén a cada letra (Mail, con el lector entre apps).
+func BuscarEn(lista []api.Contact, text string, limit int) ([]api.Contact, error) {
+	if buscar.Plegar(strings.TrimSpace(text)) == "" {
+		return nil, queryError(http.StatusBadRequest, "contact_query_required")
+	}
+	return buscarEn(lista, func(c *api.Contact) *api.Contact { return c }, func(i int) string { return textoBuscable(&lista[i]) }, text, limit)
+}
+
+// TextosBuscables es, de cada contacto de lista, lo que mira la búsqueda, ya plegado.
+// Quien busca muchas veces en la misma lista (la libreta en memoria de Mail y Calendar,
+// a cada letra) lo calcula una vez: plegar 20.000 contactos en cada letra eran 100 ms y
+// 170 MB de basura cuando nada casaba (contacts/lector, libreta_bench_test.go).
+func TextosBuscables(lista []api.Contact) []string {
+	out := make([]string, len(lista))
+	for i := range lista {
+		out[i] = textoBuscable(&lista[i])
+	}
+	return out
+}
+
+// BuscarEnTextos es BuscarEn con los textos de TextosBuscables(lista) ya calculados.
+func BuscarEnTextos(lista []api.Contact, textos []string, text string, limit int) ([]api.Contact, error) {
+	if buscar.Plegar(strings.TrimSpace(text)) == "" {
+		return nil, queryError(http.StatusBadRequest, "contact_query_required")
+	}
+	if len(textos) != len(lista) {
+		textos = TextosBuscables(lista)
+	}
+	return buscarEn(lista, func(c *api.Contact) *api.Contact { return c }, func(i int) string { return textos[i] }, text, limit)
+}
+
+// textoBuscable es lo que mira la búsqueda de un contacto, sin acentos ni mayúsculas.
+func textoBuscable(person *api.Contact) string {
+	fields := make([]string, 0, 6+len(person.Emails)+len(person.Phones))
+	fields = append(fields, person.FormattedName, person.FamilyName, person.GivenName, person.Organization, person.Nickname, person.Note)
+	for _, email := range person.Emails {
+		fields = append(fields, email.Email)
+	}
+	for _, phone := range person.Phones {
+		fields = append(fields, phone.Phone)
+	}
+	return buscar.Plegar(strings.Join(fields, "\n"))
+}
+
+func buscarEn[T any](lista []T, contacto func(*T) *api.Contact, texto func(int) string, text string, limit int) ([]api.Contact, error) {
+	query := buscar.Plegar(strings.TrimSpace(text))
 	result := []api.Contact{}
 	limit = pageLimit(limit, 50)
-	for _, person := range people {
-		fields := []string{person.FormattedName, person.FamilyName, person.GivenName, person.Organization, person.Nickname, person.Note}
-		for _, email := range person.Emails {
-			fields = append(fields, email.Email)
-		}
-		for _, phone := range person.Phones {
-			fields = append(fields, phone.Phone)
-		}
-		if strings.Contains(buscar.Plegar(strings.Join(fields, "\n")), query) {
-			result = append(result, person.Contact)
+	for i := range lista {
+		if strings.Contains(texto(i), query) {
+			result = append(result, *contacto(&lista[i]))
 			if len(result) == limit {
 				break
 			}
@@ -210,29 +308,21 @@ func (s *Snapshot) QueryPhoto(uid string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	value, err := card.PhotoDataURI(person.VCard)
-	if err != nil {
-		return nil, err
-	}
-	if value == "" {
-		return nil, queryError(http.StatusNotFound, "private_contact_photo_not_found")
-	}
-	raw, _, err := card.PhotoBytes(value)
-	return raw, err
+	return FotoDeVCard(person.VCard)
 }
 
 func (s *Snapshot) QueryFavorites() ([]string, error) {
-	people, err := s.visiblePeople()
-	if err != nil {
-		return nil, err
-	}
 	result := []string{}
 	seen := map[string]bool{}
-	for _, person := range people {
+	err := s.cadaVisible(func(person *ContactView) bool {
 		if person.Favorite && !seen[person.UID] {
 			result = append(result, person.UID)
 			seen[person.UID] = true
 		}
+		return true
+	})
+	if err != nil {
+		return nil, err
 	}
 	return result, nil
 }
@@ -245,21 +335,24 @@ func (s *Snapshot) QueryGroups(book string) ([]api.ContactGroup, error) {
 	if !slices.ContainsFunc(books, func(value api.AddressBook) bool { return value.ID == book }) {
 		return nil, queryError(http.StatusNotFound, "private_address_book_not_found")
 	}
-	groups, err := s.Groups()
+	groups, err := s.grupos()
 	if err != nil {
 		return nil, err
 	}
 	result := []api.ContactGroup{}
 	for _, group := range groups {
 		if group.AddressBookID == book && !group.BookDeleted && group.DeletedAt == nil {
-			result = append(result, group.ContactGroup)
+			value := group.ContactGroup
+			value.Members = slices.Clone(value.Members)
+			result = append(result, value)
 		}
 	}
 	return result, nil
 }
 
 func (s *Snapshot) QueryTrash(limit int) ([]api.TrashItem, error) {
-	people, err := s.Contacts()
+	// Los guardados, solo para leer: lo que sale son copias.
+	people, err := s.contactos()
 	if err != nil {
 		return nil, err
 	}
@@ -268,16 +361,7 @@ func (s *Snapshot) QueryTrash(limit int) ([]api.TrashItem, error) {
 		if person.BookDeleted || person.DeletedAt == nil {
 			continue
 		}
-		primary := ""
-		for _, email := range person.Emails {
-			if primary == "" || email.IsPrimary {
-				primary = email.Email
-			}
-			if email.IsPrimary {
-				break
-			}
-		}
-		result = append(result, api.TrashItem{ID: person.ID, UID: person.UID, FormattedName: person.FormattedName, Organization: person.Organization, PrimaryEmail: primary, DeletedAt: *person.DeletedAt})
+		result = append(result, api.TrashItem{ID: person.ID, UID: person.UID, FormattedName: person.FormattedName, Organization: person.Organization, PrimaryEmail: CorreoPrincipal(person.Emails), DeletedAt: *person.DeletedAt})
 	}
 	slices.SortFunc(result, func(a, b api.TrashItem) int {
 		if n := b.DeletedAt.Compare(a.DeletedAt); n != 0 {
@@ -289,27 +373,13 @@ func (s *Snapshot) QueryTrash(limit int) ([]api.TrashItem, error) {
 }
 
 func (s *Snapshot) QueryCSV() (string, []byte, error) {
-	people, err := s.visiblePeople()
+	contacts := []api.Contact{}
+	err := s.cadaVisible(func(person *ContactView) bool {
+		contacts = append(contacts, person.Contact)
+		return true
+	})
 	if err != nil {
 		return "", nil, err
 	}
-	contacts := make([]card.Contact, 0, len(people))
-	for _, person := range people {
-		raw, err := json.Marshal(person.Contact)
-		if err != nil {
-			return "", nil, err
-		}
-		var contact card.Contact
-		err = json.Unmarshal(raw, &contact)
-		clear(raw)
-		if err != nil {
-			return "", nil, err
-		}
-		contacts = append(contacts, contact)
-	}
-	var output bytes.Buffer
-	if err := card.WriteContactsCSV(&output, contacts); err != nil {
-		return "", nil, err
-	}
-	return "contacts.csv", output.Bytes(), nil
+	return CSVDeContactos(contacts)
 }

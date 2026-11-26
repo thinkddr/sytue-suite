@@ -92,6 +92,9 @@ type buscaHueco struct {
 	// carga son las dos barras de «cargando», las mismas mientras dure la carga: el
 	// latido es una animación y se para al terminar, no cuando Fyne recoja las viejas.
 	carga *ui.BloquesEsqueleto
+	// con y sin son los invitados con cuya ocupación se ha contado y los que el
+	// proveedor no sabe (sin personas con Pantalla.Invitar; invitarlocal.go).
+	con, sin []string
 }
 
 // cargado termina la carga y para el latido de las barras.
@@ -149,19 +152,29 @@ func (f *formulario) pedirHuecos() {
 	turno := h.turno
 	h.cargando, h.fallo = true, false
 	f.rehacer()
-	f.a.Huecos(desde, hasta, MinutosEntre(f.e.Inicio, f.e.Fin), f.e.Zona, h.laborables.Encendido,
+	minutos := MinutosEntre(f.e.Inicio, f.e.Fin)
+	f.a.Huecos(desde, hasta, minutos, f.e.Zona, h.laborables.Encendido,
 		func(l []api.Hueco, err error) {
 			if turno != h.turno {
 				return
 			}
+			if err == nil && f.conOcupacionDeInvitados() {
+				// Y los ratos en que algún invitado está ocupado, si su proveedor lo sabe.
+				f.pedirOcupacion(l, desde, hasta, minutos, turno)
+				return
+			}
 			h.cargado()
+			h.con, h.sin = nil, nil
 			h.fallo, h.lista = err != nil, l
 			f.rehacer()
 		})
 }
 
-// elegirHueco es `onPick`: el evento pasa a ese hueco y el panel se cierra.
+// elegirHueco es `onPick`: el evento pasa a ese hueco y el panel se cierra. El hueco es
+// un instante y los campos dicen la hora de pared en la zona del evento, que es la del
+// botón pulsado (gruposHuecos).
 func (f *formulario) elegirHueco(inicio time.Time, minutos int) {
+	inicio = enLaPared(inicio, f.e.zonaDe(f.p), f.p.zona())
 	f.e.Inicio, f.e.Fin = inicio, inicio.Add(time.Duration(minutos)*time.Minute)
 	f.escribirFechas()
 	f.bh.abierto = false
@@ -204,6 +217,10 @@ func (f *formulario) panelHuecos() fyne.CanvasObject {
 	natural := h.laborables.MinSize().Width + espacio3 + h.ventana.MinSize().Width
 	controles := container.New(ui.Flujo{Hueco: espacio3, Ancho: natural}, h.laborables, h.ventana)
 	filas := []fyne.CanvasObject{container.New(ui.Flujo{Hueco: espacio2, Ancho: interior, Repartir: true}, resumen, controles)}
+	if quienes := f.resumenOcupacion(); quienes != "" && !h.cargando && !h.fallo {
+		// Sin personas: con la ocupación de quién se ha contado y de quién no se sabe.
+		filas = append(filas, ui.NuevoParrafo(quienes, tema.TextoXS, ui.Normal, "text-muted", v).A(interior))
+	}
 
 	inicios := IniciosCandidatos(h.lista, time.Duration(minutos)*time.Minute)
 	switch {

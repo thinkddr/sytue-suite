@@ -490,6 +490,64 @@ func TestCompatGoogleUpdatePatchDeleteEvent(t *testing.T) {
 	}
 }
 
+// La emulación no enseña las RDATE ni las EXDATE de una serie (`recurrence` lleva solo
+// la RRULE) ni las acepta, así que el cliente que guarda lo que leyó no las trae. Editar
+// la serie por aquí las conserva: sin ellas, la ocurrencia quitada con «solo este» volvía.
+// Con la serie movida, las EXDATE van con su inicio (las RDATE se quedan, como en la
+// pantalla); quitada la regla, el evento deja de ser una serie y no lleva ninguna.
+func TestCompatGoogleEditarUnaSerieConservaSusFechas(t *testing.T) {
+	serie := compatEvent()
+	serie.RRule = "FREQ=WEEKLY;COUNT=6"
+	quitada := compatStart.AddDate(0, 0, 7)
+	anadida := time.Date(2026, 8, 20, 15, 0, 0, 0, time.UTC)
+	serie.ExDate, serie.RDate = []time.Time{quitada}, []time.Time{anadida}
+	f := &fakeService{ensureCal: compatCalendar("user-1"), event: serie}
+	h := compatRouter(f, "user-1")
+	evento := "/compat/google/calendar/v3/calendars/primary/events/" + compatEvID.String()
+	fechas := func(cuando string, rdate, exdate []time.Time) {
+		t.Helper()
+		in := f.gotEventIn
+		if !mismasFechas(in.RDate, rdate) || !mismasFechas(in.ExDate, exdate) {
+			t.Errorf("%s: RDATE %v (quiero %v), EXDATE %v (quiero %v)", cuando, in.RDate, rdate, in.ExDate, exdate)
+		}
+	}
+
+	if rec := compatDo(h, http.MethodPatch, evento, `{"summary":"Repaso semanal"}`); rec.Code != http.StatusOK {
+		t.Fatalf("patch: %d (%s)", rec.Code, rec.Body.String())
+	}
+	if f.gotEventIn.RRule != serie.RRule {
+		t.Fatalf("patch del título: la regla %q", f.gotEventIn.RRule)
+	}
+	fechas("patch del título", serie.RDate, serie.ExDate)
+
+	// events.update con lo que leyó, una hora más tarde (las 11:00 de Madrid eran las 9:00 UTC).
+	mover := `{"summary":"Repaso","start":{"dateTime":"2026-07-28T12:00:00+02:00","timeZone":"Europe/Madrid"},` +
+		`"end":{"dateTime":"2026-07-28T13:00:00+02:00","timeZone":"Europe/Madrid"},"recurrence":["RRULE:FREQ=WEEKLY;COUNT=6"]}`
+	if rec := compatDo(h, http.MethodPut, evento, mover); rec.Code != http.StatusOK {
+		t.Fatalf("update: %d (%s)", rec.Code, rec.Body.String())
+	}
+	fechas("update con la serie movida", serie.RDate, []time.Time{quitada.Add(time.Hour)})
+
+	sinRegla := `{"summary":"Repaso","start":{"dateTime":"2026-07-28T11:00:00+02:00","timeZone":"Europe/Madrid"},` +
+		`"end":{"dateTime":"2026-07-28T12:00:00+02:00","timeZone":"Europe/Madrid"}}`
+	if rec := compatDo(h, http.MethodPut, evento, sinRegla); rec.Code != http.StatusOK {
+		t.Fatalf("update sin regla: %d (%s)", rec.Code, rec.Body.String())
+	}
+	fechas("update sin la regla", nil, nil)
+}
+
+func mismasFechas(a, b []time.Time) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if !a[i].Equal(b[i]) {
+			return false
+		}
+	}
+	return true
+}
+
 // --- Microsoft Graph ---------------------------------------------------------
 
 func TestCompatGraphCalendars(t *testing.T) {

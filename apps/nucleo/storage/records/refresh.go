@@ -51,6 +51,9 @@ func (r *Repository) RefreshWithProjection(parent context.Context, prepare Refre
 		if err := ctx.Err(); err != nil {
 			return err
 		}
+		loaded := candidate.loadedNow()
+		r.noteHeadsLocked(candidate.heads, loaded)
+		r.loaded = loaded
 		r.binding, r.catalog, r.entries, r.byObject, r.heads = candidate.binding, candidate.catalog, candidate.entries, candidate.byObject, candidate.heads
 		if publish != nil {
 			publish()
@@ -80,7 +83,8 @@ func (r *Repository) refreshedProjection(ctx context.Context, prepare RefreshPro
 	if state.Mode == "legacy" {
 		return nil, nil, ErrNotReady
 	}
-	candidate := &Repository{cfg: r.cfg, gate: r.gate}
+	// Lo ya comprobado vale igual para el candidato: va por referencia (verified_cache.go).
+	candidate := &Repository{cfg: r.cfg, gate: r.gate, verified: r.verified}
 	// openCompleted validates into a detached projection, without WAL retirement.
 	if err := candidate.openCompleted(ctx, state); err != nil {
 		return nil, nil, err

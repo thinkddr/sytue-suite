@@ -162,6 +162,11 @@ func (c *Cabecera) Sincronizar() {
 	if f := c.ctx.Compartir; f != nil {
 		c.compartir.AlPulsar = func() { f(c.compartir) }
 	}
+	if c.ctx.sinCompartir() {
+		c.compartir.Hide()
+	} else if !c.compartir.Visible() {
+		c.compartir.Show()
+	}
 	c.descargar.Refresh()
 	c.compartir.Refresh()
 	c.marcarGuardado()
@@ -369,6 +374,11 @@ func (r *cabeceraRenderer) Layout(t fyne.Size) {
 	}
 	r.c.ponerChip(time.Now())
 	chip := MedidaChipGuardado(r.c.chip.Texto).Width
+	// Oculto (edición local, O-02), «Compartir» no ocupa sitio.
+	anchoCompartir := r.c.compartir.MinSize().Width
+	if !r.c.compartir.Visible() {
+		anchoCompartir = -HuecoCabecera
+	}
 	if ancha {
 		// El título se ciñe a lo que pide su texto, con el `max-w-[360px]` como tope: en
 		// producción mide 217,5, no 360. El suelo es el ancho de la marca de agua, que si
@@ -386,7 +396,7 @@ func (r *cabeceraRenderer) Layout(t fyne.Size) {
 		// y el título es el `flex-1` que se queda lo que dejan el chip y «Compartir», entre
 		// `min-w-24` y `max-w-[40vw]`; si ni así cabe, el chip cede y se corta. Medido en
 		// raíz de 16: h-7=28, px-1.5=6 y el chip no se pisa con Compartir.
-		libre := t.Width - x - MargenCabecera - r.c.compartir.MinSize().Width - 2*HuecoCabecera
+		libre := t.Width - x - MargenCabecera - anchoCompartir - 2*HuecoCabecera
 		r.c.titulo.Ancho = min(max(libre-chip, tema.Espacio(24)), 0.4*t.Width)
 		chip = max(min(chip, libre-r.c.titulo.Ancho), 0)
 	}
@@ -403,11 +413,14 @@ func (r *cabeceraRenderer) Layout(t fyne.Size) {
 	if !ancha {
 		r.c.descargar.Hide()
 		botones = botones[1:]
-		der = min(der, x+chip+HuecoCabecera+r.c.compartir.MinSize().Width)
+		der = min(der, x+chip+HuecoCabecera+anchoCompartir)
 	} else {
 		r.c.descargar.Show()
 	}
 	for _, b := range botones {
+		if !b.Visible() {
+			continue
+		}
 		m := b.MinSize()
 		der -= m.Width
 		b.Move(fyne.NewPos(der, (t.Height-tema.Borde-m.Height)/2))

@@ -39,6 +39,10 @@ import (
 // capasPropias son las superposiciones abiertas por fuera de `ui`, con su porqué. Se
 // comparan por IGUALDAD: una que desaparezca también pone esto en rojo.
 var capasPropias = []string{
+	// El selector de ficheros del SISTEMA en el teléfono (el de la suite y el de Sytue
+	// Office): el `dialog` de Fyne abre ahí el del sistema, que se cierra con su propio
+	// «atrás».
+	"anfitrion/elegir_movil.go: dialog.NewFileOpen",
 	// El visor, el editor y la foto pública de SyPhotos: capas a pantalla completa que
 	// implementan `ui.Descartable` y cuyas teclas atiende `teclaSuelta` (sin foco, a
 	// propósito: las flechas, Espacio, «i» y «z» son del visor).
@@ -51,7 +55,6 @@ var capasPropias = []string{
 	// Los selectores de ficheros del SISTEMA en el teléfono: el `dialog` de Fyne abre ahí
 	// el del sistema, que se cierra con su propio «atrás».
 	"cmd/drive/selector_movil.go: dialog.ShowFileOpenMultiple",
-	"sesion/elegir_movil.go: dialog.NewFileOpen",
 }
 
 // aperturasSuite son las llamadas de `ui` que ponen algo encima.

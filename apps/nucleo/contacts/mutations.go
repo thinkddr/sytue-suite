@@ -5,17 +5,22 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"slices"
 	"time"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/storage"
 )
 
 func (r *Repository) mutateAggregate(parent context.Context, operation string, input any, prepare func(*Snapshot) (Aggregate, error)) (Aggregate, error) {
+	// hecha es lo que vio y compuso la preparación, si el motor la llamó.
+	var hecha *escritura
 	raw, err := r.core.Mutate(parent, operation, input, func(ctx context.Context) (string, string, string, []byte, error) {
-		snapshot, err := r.Snapshot(ctx)
+		hecha = nil
+		base, err := r.foto(ctx)
 		if err != nil {
 			return "", "", "", nil, err
 		}
+		snapshot := base.snapshot.copia()
 		change, err := prepare(snapshot)
 		if err != nil {
 			return "", "", "", nil, err
@@ -35,6 +40,9 @@ func (r *Repository) mutateAggregate(parent context.Context, operation string, i
 		if change.DeletedAt != nil {
 			state = "trash"
 		}
+		if err == nil {
+			hecha = &escritura{base: base, change: change, candidate: candidate, payload: slices.Clone(payload)}
+		}
 		return change.Kind, change.ID, state, payload, err
 	})
 	if err != nil {
@@ -45,6 +53,7 @@ func (r *Repository) mutateAggregate(parent context.Context, operation string, i
 	if json.Unmarshal(raw, &change) != nil || change.Validate(r.scope) != nil {
 		return Aggregate{}, ErrSnapshot
 	}
+	r.anotarEscritura(hecha, raw)
 	return change, nil
 }
 

@@ -89,7 +89,18 @@ type Lateral struct {
 	Nubes        *api.NubesPersonales
 	NubeActiva   string
 	AlElegirNube func(api.NubePersonal)
+	// SoloEquipo es Sytue Office: solo «Mi unidad», «Recientes», «Destacados» y
+	// «Papelera», sin nubes ni pie de la organización (DR-05). Falso, el de siempre.
+	SoloEquipo bool
+	// Unidades son las cuentas de nube de Sytue Office, bajo «Tus nubes» (DR-13);
+	// UnidadActiva, la que se mira ("" la carpeta del disco).
+	Unidades       []UnidadEquipo
+	UnidadActiva   string
+	AlElegirUnidad func(UnidadEquipo)
 }
+
+// enEquipo son las ubicaciones que tienen sentido en las carpetas del disco.
+var enEquipo = map[Seccion]bool{MiUnidad: true, Recientes: true, Favoritos: true, Papelera: true}
 
 // Cuota es el espacio de la organización, ya en bytes.
 type Cuota struct {
@@ -116,11 +127,25 @@ func (l *Lateral) t(clave string, vars ...i18n.Vars) string {
 func (l *Lateral) Objeto(v tema.Variante) fyne.CanvasObject {
 	filas := make([]fyne.CanvasObject, 0, len(ubicaciones))
 	for _, u := range ubicaciones {
-		f := ui.NuevaFilaLateral(l.t(u.clave), l.icono(u.icono, u.seccion == l.Activa, v), l.elegir(u.seccion))
-		f.Activa = u.seccion == l.Activa
+		if l.SoloEquipo && !enEquipo[u.seccion] {
+			continue
+		}
+		activa := u.seccion == l.Activa && (!l.SoloEquipo || l.UnidadActiva == "")
+		f := ui.NuevaFilaLateral(l.t(u.clave), l.icono(u.icono, activa, v), l.elegir(u.seccion))
+		f.Activa = activa
 		filas = append(filas, f)
 	}
 	var cuerpo fyne.CanvasObject = ui.NuevaSeccionLateral(l.t("nav.locations"), filas...)
+	if l.SoloEquipo {
+		if us := l.seccionUnidades(v); us != nil {
+			cuerpo = container.New(ui.Columna{}, cuerpo, us)
+		}
+		lat := ui.NuevoLateral(l.t("nav.locations"), cuerpo)
+		if m := l.medidor(); m != nil {
+			lat.Pie = m
+		}
+		return lat
+	}
 	if nubes := l.seccionNubes(v); nubes != nil {
 		cuerpo = container.New(ui.Columna{}, cuerpo, nubes)
 	}
@@ -161,6 +186,26 @@ func (l *Lateral) seccionNubes(v tema.Variante) fyne.CanvasObject {
 	}
 	if len(filas) == 0 {
 		return nil
+	}
+	return ui.NuevaSeccionLateral(l.t("nav.clouds"), filas...)
+}
+
+// seccionUnidades es «Tus nubes» en Sytue Office: una fila por cuenta conectada. Sin
+// ninguna, no se pinta.
+func (l *Lateral) seccionUnidades(v tema.Variante) fyne.CanvasObject {
+	if len(l.Unidades) == 0 {
+		return nil
+	}
+	filas := make([]fyne.CanvasObject, 0, len(l.Unidades))
+	for _, u := range l.Unidades {
+		activa := l.UnidadActiva == u.ID
+		f := ui.NuevaFilaLateral(u.Nombre, l.icono(iconos.Nube, activa, v), func() {
+			if l.AlElegirUnidad != nil {
+				l.AlElegirUnidad(u)
+			}
+		})
+		f.Activa = activa
+		filas = append(filas, f)
 	}
 	return ui.NuevaSeccionLateral(l.t("nav.clouds"), filas...)
 }

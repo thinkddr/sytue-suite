@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 )
 
@@ -19,16 +20,19 @@ import (
 var ExtensionesImagen = []string{"jpg", "jpeg", "png", "gif", "webp", "heic", "heif", "avif", "tif", "tiff", "bmp"}
 
 // EnElMovil es el selector de ficheros donde el sistema no tiene un programa que lo abra:
-// en el móvil lo da el toolkit, y lo pone `apps/fyne/sesion` al arrancar. Recibe las
+// en el móvil lo da el toolkit, y lo pone `apps/fyne/anfitrion` al arrancar (por `sesion`
+// en la edición conectada y por `local.Abrir` en Sytue Office; en iOS, movil_ios.go). Recibe las
 // extensiones que se aceptan (nil, cualquiera) y devuelve rutas de COPIAS en la carpeta
 // temporal de la app: el selector del móvil da `content://`, y quien llama a [Elegir] y
 // a [ElegirImagenes] espera rutas. Cancelar devuelve nil, nil.
 var EnElMovil func(extensiones []string) ([]string, error)
 
 // EnFotos es el selector de la FOTOTECA del sistema donde la hay y es otro que el de
-// ficheros: en iOS, el de la app Fotos (PHPicker) y no el de «Archivos». Lo usa
-// [ElegirImagenes]; devuelve rutas de copias, como [EnElMovil]. nil: no lo hay.
-var EnFotos func() ([]string, error)
+// ficheros: en iOS, el de la app Fotos (PHPicker) y no el de «Archivos». Lo usan
+// [ElegirImagenes] y [ElegirFotosYVideos]; recibe las extensiones pedidas (todas de
+// imagen o de vídeo) y ofrece también los vídeos si alguna es de vídeo. Devuelve rutas
+// de copias, como [EnElMovil]. nil: no lo hay.
+var EnFotos func(extensiones []string) ([]string, error)
 
 // panelPropio, si está, es el panel de abrir del sistema DENTRO de este proceso. Solo lo
 // pone la variante de la Mac App Store (elegir_tienda_darwin.go): con el App Sandbox, el
@@ -55,10 +59,43 @@ var porPortalElegir func(titulo string, extensiones []string) ([]string, error)
 // Donde el sistema tiene un selector propio de la fototeca ([EnFotos], iOS), es ese: ahí
 // están las fotos, con sus álbumes, y no en «Archivos».
 func ElegirImagenes(titulo string) ([]string, error) {
-	if EnFotos != nil {
-		return EnFotos()
+	return ElegirFotosYVideos(titulo, ExtensionesImagen...)
+}
+
+// ElegirFotosYVideos es [ElegirImagenes] con las extensiones que se pidan, de imagen y de
+// vídeo (Photos importa vídeos). Si todas lo son y el sistema tiene selector de la
+// fototeca ([EnFotos], iOS), es ese, con los vídeos si se piden; si no, el de ficheros
+// filtrado por ellas ([ElegirConTipos]).
+func ElegirFotosYVideos(titulo string, extensiones ...string) ([]string, error) {
+	if EnFotos != nil && soloFotosYVideos(extensiones) {
+		return EnFotos(extensiones)
 	}
-	return ElegirConTipos(titulo, ExtensionesImagen...)
+	return ElegirConTipos(titulo, extensiones...)
+}
+
+// ExtensionesVideo son las de vídeo que el selector de la fototeca entiende como tales.
+var ExtensionesVideo = []string{"mp4", "m4v", "mov", "mkv", "webm", "avi", "mpg", "mpeg", "ogv", "3gp", "3g2"}
+
+// soloFotosYVideos dice si todas las extensiones son de imagen o de vídeo (y hay alguna).
+func soloFotosYVideos(extensiones []string) bool {
+	for _, e := range extensiones {
+		e = strings.ToLower(strings.TrimPrefix(e, "."))
+		if !slices.Contains(ExtensionesImagen, e) && !slices.Contains(ExtensionesVideo, e) {
+			return false
+		}
+	}
+	return len(extensiones) > 0
+}
+
+// ConVideos dice si alguna de las extensiones es de vídeo: el selector de la fototeca
+// ofrece entonces también los vídeos.
+func ConVideos(extensiones []string) bool {
+	for _, e := range extensiones {
+		if slices.Contains(ExtensionesVideo, strings.ToLower(strings.TrimPrefix(e, "."))) {
+			return true
+		}
+	}
+	return false
 }
 
 // ElegirConTipos es el selector del sistema filtrado por extensión (sin el punto): el

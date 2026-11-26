@@ -229,7 +229,7 @@ func (p *Pantalla) botonES() fyne.CanvasObject {
 		}
 	}
 	b.AlPulsar = func() {
-		sinImportar := p.SinConexion || p.Activa == nil || !p.PuedeImportar
+		sinImportar := !p.escribe() || p.Activa == nil || !p.PuedeImportar
 		elemento := func(clave string, inerte bool, f func()) fyne.CanvasObject {
 			e := ui.NuevoElementoMenu(p.t(clave, nil), iconos.Ninguno, f)
 			e.Inerte = inerte || f == nil

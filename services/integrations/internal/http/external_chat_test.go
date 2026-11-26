@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/services/integrations/internal/connector"
 )
 
@@ -145,5 +146,53 @@ func TestExternalProviderErrorsDoNotEchoBodyOrToken(t *testing.T) {
 	_, err := externalSlackChannels(context.Background(), rt, "")
 	if err == nil || strings.Contains(err.Error(), "personal-user-secret") || strings.Contains(err.Error(), "private text") {
 		t.Fatalf("unsafe provider error %v", err)
+	}
+}
+
+// Los clientes del núcleo (RO-01) dan los mismos errores de la pasarela que daba su
+// transporte propio: permisos, espera del 429 (60 s si el proveedor no dice), los
+// códigos de Slack y una respuesta ilegible, sin el cuerpo del proveedor y sin poner
+// ellos un token (lo inyecta el runtime).
+func TestLosClientesDelNucleoDanLosErroresDeLaPasarela(t *testing.T) {
+	for _, tc := range []struct {
+		status        int
+		retry, body   string
+		code          string
+		want, seconds int
+	}{
+		{http.StatusForbidden, "", `{}`, "rooms_provider_permission", http.StatusUnprocessableEntity, 0},
+		{http.StatusUnauthorized, "", `{}`, "rooms_provider_permission", http.StatusUnprocessableEntity, 0},
+		{http.StatusTooManyRequests, "", `{}`, "external_rate_limited", http.StatusTooManyRequests, 60},
+		{http.StatusTooManyRequests, "120", `{}`, "external_rate_limited", http.StatusTooManyRequests, 120},
+		{http.StatusInternalServerError, "", `secreto`, "rooms_provider_rejected", http.StatusBadGateway, 0},
+		{http.StatusOK, "", `no es json secreto`, "rooms_provider_response", http.StatusBadGateway, 0},
+		{http.StatusOK, "", `{"ok":false,"error":"token_revoked"}`, "external_reconnect_required", http.StatusConflict, 0},
+		{http.StatusOK, "", `{"ok":false,"error":"missing_scope"}`, "external_provider_permission", http.StatusForbidden, 0},
+	} {
+		calls := 0
+		rt := roomsTestRuntime(func(r *http.Request) (*http.Response, error) {
+			calls++
+			if r.Header.Get("Authorization") != "" {
+				t.Fatal("el cliente puso un token: lo inyecta el runtime")
+			}
+			res := roomsTestResponse(tc.status, tc.body)
+			if tc.retry != "" {
+				res.Header.Set("Retry-After", tc.retry)
+			}
+			return res, nil
+		})
+		_, err := externalSlackChannels(context.Background(), rt, "")
+		var apiError *httpx.Error
+		if !errors.As(err, &apiError) || apiError.Status != tc.want || apiError.Code != tc.code || strings.Contains(err.Error(), "secreto") || calls != 1 {
+			t.Fatalf("%d %s: %v (llamadas %d)", tc.status, tc.body, err, calls)
+		}
+		if tc.seconds != 0 && apiError.Params["retry_after_seconds"] != tc.seconds {
+			t.Fatalf("espera: %v", apiError.Params)
+		}
+	}
+	rt := roomsTestRuntime(func(*http.Request) (*http.Response, error) { return nil, errors.New("sin red") })
+	var apiError *httpx.Error
+	if _, err := externalGoogleChannels(context.Background(), rt, ""); !errors.As(err, &apiError) || apiError.Code != "rooms_provider_unreachable" {
+		t.Fatalf("sin red: %v", err)
 	}
 }

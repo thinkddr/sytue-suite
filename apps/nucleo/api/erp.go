@@ -276,7 +276,7 @@ type cuerpoDatos struct {
 
 // Crear inserta un registro. `data` va con los valores YA en la forma que el servicio
 // valida: el dinero en céntimos enteros, los decimales como cadena canónica, las fechas
-// en AAAA-MM-DD y las fechas con hora en RFC3339 (services/syerp/internal/domain).
+// en AAAA-MM-DD y las fechas con hora en RFC3339 (apps/nucleo/erp/dominio).
 func (e *ERP) Crear(ctx context.Context, modelo string, data map[string]any) (ERPRegistro, error) {
 	if e.private != nil {
 		return e.private.Crear(ctx, modelo, data)

@@ -194,6 +194,7 @@ func (p *PDF) localSignPrepare(ctx context.Context, fields map[string]string, pa
 		Motivo, Lugar, Contacto string
 		Pagina                  int
 		Rect                    [4]float64
+		Trazos                  [][][2]float64
 		Bloquear                bool
 	}
 	if err := localpdf.DecodeOperationJSON(fields["firma"], "firma", &options); err != nil {
@@ -207,7 +208,7 @@ func (p *PDF) localSignPrepare(ctx context.Context, fields map[string]string, pa
 		var err error
 		prepared, err = localpdf.PrepararFirmaPDF(doc, localpdf.OpcionesFirma{
 			Motivo: options.Motivo, Lugar: options.Lugar, Contacto: options.Contacto,
-			Pagina: options.Pagina, Rect: options.Rect, Bloquear: options.Bloquear,
+			Pagina: options.Pagina, Rect: options.Rect, Trazos: options.Trazos, Bloquear: options.Bloquear,
 		}, chain)
 		// La respuesta es JSON: el preparado no se cuenta como PDF de salida.
 		return PDFRespuesta{Cabecera: http.Header{}}, err
@@ -227,6 +228,8 @@ func (p *PDF) localSignPrepare(ctx context.Context, fields map[string]string, pa
 		ID: id, Preparado: prepared.PDF, Resumen: prepared.Resumen, DigestInfo: prepared.DigestInfo,
 		PorFirmar: prepared.PorFirmar, Hueco: [2]int{prepared.Inicio, prepared.Fin}, Anexado: prepared.Anexado,
 		Algoritmo: "rsa", Caduca: expires, Fecha: prepared.Fecha, Paginas: pages, Nivel: "avanzada",
+		// La autoridad que eligió la persona en Sytue Office (ConLocal); vacía, sin sello.
+		Sello: hostDeSello(p.selloLocal().URL),
 	}
 	if _, ok := chain[0].PublicKey.(*ecdsa.PublicKey); ok {
 		out.Algoritmo = "ecdsa"
@@ -245,7 +248,8 @@ func (p *PDF) localSignPrepare(ctx context.Context, fields map[string]string, pa
 }
 
 // localSignComplete es `/pdf/sign/complete` en el dispositivo: el preparado vuelve
-// tal cual, la firma tiene que ser de ESE resumen con ESA clave, y sale sin sello.
+// tal cual y la firma tiene que ser de ESE resumen con ESA clave. Sale sin sello salvo
+// con la autoridad que eligió la persona en Sytue Office (ConLocal) y sin `sin_sello`.
 func (p *PDF) localSignComplete(ctx context.Context, fields map[string]string, docs ...PDFFichero) (PDFRespuesta, error) {
 	if p.signatures == nil {
 		return PDFRespuesta{}, ErrPrivatePDFOperation
@@ -272,10 +276,17 @@ func (p *PDF) localSignComplete(ctx context.Context, fields map[string]string, d
 	if err != nil {
 		return PDFRespuesta{}, errLocalSignatureMismatch
 	}
-	signed, _, err := localpdf.CompletarFirmaPDF(localpdf.FirmaPreparada{
+	var stamp func([]byte) ([]byte, error)
+	if opts := p.selloLocal(); opts.URL != "" && fields["sin_sello"] != "1" {
+		// La petición del sello va dentro de la de firmar: si la persona corta, se corta.
+		stamp = func(digest []byte) ([]byte, error) { return localpdf.PedirSello(ctx, digest, opts) }
+	}
+	signed, stamped, err := localpdf.CompletarFirmaPDF(localpdf.FirmaPreparada{
 		PDF: docs[0].Datos, Inicio: prepared.start, Fin: prepared.end, PorFirmar: prepared.attributes,
-	}, prepared.chain, signature, nil)
+	}, prepared.chain, signature, stamp)
 	switch {
+	case errors.Is(err, localpdf.ErrSelloNoDisponible):
+		return PDFRespuesta{}, errLocalSelloCaido
 	case errors.Is(err, localpdf.ErrFirmaNoCorresponde):
 		return PDFRespuesta{}, errLocalSignatureMismatch
 	case errors.Is(err, localpdf.ErrPreparadoAlterado):
@@ -290,6 +301,6 @@ func (p *PDF) localSignComplete(ctx context.Context, fields map[string]string, d
 		return PDFRespuesta{}, err
 	}
 	response := localPDFResponse("application/pdf", signed)
-	response.Cabecera.Set("X-Sytue-Sello", "no")
+	response.Cabecera.Set("X-Sytue-Sello", map[bool]string{true: "si", false: "no"}[stamped])
 	return response, nil
 }

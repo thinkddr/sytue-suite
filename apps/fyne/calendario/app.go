@@ -284,6 +284,7 @@ func NuevaAppConVida(parent context.Context, p *Pantalla, cal *api.Calendars) *A
 	p.AlMoverEvento = a.mover
 	p.AlMenuCalendario = a.menuCalendario
 	p.AlCrearCalendario = func() { a.formularioCalendario(nil) }
+	p.alCrearEnCuenta = func(g GrupoCuenta) { p.cajonAbierto = false; a.formularioCalendarioEn(g.CrearCalendario) }
 	p.AlSuscribirse = a.formularioSuscripcion
 	p.AlGestionarRecursos = a.gestionarRecursos
 	p.AlVerInvitaciones = a.abrirInvitaciones
@@ -438,7 +439,9 @@ func (a *App) cargarCalendarios() {
 		var compartidos []api.Calendar
 		var errC error
 		var lecturas sync.WaitGroup
-		lecturas.Go(func() { compartidos, errC = a.Cal.SharedWithMe(ctx) })
+		if !a.P.SinPersonas {
+			lecturas.Go(func() { compartidos, errC = a.Cal.SharedWithMe(ctx) })
+		}
 		propios, err := a.Cal.List(ctx)
 		lecturas.Wait()
 		if errC != nil {
@@ -603,7 +606,7 @@ func (a *App) fallar(clave string, err error) {
 // contarInvitaciones pone el número de la insignia de «Invitaciones». Falla en
 // silencio, como en la web: sin número la cabecera sigue sirviendo.
 func (a *App) contarInvitaciones() {
-	if a.Cal == nil {
+	if a.Cal == nil || a.P.SinPersonas {
 		return
 	}
 	a.lanzar(func(vida context.Context) {

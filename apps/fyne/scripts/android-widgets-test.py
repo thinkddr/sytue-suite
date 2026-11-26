@@ -19,7 +19,14 @@ SPEC = importlib.util.spec_from_file_location("widgets", Path(__file__).with_nam
 WIDGETS = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(WIDGETS)
 
+# Un árbol autónomo de Sytue Office no trae la edición conectada (apps/fyne/cmd) y sí el
+# vendor/ de su espacio de trabajo en la raíz:
+# allí los widgets de la conectada no tienen app con la que probarse y los prueba sytue-one.
+# En sytue-one es siempre falso.
+SIN_LA_CONECTADA = not (WIDGETS.FYNE / "cmd").exists() and (WIDGETS.FYNE.parents[1] / "vendor/modules.txt").is_file()
 
+
+@unittest.skipIf(SIN_LA_CONECTADA, "sin apps/fyne/cmd (sytue-office): los widgets de la conectada los prueba sytue-one")
 class ResourceTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="sytue-widget-test-")
@@ -195,6 +202,101 @@ class FondoTests(unittest.TestCase):
         # Encendido por decisión del dueño (2026-11-07), aún sin la prueba del runbook en un
         # teléfono. Apagarlo es un commit revisado: este test cambia con él.
         self.assertIs(WIDGETS.FONDO_GO, True)
+
+
+class OfficeTests(unittest.TestCase):
+    """Sytue Office (`--edicion local`): iconos sin widgets ni broker, y ML Kit si va."""
+
+    MANIFIESTO = '''<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+        package="eu.sytue.office.docus" android:versionCode="5" android:versionName="1.2.3">
+        <uses-permission android:name="android.permission.INTERNET" />
+        <application android:label="Sytue Docus Office" android:debuggable="false">
+        <activity android:name="org.golang.app.GoNativeActivity" android:exported="true">
+            <meta-data android:name="android.app.lib_name" android:value="Sytue_Docus_Office" />
+        </activity>%s
+        </application></manifest>'''
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(prefix="sytue-office-test-")
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        self.apk = self.root / "apk"
+        app = WIDGETS.FYNE / "cmd-local/docus"
+        icono = self.apk / "res/mipmap-xxxhdpi/icon.png"
+        icono.parent.mkdir(parents=True)
+        shutil.copyfile(app / "Icon.png", icono)
+        self.manifest = self.root / "AndroidManifest.xml"
+        self.manifest.write_text(self.MANIFIESTO % "")
+        self.args = argparse.Namespace(appdir=app, apk_root=self.apk, manifest=self.manifest,
+            aapt2=Path(os.environ["SYTUE_AAPT2"]), android_jar=Path(os.environ["SYTUE_ANDROID_JAR"]),
+            min_sdk=24, target_sdk=36, mlkit=None, r_java=None)
+
+    def dump(self):
+        path = self.root / "resources.apk"
+        with zipfile.ZipFile(path, "w") as archive:
+            for source in self.apk.rglob("*"):
+                if source.is_file():
+                    archive.write(source, source.relative_to(self.apk))
+        return subprocess.check_output([str(self.args.aapt2), "dump", "xmltree", str(path),
+            "--file", "AndroidManifest.xml"], text=True)
+
+    def test_icons_without_widgets_or_session(self):
+        WIDGETS.prepare_office(self.args)
+        dump = self.dump()
+        self.assertIn("Sytue_Docus_Office", dump)
+        self.assertRegex(dump, r"icon\(0x01010002\)=@0x7f[0-9a-f]+")
+        for ajeno in ("eu.sytue.nativo.Widgets", "RefrescoWidgets", "SesionProveedor", "queries"):
+            self.assertNotIn(ajeno, dump)
+        self.assertFalse((self.apk / "assets/sytue-widget.json").exists())
+
+    def test_the_connected_session_pieces_are_refused(self):
+        self.manifest.write_text(self.MANIFIESTO % '''
+            <provider android:name="eu.sytue.nativo.SesionProveedor"
+                android:authorities="eu.sytue.office.docus.sytue.sesion" android:exported="true" />''')
+        with self.assertRaisesRegex(ValueError, "SesionProveedor"):
+            WIDGETS.prepare_office(self.args)
+
+    def test_the_connected_manifest_is_not_office(self):
+        self.manifest.write_text((self.MANIFIESTO % "").replace("eu.sytue.office.docus", "eu.sytue.docs"))
+        with self.assertRaisesRegex(ValueError, "Sytue Office"):
+            WIDGETS.prepare_office(self.args)
+
+    def mlkit(self):
+        """Una carpeta como la de `android-mlkit.py preparar`, con una biblioteca de juguete."""
+        m = self.root / "mlkit"
+        (m / "res/01-lib/values").mkdir(parents=True)
+        (m / "res/01-lib/values/values.xml").write_text('''<resources>
+            <integer name="google_play_services_version">12451000</integer>
+            <string name="lib_texto">hola</string></resources>''')
+        (m / "rtxt").mkdir()
+        (m / "rtxt/com.example.lib.txt").write_text("int integer google_play_services_version 0x0\n"
+                                                     "int string lib_texto 0x0\n")
+        (m / "manifiesto.xml").write_text('''<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+            <uses-permission android:name="com.google.android.apps.aicore.service.BIND_SERVICE" />
+            <queries><package android:name="com.google.android.aicore" /></queries>
+            <application>
+            <meta-data android:name="com.google.android.gms.version" android:value="@integer/google_play_services_version" />
+            <provider android:name="com.google.mlkit.common.internal.MlKitInitProvider"
+                android:authorities="${applicationId}.mlkitinitprovider" android:exported="false" />
+            </application></manifest>''')
+        return m
+
+    def test_mlkit_manifest_resources_and_r(self):
+        self.args.mlkit, self.args.r_java = self.mlkit(), self.root / "r"
+        WIDGETS.prepare_office(self.args)
+        dump = self.dump()
+        for value in ("com.google.android.apps.aicore.service.BIND_SERVICE", "com.google.android.aicore",
+                      "eu.sytue.office.docus.mlkitinitprovider", "com.google.android.gms.version"):
+            self.assertIn(value, dump)
+        self.assertNotIn("${applicationId}", dump)
+        r = (self.root / "r/com/example/lib/R.java").read_text()
+        self.assertIn("package com.example.lib;", r)
+        self.assertRegex(r, r"public static final int lib_texto = 0x7f[0-9a-f]{6};")
+        self.assertRegex(r, r"public static final int google_play_services_version = 0x7f[0-9a-f]{6};")
+
+    def test_r_without_its_symbol_fails(self):
+        with self.assertRaisesRegex(ValueError, "no está en la tabla"):
+            WIDGETS.r_java("int string otro 0x7f010000\n", "int string lib_texto 0x0\n", "com.example.lib")
 
 
 if __name__ == "__main__":

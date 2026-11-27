@@ -11,7 +11,7 @@ func entorno(vars map[string]string) func(string) string {
 }
 
 // El requisito es explícito: una producción nueva tiene que quedar con
-// admin@sytue.eu dado de alta aunque el despliegue no pase ninguna
+// el admin global dado de alta aunque el despliegue no pase ninguna
 // variable de identidad. Solo las credenciales son obligatorias.
 func TestBootstrapOwnerPorDefectoEsElAdminGlobal(t *testing.T) {
 	in, err := bootstrapOwnerInputFromEnv(entorno(map[string]string{
@@ -23,7 +23,7 @@ func TestBootstrapOwnerPorDefectoEsElAdminGlobal(t *testing.T) {
 	if in.Email != "admin@sytue.eu" {
 		t.Errorf("correo por defecto inesperado: %q", in.Email)
 	}
-	if in.Name != "Daniel Delgado" {
+	if in.Name != "Admin Sytue" {
 		t.Errorf("nombre por defecto inesperado: %q", in.Name)
 	}
 	// El slug ES la dirección: la organización de Sytue vive en

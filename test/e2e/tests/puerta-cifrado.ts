@@ -29,6 +29,57 @@
 export const PERFIL_CIFRADO = "age-MLKEM768-X25519-v1";
 
 /**
+ * Por dónde abre Mail el correo de la cuenta: `boveda` (la puerta de `PqVaultGate` y
+ * `vault/mail-private.ts`), `matrix`, `retirada` o `dudoso`. Es la misma pregunta que
+ * hace `elegirAlmacenCorreo` (apps/mail/src/client/almacenCorreo.ts) a la autoridad de
+ * Rooms, de solo lectura.
+ *
+ * POR QUÉ IMPORTA. Si la cuenta va por Matrix, la puerta de la bóveda no se monta y
+ * nada de lo que se mida dice si la bóveda abre: v4.0.2 dejó roto el correo sobre la
+ * bóveda (`mail.capacidades…host.authority.revalidate`) y la cuenta de auditoría, que
+ * iba por Matrix, lo abría sin problema. Va a `page.evaluate`: no toca nada de fuera.
+ */
+export async function almacenCorreo(
+  base: string,
+): Promise<"boveda" | "matrix" | "retirada" | "dudoso"> {
+  try {
+    const s = await fetch(`${base}/auth/session`, { credentials: "same-origin" });
+    const sesion = (await s.json()) as { user?: { id?: unknown }; tenant?: unknown };
+    const subject = sesion.user?.id;
+    const tenant = sesion.tenant;
+    if (typeof subject !== "string" || typeof tenant !== "string") return "dudoso";
+    const raw = new TextEncoder().encode(JSON.stringify({ tenant, subject, product: "mail" }));
+    const ambito =
+      "v1." +
+      btoa(String.fromCharCode(...raw))
+        .replaceAll("+", "-")
+        .replaceAll("/", "_")
+        .replace(/=+$/u, "");
+    const res = await fetch(`${base}/api/matrix/storage/authority/`, {
+      credentials: "same-origin",
+      headers: { "X-Sytue-Storage-Scope": ambito },
+    });
+    const body = (await res.json().catch(() => null)) as {
+      user_id?: unknown;
+      code?: unknown;
+      error?: { code?: unknown };
+    } | null;
+    if (res.ok)
+      return typeof body?.user_id === "string" && body.user_id
+        ? body.user_id.endsWith(":sytue-vault")
+          ? "boveda"
+          : "matrix"
+        : "dudoso";
+    const code = body?.code ?? body?.error?.code;
+    if (res.status === 409 && code === "storage_root_enrollment_required") return "boveda";
+    if (res.status === 409 && code === "storage_matrix_retired") return "retirada";
+    return "dudoso";
+  } catch {
+    return "dudoso";
+  }
+}
+
+/**
  * - `abierta`: no hay puerta en la página, o ya dejó pasar.
  * - `abriendo`: la puerta está preguntando al puente («Desbloqueando…»).
  * - `cerrada`: la puerta espera que se vuelva a entrar (o no pudo abrir).

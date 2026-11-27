@@ -31,7 +31,7 @@ import {
   porQueNoEntra,
   salirDelPasoDeAutorizacion,
 } from './tests/helpers.ts';
-import { PERFIL_CIFRADO, estadoPuertaCifrado } from './tests/puerta-cifrado.ts';
+import { PERFIL_CIFRADO, almacenCorreo, estadoPuertaCifrado } from './tests/puerta-cifrado.ts';
 import {
   DETECTOR,
   DETECTOR_DOCUMENTO,
@@ -321,10 +321,30 @@ async function asegurarSesion(page, destino = '') {
 }
 
 /**
+ * Lo más que se espera a que la puerta del cifrado TERMINE. No es solo la consulta al
+ * puente (segundos): detrás va la preparación de la app —Mail baja su núcleo, comprueba
+ * la autoridad y pide sus capacidades—, y en el runner pasa de 15 s. Con 15 s la puerta
+ * seguía «abriendo» y se daba por abierta: el barrido midió el esqueleto de carga de
+ * Mail y lo dio por «ok» mientras en producción la preparación fallaba
+ * (`prepare/mail.capacidades…host.authority.revalidate…host_port_rejected`, v4.0.2).
+ */
+const PUERTA_MS = 180_000;
+
+/** El código del fallo que la puerta deja plegado en «Más información». Fijo, sin datos de la cuenta. */
+const codigoFalloPuerta = (page) =>
+  page
+    .evaluate(
+      () =>
+        document.querySelector('[data-sytue-boveda-fallo]')?.getAttribute('data-sytue-boveda-fallo') ?? '',
+    )
+    .catch(() => '');
+
+/**
  * Deja ABIERTA la puerta del cifrado de la app que hay delante (ver
  * `tests/puerta-cifrado.ts`). Devuelve `abierta` si no había puerta o ya dejaba
  * pasar, `desbloqueada` si hubo que volver a entrar (la página ya está de vuelta en
- * la misma ruta) y `cerrada` si sigue sin abrir.
+ * la misma ruta), `cerrada` si sigue sin abrir y `atascada` si a los `PUERTA_MS`
+ * sigue «abriendo». Las dos últimas son FALLO: no hay app que medir.
  *
  * POR QUÉ HACE FALTA. Solo el PRIMER perfil de cada barrido escribe la contraseña
  * en este contexto, y es la página de acceso del IdP la que deriva de ella la clave
@@ -347,16 +367,20 @@ async function asegurarSesion(page, destino = '') {
  */
 async function abrirPuertaCifrado(page, app) {
   const estado = () => page.evaluate(estadoPuertaCifrado, PERFIL_CIFRADO).catch(() => 'abierta');
-  // La puerta pregunta al puente al montarse: se le deja contestar (≤15 s).
+  // Hasta que deja de estar «abriendo», y no un plazo fijo: lo que falla tarda en
+  // fallar (ver `PUERTA_MS`). Seguir «abriendo» al final NO es estar abierta.
   const asentado = async () => {
+    const hasta = Date.now() + PUERTA_MS;
     let e = await estado();
-    for (let i = 0; e === 'abriendo' && i < 30; i++) {
-      await page.waitForTimeout(500);
+    while (e === 'abriendo' && Date.now() < hasta) {
+      await page.waitForTimeout(1000);
       e = await estado();
     }
     return e;
   };
-  if ((await asentado()) !== 'cerrada') return 'abierta';
+  const antes = await asentado();
+  if (antes === 'abriendo') return 'atascada';
+  if (antes !== 'cerrada') return 'abierta';
   const aqui = new URL(page.url());
   const volver = aqui.pathname + aqui.search;
   await navegar(
@@ -365,7 +389,9 @@ async function abrirPuertaCifrado(page, app) {
   );
   await asegurarSesion(page);
   await page.waitForTimeout(3500);
-  return (await asentado()) === 'cerrada' ? 'cerrada' : 'desbloqueada';
+  const despues = await asentado();
+  if (despues === 'abriendo') return 'atascada';
+  return despues === 'cerrada' ? 'cerrada' : 'desbloqueada';
 }
 
 /**
@@ -1098,6 +1124,9 @@ mkdirSync(SALIDA, { recursive: true });
 const browser = await chromium.launch();
 const informe = [];
 
+// Por dónde abre la cuenta su correo (`almacenCorreo`): se pregunta una vez, con la
+// primera visita a Mail. Si no es la bóveda, la puerta de la bóveda de Mail no se mide.
+let almacenMail = null;
 for (const [nombre, perfil, opts] of ELEGIDOS) {
   if (PEDIDOS.length && !PEDIDOS.includes(nombre)) continue;
   const ctx = await browser.newContext({
@@ -1160,8 +1189,15 @@ for (const [nombre, perfil, opts] of ELEGIDOS) {
           // ni se montaba, porque a ese contexto le faltaba la clave de
           // desbloqueo (ver `abrirPuertaCifrado`). Abierta la puerta, el enlace
           // está en cuanto llega la lista.
-          if ((await abrirPuertaCifrado(page, app)) === 'cerrada') {
-            throw new Error('la puerta del cifrado no se abrió tras volver a entrar');
+          const puertaLista = await abrirPuertaCifrado(page, app);
+          if (puertaLista === 'cerrada' || puertaLista === 'atascada') {
+            const codigo = await codigoFalloPuerta(page);
+            throw new Error(
+              (puertaLista === 'cerrada'
+                ? 'la puerta del cifrado no se abrió tras volver a entrar'
+                : `la puerta del cifrado sigue abriendo a los ${PUERTA_MS / 1000} s`) +
+                (codigo ? ` (${codigo.slice(0, 160)})` : ''),
+            );
           }
           const href = await page
             .locator(`a[href*="${entrada.enlace}"]`)
@@ -1213,10 +1249,14 @@ for (const [nombre, perfil, opts] of ELEGIDOS) {
         // «Volver a entrar», y medirlo daba «ok» a una pantalla que no se había
         // visto (todos los perfiles menos el primero; ver `abrirPuertaCifrado`).
         const puerta = await abrirPuertaCifrado(page, app);
+        if (app === 'mail' && almacenMail === null) {
+          almacenMail = await page.evaluate(almacenCorreo, BASES.mail).catch(() => 'dudoso');
+          console.log(`  ·       ${nombre.padEnd(20)} mail: la cuenta abre su correo por «${almacenMail}»`);
+        }
         if (puerta === 'desbloqueada') {
           resp = await navegar(page, url);
           await page.waitForTimeout(3500);
-        } else if (puerta === 'cerrada') {
+        } else if (puerta === 'cerrada' || puerta === 'atascada') {
           // Lo que dice la puerta (sin datos de la cuenta: es el texto fijo del
           // estado) para saber POR QUÉ no abre —clave que no abre, importación a
           // medias, otro dispositivo copiando— sin tener que reproducirlo a mano.
@@ -1225,26 +1265,23 @@ for (const [nombre, perfil, opts] of ELEGIDOS) {
             .catch(() => '');
           // El código del fallo (`prepare/drive.import.row_heads`) va plegado dentro de
           // «Más información» y no sale en el texto. Es fijo, sin datos de la cuenta.
-          const codigo = await page
-            .evaluate(
-              () =>
-                document
-                  .querySelector('[data-sytue-boveda-fallo]')
-                  ?.getAttribute('data-sytue-boveda-fallo') ?? '',
-            )
-            .catch(() => '');
+          const codigo = await codigoFalloPuerta(page);
+          const motivo =
+            puerta === 'cerrada'
+              ? 'la puerta del cifrado no se abrió tras volver a entrar'
+              : `la puerta del cifrado sigue abriendo a los ${PUERTA_MS / 1000} s`;
           console.log(
-            `  SALTO   ${nombre.padEnd(20)} ${url.padEnd(46)} la puerta del cifrado no se abrió: se mediría la puerta, no la app`,
+            `  SALTO   ${nombre.padEnd(20)} ${url.padEnd(46)} ${motivo}: se mediría la puerta, no la app`,
           );
           console.log(`          la puerta dice: ${dice.slice(0, 300)}`);
-          if (codigo) console.log(`          código del fallo: ${codigo.slice(0, 120)}`);
+          if (codigo) console.log(`          código del fallo: ${codigo.slice(0, 200)}`);
           informe.push({
             app,
             ruta,
             perfil: nombre,
-            salto: 'la puerta del cifrado no se abrió tras volver a entrar: no hay app que medir',
+            salto: `${motivo}: no hay app que medir`,
             puerta: dice.slice(0, 600),
-            ...(codigo ? { codigo: codigo.slice(0, 120) } : {}),
+            ...(codigo ? { codigo: codigo.slice(0, 200) } : {}),
           });
           continue;
         }
@@ -1476,6 +1513,15 @@ if (sinCubrir.length)
   console.log(
     `${sinCubrir.length} páginas de la suite NO las visita esta puerta (ver «SIN CUBRIR» arriba).`,
   );
+// La bóveda de Mail sin medir es un agujero como una página sin visitar: v4.0.2 salió
+// con el correo cifrado roto sobre la bóveda y el barrido dio Mail por «ok» porque la
+// cuenta lo abría por Matrix.
+const bovedaMailSinMedir = almacenMail !== null && almacenMail !== 'boveda';
+if (bovedaMailSinMedir)
+  console.log(
+    `La cuenta de auditoría abre Mail por «${almacenMail}», no por la bóveda: un fallo del ` +
+      'correo cifrado sobre la bóveda NO se vería. Hay que pasar su correo a la bóveda.',
+  );
 // Código de salida, para poder usarlo como PUERTA y no solo como informe: un
 // script que siempre sale con 0 no impide que la regresión entre.
 //
@@ -1487,4 +1533,6 @@ if (sinCubrir.length)
 //
 // Y una pantalla que esta lista no visita cuenta igual que una que desborda: el
 // agujero no se ve en ninguna medida, solo en que no la hay.
-process.exit(graves.length || caidas.length || saltadas.length || sinCubrir.length ? 1 : 0);
+process.exit(
+  graves.length || caidas.length || saltadas.length || sinCubrir.length || bovedaMailSinMedir ? 1 : 0,
+);

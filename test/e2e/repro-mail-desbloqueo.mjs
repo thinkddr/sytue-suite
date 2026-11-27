@@ -21,13 +21,18 @@
 //      después de cada llamada, así que la autoridad se comprueba igual.
 // Con el arreglo ya desplegado, la primera pasada abre y la segunda no se hace.
 //
+// SOLO PRUEBA ALGO SI LA CUENTA ABRE SU CORREO POR LA BÓVEDA (`almacenCorreo`). Con el
+// correo en Matrix, la puerta de la bóveda no se monta y «abierta» no dice nada: así
+// salió la primera tirada contra v4.0.2 (run 46022534651): Mail «abría» con el camino
+// de la bóveda roto para todos, porque la cuenta de auditoría no pasaba por él.
+//
 // En la nube (`mobile.yml` → `workflow_dispatch`, `reproductor=repro-mail-desbloqueo.mjs`).
 // Desde el portátil NO: lo que decide es dónde corre el navegador.
 //
 //   SYTUE_AUDIT_EMAIL=… SYTUE_AUDIT_PASS=… SYTUE_AUDIT_TOTP=… bun run repro-mail-desbloqueo.mjs
 import { chromium } from 'playwright';
 import { codigoTOTP, porQueNoEntra } from './tests/helpers.ts';
-import { PERFIL_CIFRADO, estadoPuertaCifrado } from './tests/puerta-cifrado.ts';
+import { PERFIL_CIFRADO, almacenCorreo, estadoPuertaCifrado } from './tests/puerta-cifrado.ts';
 
 const DOMINIO = process.env.SYTUE_BASE_DOMAIN || 'sytue.eu';
 const IDP = `id.${DOMINIO}`;
@@ -45,8 +50,16 @@ if (!CRED.email || !CRED.pass) {
   console.error('Faltan SYTUE_AUDIT_EMAIL / SYTUE_AUDIT_PASS.');
   process.exit(2);
 }
-/** Lo que puede tardar la preparación de Mail con el núcleo sin caché. */
-const ESPERA_MS = 240_000;
+/**
+ * PASAR EL CORREO DE LA CUENTA A LA BÓVEDA (autorizado por el dueño el 2026-11-27).
+ * Solo con `SYTUE_TRASPASO_BOVEDA=1`, que pone `traspaso-auditoria-boveda.mjs`: el paso
+ * `reproductor` de `mobile.yml` solo acepta un nombre de fichero, y así la sonda de
+ * siempre no traspasa nunca por accidente. Es lo que hace el botón «Pasar a la bóveda»
+ * de Mail: vacía el correo privado de la cuenta en Matrix y abre una bóveda nueva.
+ */
+const TRASPASO = process.env.SYTUE_TRASPASO_BOVEDA === '1';
+/** Lo que puede tardar la preparación de Mail con el núcleo sin caché (más, si traspasa). */
+const ESPERA_MS = TRASPASO ? 600_000 : 240_000;
 /** Tanto tiempo seguido sin puerta para darla por abierta (y no una página a medio hidratar). */
 const ABIERTA_MS = 10_000;
 
@@ -55,6 +68,18 @@ const browser = await chromium.launch();
 // llegaría a la página.
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, serviceWorkers: 'block' });
 const page = await ctx.newPage();
+
+// El JS de Mail que sirve producción. `capabilitiesHandlers` es el arreglo de v4.0.3
+// (los nombres de método no se minifican): sin él, el camino de la bóveda está roto y
+// no se traspasa nada.
+const jsMail = [];
+page.on('response', (res) => {
+  const u = new URL(res.url());
+  if (u.hostname === HOST && u.pathname.startsWith(`${BASE}/`) && u.pathname.endsWith('.js'))
+    jsMail.push(res.text().catch(() => ''));
+});
+const sirveArreglo = async () =>
+  (await Promise.all(jsMail)).some((texto) => texto.includes('capabilitiesHandlers'));
 
 // El código del fallo que deja la puerta en la consola (`PqVaultGate`).
 const avisos = [];
@@ -175,13 +200,54 @@ async function inyectarArreglo() {
   );
 }
 
+/**
+ * Pide el traspaso como el botón «Pasar a la bóveda» (`pedirTraspaso` de
+ * apps/mail/src/client/almacenCorreo.ts): la marca de la pestaña. La siguiente carga de
+ * Mail abre la bóveda nueva y la olvida en cuanto el correo abre.
+ */
+async function pedirTraspaso() {
+  await abrirMail();
+  await page.waitForTimeout(5000);
+  const antes = await page.evaluate(almacenCorreo, BASE).catch(() => 'dudoso');
+  console.log(`   antes del traspaso, la cuenta abre su correo por «${antes}»`);
+  if (antes === 'boveda') return;
+  if (!(await sirveArreglo()))
+    throw new Error(
+      'producción no sirve todavía el arreglo de v4.0.3 (no hay `capabilitiesHandlers` en el JS de ' +
+        'Mail): el traspaso acabaría en la bóveda rota. No se ha tocado nada.',
+    );
+  if (antes !== 'matrix')
+    throw new Error(`la autoridad de Rooms contesta «${antes}»: no se pide un traspaso a ciegas`);
+  const pedido = await page.evaluate(async (base) => {
+    const sesion = await (await fetch(`${base}/auth/session`)).json();
+    const actor = sesion?.user?.id;
+    if (typeof actor !== 'string' || !actor) return false;
+    sessionStorage.setItem(`sytue.mail.traspaso:${sesion.tenant ?? ''}:${actor}`, '1');
+    return true;
+  }, BASE);
+  if (!pedido) throw new Error('sin sesión de Mail: no se puede pedir el traspaso');
+  console.log('   traspaso pedido: Mail abre una bóveda nueva y deja de usar Matrix');
+}
+
 let salida = 1;
 try {
+  if (TRASPASO) await pedirTraspaso();
   const tal = await esperarPuerta();
+  // Sin la bóveda, «abierta» no dice nada de ella: Matrix o la pantalla de «Pasar a la
+  // bóveda» tampoco llevan la marca de la puerta (ver `almacenCorreo`).
+  const almacen = await page.evaluate(almacenCorreo, BASE).catch(() => 'dudoso');
+  console.log(`\n   la cuenta abre su correo por «${almacen}»`);
   informar('Mail tal cual está desplegado', tal);
-  if (tal.estado === 'abierta') {
-    console.log('\n✓ Mail abre sus datos cifrados.');
+  if (tal.estado === 'abierta' && almacen !== 'boveda') {
+    console.log(
+      '\n✗ La cuenta no abre su correo por la bóveda: esta sonda no prueba el camino de la bóveda.',
+    );
+  } else if (tal.estado === 'abierta') {
+    console.log('\n✓ Mail abre sus datos cifrados en la bóveda.');
     salida = 0;
+  } else if (TRASPASO) {
+    // Con el traspaso no se inyecta nada: la bóveda nueva se abre con el código servido.
+    console.log('\n✗ El traspaso no terminó de abrir la bóveda: el código de arriba es el fallo.');
   } else {
     if (tal.codigo.includes('host.authority.revalidate'))
       console.log('   → reproducido: el puerto temporal de capacidades no responde a authority.revalidate.');

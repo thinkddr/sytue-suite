@@ -34,18 +34,27 @@ export function coloresEnHex(estilo: string): string {
 }
 
 /**
- * El HTML del editor con los colores de sus `style` en hexadecimal y sin los espacios de
- * ancho cero que deja el Markdown en la línea para seguir escribiendo fuera del formato.
+ * El HTML de `origen` (el editor, o la copia de lo seleccionado) con los colores de sus
+ * `style` en hexadecimal y sin los espacios de ancho cero que deja el Markdown en la línea
+ * para seguir escribiendo fuera del formato.
+ *
+ * Recibe los NODOS y no su HTML: se trabaja sobre una copia de ellos, sin volver a
+ * interpretar como HTML lo que ya estaba en el DOM (CodeQL `js/xss-through-dom`, alerta
+ * 488 de sytue-suite). Lo serializado y vuelto a analizar no siempre es lo mismo; la
+ * copia de los nodos, sí.
  */
-export function normalizarSalida(entrada: string): string {
-  const html = entrada.includes('\u200b') ? entrada.replaceAll('\u200b', '') : entrada;
+export function normalizarSalida(origen: Element): string {
+  const html = origen.innerHTML;
   // El paso rápido: casi ninguna pulsación trae un color, una imagen o un bloque con
   // atributos que ordenar.
   const colores = /style="[^"]*rgba?\(/i.test(html);
-  if (!colores && !html.includes('data-adjunto') && !FUERA_DE_ORDEN.test(html)) return html;
-  // Un `<template>`: su contenido es inerte y no carga nada.
+  if (!colores && !html.includes('data-adjunto') && !FUERA_DE_ORDEN.test(html))
+    return sinAnchoCero(html);
+  // La copia va al documento inerte de un `<template>`: no carga nada y el DOM del editor
+  // no se toca.
   const caja = document.createElement('template');
-  caja.innerHTML = html;
+  const inerte = caja.content.ownerDocument;
+  for (const hijo of origen.childNodes) caja.content.append(inerte.importNode(hijo, true));
   if (colores)
     for (const el of caja.content.querySelectorAll<HTMLElement>('[style]')) {
       const antes = el.getAttribute('style') ?? '';
@@ -60,8 +69,11 @@ export function normalizarSalida(entrada: string): string {
   }
   for (const el of caja.content.querySelectorAll<HTMLElement>('pre, details'))
     ordenarAtributos(el, ORDEN[el.tagName.toLowerCase()] ?? []);
-  return caja.innerHTML;
+  return sinAnchoCero(caja.innerHTML);
 }
+
+const sinAnchoCero = (html: string): string =>
+  html.includes('\u200b') ? html.replaceAll('\u200b', '') : html;
 
 /** Un bloque con sus atributos fuera del orden de siempre (lo único que hay que ordenar). */
 const FUERA_DE_ORDEN = /<pre [^>]*data-ajuste[^>]*data-lineas|<details [^>]*open[^>]*data-expandir/;

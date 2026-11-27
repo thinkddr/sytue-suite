@@ -738,7 +738,7 @@ export function RichText({
   const emitir = () => {
     const html = ref.current?.innerHTML ?? '';
     setVacio(ref.current?.textContent?.trim() === '' && !html.includes('<img'));
-    const limpio = normalizarSalida(html);
+    const limpio = ref.current ? normalizarSalida(ref.current) : '';
     onChange(limpio);
     medirNumeros();
     if (recuento.current) clearTimeout(recuento.current);

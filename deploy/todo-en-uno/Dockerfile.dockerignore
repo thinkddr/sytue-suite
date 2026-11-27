@@ -1,0 +1,19 @@
+# Contexto del contenedor «todo en uno»: el repositorio sin artefactos locales.
+# Nunca entra la configuración ni los certificados de ESTE equipo (.env, *.pem).
+.git
+**/node_modules
+**/dist
+**/.astro
+**/.turbo
+**/coverage
+**/*.tsbuildinfo
+**/.DS_Store
+*.log
+deploy/compose/.env
+deploy/compose/.env.*
+!deploy/compose/.env.example
+deploy/compose/.servidor
+deploy/compose/traefik/certs/*.pem
+deploy/helm/create-databases.sh
+deploy/helm/bootstrap-admin.sh
+.deps

@@ -15,11 +15,18 @@ let current = {
 let maximum = 0,
   shared = false,
   ready = true,
-  calls = 0;
+  calls = 0,
+  revalidations = 0;
 const encoder = new TextEncoder();
 globalThis.sytueCoreHostCall = async (request) => {
   assert.equal(request.port, port);
   if (request.method === 'current') return encoder.encode(JSON.stringify(current));
+  // The real host port must answer this: mail.capabilities goes through AuthorizedJS.
+  if (request.method === 'authority.revalidate') {
+    assert.deepEqual(request.scope, scope);
+    revalidations++;
+    return new Uint8Array();
+  }
   assert.equal(request.method, 'source.capabilities');
   assert.deepEqual(request.scope, scope);
   calls++;
@@ -57,6 +64,7 @@ try {
   assert.equal(result.ok, true);
   assert.equal(result.value.max_body_bytes, 50 << 20);
   assert.deepEqual(result.value.scope, scope);
+  assert(revalidations > 0);
   maximum = 100 << 20;
   result = await call();
   assert.equal(result.ok, true);

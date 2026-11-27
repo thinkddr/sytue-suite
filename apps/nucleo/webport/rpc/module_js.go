@@ -74,7 +74,7 @@ func (d *moduleDispatcher) dispatch(_ js.Value, args []js.Value) (result any) {
 	}
 	value, err := d.module.Execute(operation, req)
 	if err != nil {
-		return map[string]any{"ok": false, "code": d.module.RejectedCode}
+		return Rechazo(d.module.RejectedCode, err)
 	}
 	return map[string]any{"ok": true, "value": value}
 }
@@ -135,6 +135,7 @@ func (d *moduleDispatcher) dispatchAsync(req js.Value, handler func(context.Cont
 				result = map[string]any{"ok": true, "value": value}
 			} else {
 				eraseModuleValue(value)
+				result = Rechazo(d.module.RejectedCode, err)
 			}
 		}()
 		return nil

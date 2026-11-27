@@ -7,6 +7,7 @@ import (
 	"context"
 	"syscall/js"
 
+	"git.sytue.eu/sytue/one/apps/nucleo/fallo"
 	"git.sytue.eu/sytue/one/apps/nucleo/mail/limits"
 	"git.sytue.eu/sytue/one/apps/nucleo/storage"
 )
@@ -19,23 +20,30 @@ import (
 func MailCapabilitiesJS(ctx context.Context, req js.Value, coreSources *Sources, corePolicies *Policies) (any, error) {
 	port, _, err := AuthorizedJS(ctx, req)
 	if err != nil {
-		return nil, err
+		return nil, fallo.En("puerto", err)
 	}
 	owner, err := OpenStorage(ctx, port, coreSources, corePolicies)
 	if err != nil || owner.FileScope().Product != "mail" || owner.StorageIdentityVersion() != storage.IsolatedIdentity {
-		return nil, ErrRejected
+		return nil, fallo.En("almacen", ErrRejected)
 	}
 	source, err := NewSource(owner, false)
 	if err != nil {
-		return nil, err
+		return nil, fallo.En("origen", err)
 	}
+	// Cada «no» del estado con su nombre: el servicio decía `private_ingress_ready:
+	// false` a todas las cuentas y aquí solo salía `crypto_rejected`.
 	state, err := source.PrivateStorageState(ctx, owner.FileScope())
-	if err != nil || state.Shared || !state.PrivateIngressReady {
-		return nil, ErrRejected
+	switch {
+	case err != nil:
+		return nil, fallo.En("estado", err)
+	case state.Shared:
+		return nil, fallo.En("compartido", ErrRejected)
+	case !state.PrivateIngressReady:
+		return nil, fallo.En("entrada_no_lista", ErrRejected)
 	}
 	maximum, err := limits.MessageBytes(state.MaxBodyBytes)
 	if err != nil {
-		return nil, err
+		return nil, fallo.En("limite", err)
 	}
 	return map[string]any{"v": 1, "scope": map[string]any{"tenant": state.Scope.Tenant, "subject": state.Scope.Subject, "product": state.Scope.Product}, "max_body_bytes": maximum}, nil
 }

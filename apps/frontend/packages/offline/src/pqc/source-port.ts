@@ -225,6 +225,27 @@ export class PqcSourcePort {
       }),
     };
   }
+  /**
+   * Los handlers del puerto temporal con el que se pregunta `mail.capabilities`. El
+   * núcleo entra por `webport.AuthorizedJS`, que pide `authority.revalidate` antes de
+   * leer: sin él, el puerto contesta `host_port_rejected` y el correo cifrado no abre
+   * (`mail.capacidades…core.puerto.rechazado.host.authority.revalidate`). Lo usan los
+   * dos caminos del correo privado, Matrix y la bóveda, para que no falte en uno solo.
+   */
+  capabilitiesHandlers(
+    revalidate: (signal: AbortSignal) => Promise<void>,
+  ): Partial<Record<Exclude<HostMethod, 'current'>, HostHandler>> {
+    return {
+      'authority.revalidate': async (_raw, ctx) => {
+        ctx.assertOpen();
+        if (this.closed) return reject();
+        await revalidate(ctx.signal);
+        ctx.assertOpen();
+        return empty();
+      },
+      'source.capabilities': this.handlers['source.capabilities']!,
+    };
+  }
   async close(): Promise<void> {
     this.closed = true;
     await this.streams.close();

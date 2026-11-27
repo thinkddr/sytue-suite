@@ -14,10 +14,14 @@ package rpc
 import (
 	"errors"
 	"strings"
+
+	"git.sytue.eu/sytue/one/apps/nucleo/fallo"
 )
 
 // ErrRejected es el mismo valor que webport.ErrRejected.
 var ErrRejected = errors.New("webport: scoped host operation rejected")
+
+func init() { fallo.Conocido(ErrRejected, "rechazado") }
 
 // ValidID admite solo el identificador opaco de un puerto: 64 hexadecimales.
 func ValidID(id string) bool {
@@ -25,4 +29,15 @@ func ValidID(id string) bool {
 		return false
 	}
 	return strings.Trim(id, "0123456789abcdef") == ""
+}
+
+// Rechazo es la respuesta de una operación que falló: el código del módulo y, si
+// el error lo dice con palabras fijas (paquete fallo), el motivo. Así «Más
+// información» dice qué paso del núcleo falló y no solo `crypto_rejected`.
+func Rechazo(code string, err error) map[string]any {
+	result := map[string]any{"ok": false, "code": code}
+	if motivo := fallo.Motivo(err); motivo != "" {
+		result["motivo"] = motivo
+	}
+	return result
 }

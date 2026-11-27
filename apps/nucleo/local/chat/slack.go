@@ -488,6 +488,11 @@ func (s *Slack) sondear(ctx context.Context, alLlegar func(api.RoomsEvent)) erro
 				return err
 			}
 			for i := len(r.Messages) - 1; i >= 0; i-- {
+				// `oldest` no siempre deja fuera el propio `desde` (`inclusive`, relojes
+				// iguales): lo ya visto no se entrega ni se cuenta como sin leer otra vez.
+				if r.Messages[i].TS <= desde {
+					continue
+				}
 				s.entregar(ctx, canal, r.Messages[i], "message", alLlegar)
 			}
 		}

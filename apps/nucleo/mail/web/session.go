@@ -6,6 +6,7 @@ import (
 	"context"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
+	"git.sytue.eu/sytue/one/apps/nucleo/fallo"
 	privateMail "git.sytue.eu/sytue/one/apps/nucleo/mail"
 	"git.sytue.eu/sytue/one/apps/nucleo/mail/application"
 	"git.sytue.eu/sytue/one/apps/nucleo/offline"
@@ -127,13 +128,13 @@ func buildMailProduct(ctx context.Context, input webport.ProductBuildContext) (w
 	store, _ := ctx.Value(storeKey{}).(Store)
 	authority, err := rooms.MatrixStorageAuthority(ctx, scope)
 	if err != nil {
-		return nil, err
+		return nil, fallo.En("autoridad", err)
 	}
 	if err := storeMatchesAuthority(store, authority); err != nil {
-		return nil, err
+		return nil, fallo.En("almacen_autoridad", err)
 	}
 	if err := isolated.RequireStorageAuthority(ctx, authority); err != nil {
-		return nil, err
+		return nil, fallo.En("autoridad_dispositivo", err)
 	}
 	requireLegacy := false
 	if store == StoreMatrix {
@@ -180,7 +181,7 @@ func buildMailProduct(ctx context.Context, input webport.ProductBuildContext) (w
 	}
 	app, err := application.New(input.Lifetime, resources, cfg) //nolint:contextcheck // the application is bound to input.Lifetime, deliberately detached from the request ctx
 	if err != nil {
-		return nil, err
+		return nil, fallo.En("aplicacion", err)
 	}
 	return &mailManagedProduct{app}, nil
 }

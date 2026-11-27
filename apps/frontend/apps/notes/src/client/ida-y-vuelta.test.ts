@@ -56,7 +56,7 @@ test('cada fichero compartido vuelve igual del editor de la web', () => {
     const campo = document.createElement('div');
     campo.innerHTML = fuente;
     pintarAdjuntos(campo, ADJUNTOS, false);
-    expect([f, normalizarSalida(campo.innerHTML)]).toEqual([f, sinBarra(fuente)]);
+    expect([f, normalizarSalida(campo)]).toEqual([f, sinBarra(fuente)]);
   }
 });
 
@@ -67,17 +67,16 @@ test('la imagen se pinta con los datos de su adjunto y se entrega nombrándolo',
   const img = campo.querySelector('img')!;
   expect(img.getAttribute('src')).not.toBe('adjunto:1732540000000-ab12cd');
   expect(img.getAttribute('data-adjunto')).toBe(ADJUNTOS[0]!.id);
-  expect(normalizarSalida(campo.innerHTML)).toBe(
+  expect(normalizarSalida(campo)).toBe(
     '<p><img src="adjunto:1732540000000-ab12cd" alt="plano.png"></p>',
   );
 });
 
 test('los atributos de un bloque se entregan en el orden de siempre, pulsados como se pulsen', () => {
-  expect(
-    normalizarSalida(
-      '<pre data-ajuste="" data-lineas="">a</pre><details open="" data-expandir=""><summary>T</summary></details>',
-    ),
-  ).toBe(
+  const campo = document.createElement('div');
+  campo.innerHTML =
+    '<pre data-ajuste="" data-lineas="">a</pre><details open="" data-expandir=""><summary>T</summary></details>';
+  expect(normalizarSalida(campo)).toBe(
     '<pre data-lineas="" data-ajuste="">a</pre><details data-expandir="" open=""><summary>T</summary></details>',
   );
 });

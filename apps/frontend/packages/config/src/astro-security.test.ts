@@ -495,12 +495,15 @@ describe('scripts sin unsafe-inline', () => {
     const culpables: string[] = [];
     for (const app of estrictas) {
       for (const fichero of astroDe(`${appsDir}${app}/src`)) {
-        for (const etiqueta of readFileSync(fichero, 'utf8').match(/<script\b[^>]*>/g) ?? []) {
+        // Sin distinguir mayúsculas: el HTML no las distingue, y un `<SCRIPT is:inline>`
+        // se ejecutaría sin firmar y sin que esto lo viera (CodeQL `js/bad-tag-filter`,
+        // alerta 489 de sytue-suite).
+        for (const etiqueta of readFileSync(fichero, 'utf8').match(/<script\b[^>]*>/gi) ?? []) {
           // Lo que procesa Astro (sin is:inline) lo firma él; un `src` lo cubre 'self';
           // un bloque de datos (JSON) no se ejecuta.
-          if (!/\bis:inline\b/.test(etiqueta)) continue;
-          if (/\bsrc=/.test(etiqueta)) continue;
-          if (/type="application\/(ld\+)?json"/.test(etiqueta)) continue;
+          if (!/\bis:inline\b/i.test(etiqueta)) continue;
+          if (/\bsrc=/i.test(etiqueta)) continue;
+          if (/type="application\/(ld\+)?json"/i.test(etiqueta)) continue;
           culpables.push(`${fichero.slice(appsDir.length)}: ${etiqueta}`);
         }
       }

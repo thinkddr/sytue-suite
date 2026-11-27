@@ -64,7 +64,9 @@ test('the editor island carries no canvas, no tab body, no formulas and no parse
 
 // El Drive de la bóveda (`@sytue/offline/matrix`, ~183 KB): el editor solo pregunta si el
 // Drive está en ella (`driveEnBoveda.ts`) y baja `driveCifrado.ts` al guardar en él.
-const DRIVE_BOVEDA = /\/packages\/offline\/src\/matrix\/|\/editor\/state\/driveCifrado\.ts$/;
+// Las dos alternativas ancladas al final: con el `$` solo en la segunda no se veía si el
+// ancla era de las dos (CodeQL `js/regex/missing-regexp-anchor`, alerta 490 de sytue-suite).
+const DRIVE_BOVEDA = /\/packages\/offline\/src\/matrix\/.+$|\/editor\/state\/driveCifrado\.ts$/;
 
 test('the editor and each kind carry no vault Drive until saving to it', () => {
   for (const ruta of [

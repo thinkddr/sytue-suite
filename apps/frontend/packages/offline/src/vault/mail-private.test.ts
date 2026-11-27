@@ -1,7 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 import { describe, expect, test } from 'bun:test';
 import type { StorageRepository } from '../matrix/storage-repository.js';
-import type { HostCallContext } from '../pqc/host-port.js';
+import { PqcHostPorts, type HostCallContext, type HostPortOptions } from '../pqc/host-port.js';
+import type { PqcRuntime } from '../pqc/runtime.js';
 import { VaultIngressControlPort, VaultIngressSecretsPort } from './mail-ports.js';
 import {
   checkVaultAuthority,
@@ -164,6 +165,108 @@ describe('openVaultMailPrivate (ADR 0087)', () => {
     expect(rechazada.check).toBe('signing_put_400_vault_key_proof');
     await expect(abrir('registered', 'drive')).rejects.toThrow();
     expect(sesiones).toBe(0);
+  });
+
+  // v4.0.2 seguía sin abrir el correo cifrado con
+  // `mail.capacidades…core.puerto.rechazado.host.authority.revalidate…host_port_rejected`:
+  // el arreglo se puso en el puerto de capacidades de Matrix y no en el de la bóveda.
+  // Visto en ROJO con el puerto temporal sin `authority.revalidate`.
+  test('el puerto de capacidades contesta lo que pide webport.AuthorizedJS', async () => {
+    const vida = new AbortController();
+    const fetchOriginal = globalThis.fetch,
+      location = Object.getOwnPropertyDescriptor(globalThis, 'location');
+    Object.defineProperty(globalThis, 'location', {
+      configurable: true,
+      value: new URL('https://suite.test/mail'),
+    });
+    const dueno = {
+      v: 1,
+      actor: scope.subject,
+      tenant: scope.tenant,
+      client_id: 'mail',
+      generation: 'a'.repeat(64),
+    };
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const ruta = new URL(new Request(input, init).url).pathname;
+      if (ruta === '/mail/auth/session')
+        return Response.json({
+          authenticated: true,
+          user: { id: dueno.actor },
+          tenant: dueno.tenant,
+          owner: dueno,
+        });
+      if (ruta.endsWith('/matrix/storage/authority/')) return new Response(autoridad());
+      return Response.json({ v: 1 });
+    }) as typeof fetch;
+    const metodos: string[] = [];
+    const fin = new Error('fin');
+    try {
+      const vault = {
+        isClosed: false,
+        scope,
+        signingKeyStatus: 'registered',
+        publicationTarget: { device_id: 'PQDEVICE' },
+        ingressUserID: userID,
+        signal: vida.signal,
+        ingressRootKey: async () => 'RAIZ',
+        // Pasar de las capacidades basta: el siguiente paso corta aquí.
+        storage: () => ({
+          prepare: async () => {
+            throw fin;
+          },
+        }),
+      } as unknown as PqVault;
+      const error = await openVaultMailPrivate(vault, {
+        basePath: '/mail',
+        createRuntime: (lease) => {
+          const puertos = new PqcHostPorts(
+            () => lease.assertOpen(),
+            () => {},
+            () => lease.binding,
+          );
+          let id = 0;
+          return {
+            registerHostPort: (options: HostPortOptions) => puertos.register(options),
+            closeAndDrain: () => puertos.drainAll(),
+            invoke: async (request: Record<string, unknown>) => {
+              expect(request.operation).toBe('mail.capabilities');
+              // Lo que hace `MailCapabilitiesJS`: AuthorizedJS y luego leer el estado.
+              for (const [method, ambito] of [
+                ['current', null],
+                ['current', null],
+                ['authority.revalidate', scope],
+                ['current', null],
+                ['source.capabilities', scope],
+              ] as const) {
+                metodos.push(method);
+                const salida = await puertos.dispatch(
+                  {
+                    type: 'host.call',
+                    id: ++id,
+                    port: String(request.port),
+                    scope: ambito,
+                    method,
+                    payload: new Uint8Array(),
+                  },
+                  () => {},
+                );
+                salida.fill(0);
+              }
+              return { v: 1, scope, max_body_bytes: 50 << 20 };
+            },
+          } as unknown as PqcRuntime;
+        },
+      }).catch((e: unknown) => e as Error & { vaultStep?: string });
+      expect(error).toBe(fin);
+      expect((error as { vaultStep?: string }).vaultStep).toBe('mail.registros');
+      expect(metodos).toContain('authority.revalidate');
+      expect(metodos.at(-1)).toBe('source.capabilities');
+    } finally {
+      vida.abort();
+      globalThis.fetch = fetchOriginal;
+      if (location) Object.defineProperty(globalThis, 'location', location);
+      else Reflect.deleteProperty(globalThis, 'location');
+    }
   });
 });
 

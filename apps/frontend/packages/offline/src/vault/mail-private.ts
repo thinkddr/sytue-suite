@@ -324,7 +324,7 @@ export async function openVaultMailPrivate(
         scope,
         lease: group,
         run,
-        handlers: { 'source.capabilities': sourceAdapter.handlers['source.capabilities']! },
+        handlers: sourceAdapter.capabilitiesHandlers(revalidate),
         cleanup: () => sourceAdapter.close(),
       }),
     );

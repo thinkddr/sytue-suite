@@ -34,7 +34,7 @@ function portapapeles(): Portapapeles | null {
 export function contenidoDe(rango: Range): { html: string; texto: string } {
   const caja = document.createElement('div');
   caja.append(rango.cloneContents());
-  return { html: normalizarSalida(caja.innerHTML), texto: rango.toString() };
+  return { html: normalizarSalida(caja), texto: rango.toString() };
 }
 
 /** Copia `rango` al portapapeles. `true` si alguna de las vías lo ha hecho. */

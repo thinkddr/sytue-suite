@@ -41,8 +41,26 @@ function serviceCode(error: { code?: unknown; body?: unknown }): string {
   }
 }
 
+// Los `new Error(...)` del propio código que dicen qué falló con un texto FIJO: el
+// núcleo de cifrado (`crypto_rejected`, `crypto_runtime_unavailable`,
+// `host_port_rejected`), IndexedDB (`indexeddb cleared`…) y la caché cifrada
+// (`offline_record_tampered`…). Solo esas familias: un mensaje cualquiera puede llevar
+// datos de la persona y no se copia.
+const fixedMessage = /^(?:crypto|host|indexeddb|offline)[a-z0-9_ ]{0,48}$/u;
+// El paso en que iba la apertura cuando falló (`mail.capacidades`), si lo marcó.
+const stepToken = /^[a-z][a-z0-9_.]{1,40}$/u;
+// El motivo del núcleo: palabras fijas del código Go separadas por puntos (paquete
+// `fallo`), acotado allí a 8 trozos y 160 caracteres.
+const coreReason = /^[a-z0-9_]{1,32}(?:\.[a-z0-9_]{1,32}){0,7}$/u;
+
 export function vaultFailureCode(error: unknown): string {
   if (!(error instanceof Error)) return 'unknown';
+  const step = (error as Error & { vaultStep?: unknown }).vaultStep;
+  const code = failureCodeOf(error);
+  return typeof step === 'string' && stepToken.test(step) ? `${step}.${code}` : code;
+}
+
+function failureCodeOf(error: Error): string {
   const e = error as Error & {
     reason?: unknown;
     check?: unknown;
@@ -93,7 +111,20 @@ export function vaultFailureCode(error: unknown): string {
       return typeof e.message === 'string' && fetchFailure.test(e.message)
         ? 'network'
         : 'error.TypeError';
-    default:
-      return 'error.' + (className.test(e.name) ? e.name : 'other');
+    default: {
+      const name = className.test(e.name) ? e.name : 'other';
+      const message = typeof e.message === 'string' ? e.message : '';
+      if (name !== 'Error' || !fixedMessage.test(message)) return 'error.' + name;
+      let base = `error.Error.${message.replaceAll(' ', '_')}`;
+      // En qué paso dijo «no» el núcleo (`core.abrir.preparar.entrada_no_lista…`).
+      const core = (e as { coreReason?: unknown }).coreReason;
+      if (typeof core === 'string' && core.length <= 160 && coreReason.test(core))
+        base += `.core.${core}`;
+      // El núcleo dijo «no» porque antes falló un puerto del anfitrión: cuál y por qué.
+      const host = (e as { hostFailure?: { method?: unknown; error?: unknown } }).hostFailure;
+      if (host && typeof host.method === 'string' && stepToken.test(host.method))
+        return `${base}.host.${host.method}.${failureCodeOf(host.error instanceof Error ? host.error : new Error())}`;
+      return base;
+    }
   }
 }

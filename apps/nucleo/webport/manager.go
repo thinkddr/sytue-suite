@@ -7,6 +7,7 @@ import (
 	"errors"
 	"sync"
 
+	"git.sytue.eu/sytue/one/apps/nucleo/fallo"
 	"git.sytue.eu/sytue/one/apps/nucleo/offline"
 	"git.sytue.eu/sytue/one/apps/nucleo/storage"
 )
@@ -138,7 +139,7 @@ func (m *Manager[C]) Open(ctx context.Context, ports ProductPorts) (*ManagedSess
 	m.mu.Unlock()
 	construction, stop := context.WithCancel(ctx)
 	stopLife := context.AfterFunc(life, stop)
-	err = s.prepare(construction, m.sources, m.policies, m.product, m.build)
+	err = fallo.En("abrir", s.prepare(construction, m.sources, m.policies, m.product, m.build))
 	stopLife()
 	stop()
 	s.mu.Lock()
@@ -162,11 +163,11 @@ func (m *Manager[C]) Open(ctx context.Context, ports ProductPorts) (*ManagedSess
 func (s *ManagedSession[C]) prepare(ctx context.Context, sources *Sources, policies *Policies, product string, build ProductBuilder[C]) error {
 	isolated, err := OpenStorage(ctx, s.ports.Isolated, sources, policies)
 	if err != nil || isolated.FileScope().Product != product || isolated.StorageIdentityVersion() != storage.IsolatedIdentity {
-		return ErrRejected
+		return fallo.En("almacen", ErrRejected)
 	}
 	resources, err := OpenResourcesForLifetime(ctx, s.life, isolated)
 	if err != nil {
-		return err
+		return fallo.En("recursos", err)
 	}
 	s.mu.Lock()
 	s.isolated = isolated
@@ -184,21 +185,21 @@ func (s *ManagedSession[C]) prepare(ctx context.Context, sources *Sources, polic
 	defer release()
 	journal, identity, err := OpenJournalForLifetime(ctx, s.life, s.ports.Isolated)
 	if err != nil || identity.Scope != isolated.FileScope() {
-		return ErrRejected
+		return fallo.En("diario", ErrRejected)
 	}
 	reader, writer, err := s.openLegacyStorages(ctx, isolated.FileScope(), sources, policies)
 	if err != nil {
-		return err
+		return fallo.En("legado", err)
 	}
 	app, err := build(ctx, ProductBuildContext{Lifetime: s.life, Isolated: isolated, LegacyReader: reader, MigrationWriter: writer, Resources: resources, Journal: journal})
 	if !validPrivateWork(app) {
-		return errors.Join(err, ErrRejected)
+		return fallo.En("producto", errors.Join(err, ErrRejected))
 	}
 	s.mu.Lock()
 	s.application = app
 	s.mu.Unlock()
 	if err != nil {
-		return err
+		return fallo.En("producto", err)
 	}
 	if err := initializeProduct(ctx, resources, app); err != nil {
 		return err
@@ -209,7 +210,7 @@ func (s *ManagedSession[C]) prepare(ctx context.Context, sources *Sources, polic
 		return offline.ErrWorkClosed
 	}
 	if err := s.startReceiverLocked(app); err != nil { //nolint:contextcheck // the receiver lives for the session lifetime, not for the call ctx
-		return err
+		return fallo.En("receptor", err)
 	}
 	s.ready = true
 	return nil
@@ -233,18 +234,18 @@ func (s *ManagedSession[C]) openLegacyStorages(ctx context.Context, scope storag
 
 func initializeProduct[C any](ctx context.Context, resources *Resources, app ManagedProduct[C]) error {
 	if _, err := resources.Register(ctx, app); err != nil {
-		return err
+		return fallo.En("registrar", err)
 	}
 	if err := app.Prepare(ctx); err != nil {
-		return err
+		return fallo.En("preparar", err)
 	}
 	if err := app.Initialize(ctx); err != nil {
-		return err
+		return fallo.En("inicializar", err)
 	}
 	if err := app.Ready(ctx); err != nil {
-		return err
+		return fallo.En("listo", err)
 	}
-	return resources.Revalidate(ctx)
+	return fallo.En("revalidar", resources.Revalidate(ctx))
 }
 func (s *ManagedSession[C]) ID() string { return s.id }
 func (s *ManagedSession[C]) Scope() storage.Scope {

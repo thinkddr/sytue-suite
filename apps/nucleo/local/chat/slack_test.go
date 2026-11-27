@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -26,6 +27,7 @@ type slackFalso struct {
 	marcados []string
 	srv      *httptest.Server
 	acuses   chan string
+	sondeos  atomic.Int32 // `conversations.history` con `oldest`: cada vuelta del sondeo
 }
 
 func nuevoSlackFalso(t *testing.T) *slackFalso {
@@ -76,6 +78,9 @@ func (f *slackFalso) servir(w http.ResponseWriter, r *http.Request) {
 		escribir(w, map[string]any{"ok": true, "user": map[string]any{"name": r.Form.Get("user"), "profile": map[string]string{"display_name": nombres[r.Form.Get("user")]}}})
 	case "conversations.history":
 		if r.Form.Get("oldest") != "" {
+			// Como Slack con `inclusive=true` (o un reloj que se repite): el mensaje que ya
+			// se vio vuelve en cada vuelta. El sondeo no debe contarlo otra vez.
+			f.sondeos.Add(1)
 			escribir(w, map[string]any{"ok": true, "messages": []map[string]any{
 				{"type": "message", "user": "U2", "text": "nuevo", "ts": "1700000100.000300"},
 			}})
@@ -180,7 +185,7 @@ func TestSlackTokenMaloSeDice(t *testing.T) {
 }
 
 func TestSlackSondeaLosCanalesAbiertos(t *testing.T) {
-	nuevoSlackFalso(t)
+	f := nuevoSlackFalso(t)
 	s := NuevaSlack("xoxp-bueno", "", &http.Client{})
 	s.Sondeo = 20 * time.Millisecond
 	ctx, parar := context.WithTimeout(t.Context(), 2*time.Second)
@@ -199,6 +204,18 @@ func TestSlackSondeaLosCanalesAbiertos(t *testing.T) {
 		}
 	case <-ctx.Done():
 		t.Fatal("el sondeo no entregó nada")
+	}
+	// Unas vueltas más del sondeo, que vuelven a traer el mismo mensaje: ni se entrega
+	// otra vez ni suma otro «sin leer». Visto en ROJO (ci-desktop de v4.0.0, Unread 2)
+	// cuando el sondeo daba otra vuelta antes de mirar los canales.
+	for desde := f.sondeos.Load(); f.sondeos.Load() < desde+3; {
+		select {
+		case ev := <-llega:
+			t.Fatalf("entregado otra vez: %+v", ev)
+		case <-ctx.Done():
+			t.Fatal("el sondeo se paró")
+		case <-time.After(5 * time.Millisecond):
+		}
 	}
 	if _, us, _ := s.Canales(ctx); len(us) != 1 || us[0].Unread != 1 {
 		t.Fatalf("sin leer: %+v", us)

@@ -10,6 +10,10 @@ import (
 	"context"
 	"syscall/js"
 
+	"git.sytue.eu/sytue/one/apps/nucleo/fallo"
+	privateMail "git.sytue.eu/sytue/one/apps/nucleo/mail"
+	"git.sytue.eu/sytue/one/apps/nucleo/offline"
+	"git.sytue.eu/sytue/one/apps/nucleo/storage"
 	"git.sytue.eu/sytue/one/apps/nucleo/webport"
 )
 
@@ -30,6 +34,20 @@ func init() {
 	asyncDomainOperations["mail.capabilities"] = func(ctx context.Context, req js.Value) (any, error) {
 		return webport.MailCapabilitiesJS(ctx, req, coreSources, corePolicies)
 	}
+}
+
+// Los errores centinela del correo con su nombre fijo: salen en «Más información»
+// (`prepare/mail.motor.error.Error.crypto_rejected.core.abrir.preparar.entrada_no_lista.no_listo`).
+func init() {
+	fallo.Conocido(privateMail.ErrNotReady, "no_listo")
+	fallo.Conocido(privateMail.ErrRecord, "registro_correo")
+	fallo.Conocido(privateMail.ErrConflict, "conflicto")
+	fallo.Conocido(privateMail.ErrClosed, "cerrado")
+	fallo.Conocido(privateMail.ErrNotFound, "no_encontrado")
+	fallo.Conocido(storage.ErrRecord, "registro")
+	fallo.Conocido(offline.ErrWorkPaused, "trabajo_pausado")
+	fallo.Conocido(offline.ErrWorkClosed, "trabajo_cerrado")
+	fallo.Conocido(offline.ErrWorkLease, "sin_arrendamiento")
 }
 
 func main() {

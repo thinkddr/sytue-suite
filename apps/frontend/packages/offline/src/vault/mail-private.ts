@@ -237,6 +237,10 @@ export async function openVaultMailPrivate(
     void closing.catch(() => {});
     return closing;
   };
+  // En qué paso va la apertura: un fallo lo lleva en `vaultStep` y sale en «Más
+  // información» (`prepare/mail.capacidades.error.Error.crypto_rejected`). Sin él, un
+  // `error.Error` no decía si había fallado el núcleo, la autoridad o la caché.
+  let paso = 'autoridad';
   try {
     group.assertOpen();
     const http = new HttpClient({
@@ -302,6 +306,7 @@ export async function openVaultMailPrivate(
     //    el correo retenido del servidor directo en la bóveda.
 
     // 3. Capacidades del módulo con un puerto de origen temporal (solo lectura).
+    paso = 'capacidades';
     const unavailable = (): Promise<never> =>
       Promise.reject(new MatrixSecurityError('unsupported'));
     const sourceAdapter = new PqcSourcePort(scope, group, {
@@ -347,6 +352,7 @@ export async function openVaultMailPrivate(
     }
 
     // 4. Los puertos del correo sobre la bóveda.
+    paso = 'registros';
     const records = vault.storage(blobs);
     await records.prepare(group.signal);
     await revalidate(group.signal);
@@ -425,6 +431,7 @@ export async function openVaultMailPrivate(
       }),
     );
     canonicalID = canonical.id;
+    paso = 'motor';
     await revalidate(group.signal);
     const engine = await openVaultMailEngine(domain, canonicalID, scope, group.signal);
     await revalidate(group.signal);
@@ -443,6 +450,7 @@ export async function openVaultMailPrivate(
       closeAndDrain,
     });
   } catch (error) {
+    marcarPaso(error, `mail.${paso}`);
     try {
       await closeAndDrain();
     } catch {
@@ -450,4 +458,11 @@ export async function openVaultMailPrivate(
     }
     throw error;
   }
+}
+
+/** Deja en el fallo el paso en que iba la apertura, si nadie lo marcó antes. */
+function marcarPaso(error: unknown, paso: string): void {
+  if (!(error instanceof Error) || !Object.isExtensible(error)) return;
+  if (Object.prototype.hasOwnProperty.call(error, 'vaultStep')) return;
+  Object.defineProperty(error, 'vaultStep', { value: paso, configurable: true });
 }

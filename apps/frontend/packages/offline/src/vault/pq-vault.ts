@@ -31,6 +31,7 @@ import type { StorageBlobPort } from '../matrix/storage-files.js';
 import {
   createStorageRecord,
   decodeStorageRecord,
+  sameStorageRecord,
   storageJSONBytes,
   StorageRecordError,
   type StorageRecord,
@@ -1331,6 +1332,26 @@ export class PqVault {
       return rec.payload;
     };
 
+    // Otro cliente publicó ya este `transaction_id` (dos pestañas o dos equipos
+    // importando a la vez): el servicio contesta 409 `conflict` porque el mismo registro,
+    // cifrado otra vez, no es byte a byte el mismo. Si el que está es EL MISMO registro,
+    // la publicación ya está hecha y vale la suya; si es otro, sigue siendo un fallo.
+    // Antes Drive se quedaba en `prepare/record.invalid.post_409_conflict` (barrido de
+    // producción, 2026-11-26).
+    const yaPublicado = async (
+      error: unknown,
+      transaction: string,
+      record: StorageRecord,
+      signal?: AbortSignal,
+    ): Promise<MatrixReference> => {
+      const yaEsta =
+        error instanceof StorageRecordError && error.check === 'post_409_conflict'
+          ? await findPublished(transaction, signal).catch(() => null)
+          : null;
+      if (yaEsta && sameStorageRecord(yaEsta.record, record)) return yaEsta.reference;
+      throw error;
+    };
+
     const publication = this.publicationTarget;
 
     const runExclusive = <T>(
@@ -1401,6 +1422,8 @@ export class PqVault {
             (tx, content) => sendRaw(room, tx, content, signal),
             readRaw,
           );
+        } catch (error) {
+          return await yaPublicado(error, transaction, record, signal);
         } finally {
           proof.fill(0);
         }
@@ -1424,6 +1447,8 @@ export class PqVault {
             },
             readRaw,
           );
+        } catch (error) {
+          return await yaPublicado(error, transaction, record, signal ?? policy.signal);
         } finally {
           proof.fill(0);
         }
@@ -1472,10 +1497,12 @@ export class PqVault {
       },
     };
 
-    const find = async (
+    // El registro publicado con ese `transaction_id`, abierto y comprobado, con su
+    // referencia; `null` si no hay ninguno.
+    const findPublished = async (
       transaction: string,
       signal?: AbortSignal,
-    ): Promise<StorageRecord | null> => {
+    ): Promise<{ record: StorageRecord; reference: MatrixReference } | null> => {
       assertOpen();
       const params = new URLSearchParams({ vault_id: this.vaultId, transaction_id: transaction });
       const res = await this.fetchImpl(`${this.base}/api/pq-vault/records?${params.toString()}`, {
@@ -1495,8 +1522,10 @@ export class PqVault {
       const opened = await this.storagePq.open(item.payload, reference, readRaw);
       if (!opened || 'fragment' in opened) throw new StorageRecordError();
       await verifyProof(reference.room_id, opened.record, opened.proof);
-      return opened.record;
+      return { record: opened.record, reference };
     };
+    const find = async (transaction: string, signal?: AbortSignal): Promise<StorageRecord | null> =>
+      (await findPublished(transaction, signal))?.record ?? null;
 
     return { transport, find };
   }

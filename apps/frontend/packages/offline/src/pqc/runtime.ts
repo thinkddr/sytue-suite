@@ -77,6 +77,8 @@ interface WorkerReply {
   ok?: boolean;
   value?: unknown;
   module_id?: unknown;
+  /** Por qué dijo «no» el núcleo, con palabras fijas (paquete `fallo` de Go). */
+  motivo?: unknown;
 }
 interface SpawnedWorker {
   readonly worker: Worker;
@@ -183,6 +185,12 @@ export class PqcRuntime {
     { worker: Worker; resolve: () => void; reject: (error: Error) => void }
   >();
   private closed = false;
+  /**
+   * El último puerto del anfitrión que falló, con su error. El núcleo solo ve «no» y
+   * contesta `crypto_rejected`; sin esto se perdía POR QUÉ (una petición al servicio
+   * que dio 409, una caché que no abrió…) y Mail quedaba en `prepare/error.Error`.
+   */
+  private ultimoFalloAnfitrion: { method: string; error: unknown } | undefined;
   private readyReject: ((error: Error) => void) | null = null;
   private readyTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly logout = (): void => {
@@ -348,8 +356,9 @@ export class PqcRuntime {
                   value.fill(0);
                 }
               },
-              () => {
+              (error: unknown) => {
                 if (this.worker !== worker) return;
+                this.ultimoFalloAnfitrion = { method: String(call.method), error };
                 try {
                   worker.postMessage({
                     type: 'host.result',
@@ -399,7 +408,20 @@ export class PqcRuntime {
         try {
           this.assertOpen();
           if (entry.port) this.ports.assertLive(entry.port);
-          if (message.ok !== true) throw new Error('crypto_rejected');
+          if (message.ok !== true) {
+            const rechazo = new Error('crypto_rejected');
+            // Para «Más información»: qué puerto del anfitrión falló antes (ver
+            // `ultimoFalloAnfitrion`). Va aparte y no en el mensaje.
+            if (this.ultimoFalloAnfitrion) {
+              Object.defineProperty(rechazo, 'hostFailure', { value: this.ultimoFalloAnfitrion });
+              this.ultimoFalloAnfitrion = undefined;
+            }
+            // Y en qué paso del núcleo (`abrir.preparar.entrada_no_lista.no_listo`): lo
+            // filtra `vaultFailureCode` antes de enseñarlo.
+            if (typeof message.motivo === 'string')
+              Object.defineProperty(rechazo, 'coreReason', { value: message.motivo });
+            throw rechazo;
+          }
           entry.resolve(message.value);
         } catch (error) {
           eraseOwnedBytes(message.value);

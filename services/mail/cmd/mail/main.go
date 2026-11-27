@@ -291,6 +291,9 @@ func run() error {
 		httpx.CheckerFunc{Label: "objectstore", Fn: blobs.Healthz},
 	)
 	api := jmap.New(cfg, st, blobs, outbound, logger).WithHub(hubNotifier).WithPrivateIngressQueue(st.PrivateIngressQueue(rooms, blobs))
+	// Si la entrada privada está montada (`private_ingress_ready`): sin esto el
+	// estado decía que no a todas las cuentas y Mail no abría ni vaciando los datos.
+	api = api.WithPrivateIngress(store.NuevaEntradaPrivada(rooms, blobs))
 	// El mismo servicio que firma publica su ancla: sin esto la ruta contesta 503
 	// y el correo sale firmado por una autoridad que nadie puede instalar.
 	//

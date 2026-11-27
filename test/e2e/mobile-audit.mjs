@@ -31,7 +31,7 @@ import {
   porQueNoEntra,
   salirDelPasoDeAutorizacion,
 } from './tests/helpers.ts';
-import { PERFIL_CIFRADO, almacenCorreo, estadoPuertaCifrado } from './tests/puerta-cifrado.ts';
+import { PERFIL_CIFRADO, estadoDelCorreo, estadoPuertaCifrado } from './tests/puerta-cifrado.ts';
 import {
   DETECTOR,
   DETECTOR_DOCUMENTO,
@@ -1124,9 +1124,11 @@ mkdirSync(SALIDA, { recursive: true });
 const browser = await chromium.launch();
 const informe = [];
 
-// Por dónde abre la cuenta su correo (`almacenCorreo`): se pregunta una vez, con la
-// primera visita a Mail. Si no es la bóveda, la puerta de la bóveda de Mail no se mide.
+// Por dónde abre la cuenta su correo y si el servicio tiene lista su entrada privada
+// (`estadoDelCorreo`): se pregunta una vez, con la primera visita a Mail. Si no es la
+// bóveda, la puerta de la bóveda de Mail no se mide; sin entrada, no abre nadie.
 let almacenMail = null;
+let entradaMail = null;
 for (const [nombre, perfil, opts] of ELEGIDOS) {
   if (PEDIDOS.length && !PEDIDOS.includes(nombre)) continue;
   const ctx = await browser.newContext({
@@ -1250,8 +1252,15 @@ for (const [nombre, perfil, opts] of ELEGIDOS) {
         // visto (todos los perfiles menos el primero; ver `abrirPuertaCifrado`).
         const puerta = await abrirPuertaCifrado(page, app);
         if (app === 'mail' && almacenMail === null) {
-          almacenMail = await page.evaluate(almacenCorreo, BASES.mail).catch(() => 'dudoso');
-          console.log(`  ·       ${nombre.padEnd(20)} mail: la cuenta abre su correo por «${almacenMail}»`);
+          const estado = await page
+            .evaluate(estadoDelCorreo, BASES.mail)
+            .catch(() => ({ almacen: 'dudoso', entrada: 'dudoso' }));
+          almacenMail = estado.almacen;
+          entradaMail = estado.entrada;
+          console.log(
+            `  ·       ${nombre.padEnd(20)} mail: la cuenta abre su correo por «${almacenMail}»; ` +
+              `entrada privada «${entradaMail}»`,
+          );
         }
         if (puerta === 'desbloqueada') {
           resp = await navegar(page, url);
@@ -1517,6 +1526,14 @@ if (sinCubrir.length)
 // con el correo cifrado roto sobre la bóveda y el barrido dio Mail por «ok» porque la
 // cuenta lo abría por Matrix.
 const bovedaMailSinMedir = almacenMail !== null && almacenMail !== 'boveda';
+// Y la entrada privada sin montar deja a TODAS las cuentas sin abrir su correo cifrado
+// (`…core.entrada_no_lista`, v4.0.4), vaya la de auditoría por donde vaya.
+const entradaMailNoLista = entradaMail === 'no_lista';
+if (entradaMailNoLista)
+  console.log(
+    'El servicio de Mail dice que la entrada privada NO está lista (private_ingress_ready): ' +
+      'ninguna cuenta abre su correo cifrado. ¿Le falta a Mail la autoridad de Rooms?',
+  );
 if (bovedaMailSinMedir)
   console.log(
     `La cuenta de auditoría abre Mail por «${almacenMail}», no por la bóveda: un fallo del ` +
@@ -1534,5 +1551,12 @@ if (bovedaMailSinMedir)
 // Y una pantalla que esta lista no visita cuenta igual que una que desborda: el
 // agujero no se ve en ninguna medida, solo en que no la hay.
 process.exit(
-  graves.length || caidas.length || saltadas.length || sinCubrir.length || bovedaMailSinMedir ? 1 : 0,
+  graves.length ||
+    caidas.length ||
+    saltadas.length ||
+    sinCubrir.length ||
+    bovedaMailSinMedir ||
+    entradaMailNoLista
+    ? 1
+    : 0,
 );

@@ -21,7 +21,7 @@
 //      después de cada llamada, así que la autoridad se comprueba igual.
 // Con el arreglo ya desplegado, la primera pasada abre y la segunda no se hace.
 //
-// SOLO PRUEBA ALGO SI LA CUENTA ABRE SU CORREO POR LA BÓVEDA (`almacenCorreo`). Con el
+// SOLO PRUEBA ALGO SI LA CUENTA ABRE SU CORREO POR LA BÓVEDA (`estadoDelCorreo`). Con el
 // correo en Matrix, la puerta de la bóveda no se monta y «abierta» no dice nada: así
 // salió la primera tirada contra v4.0.2 (run 46022534651): Mail «abría» con el camino
 // de la bóveda roto para todos, porque la cuenta de auditoría no pasaba por él.
@@ -32,7 +32,7 @@
 //   SYTUE_AUDIT_EMAIL=… SYTUE_AUDIT_PASS=… SYTUE_AUDIT_TOTP=… bun run repro-mail-desbloqueo.mjs
 import { chromium } from 'playwright';
 import { codigoTOTP, porQueNoEntra } from './tests/helpers.ts';
-import { PERFIL_CIFRADO, almacenCorreo, estadoPuertaCifrado } from './tests/puerta-cifrado.ts';
+import { PERFIL_CIFRADO, estadoDelCorreo, estadoPuertaCifrado } from './tests/puerta-cifrado.ts';
 
 const DOMINIO = process.env.SYTUE_BASE_DOMAIN || 'sytue.eu';
 const IDP = `id.${DOMINIO}`;
@@ -208,13 +208,25 @@ async function inyectarArreglo() {
 async function pedirTraspaso() {
   await abrirMail();
   await page.waitForTimeout(5000);
-  const antes = await page.evaluate(almacenCorreo, BASE).catch(() => 'dudoso');
-  console.log(`   antes del traspaso, la cuenta abre su correo por «${antes}»`);
+  const { almacen: antes, entrada } = await page
+    .evaluate(estadoDelCorreo, BASE)
+    .catch(() => ({ almacen: 'dudoso', entrada: 'dudoso' }));
+  console.log(
+    `   antes del traspaso, la cuenta abre su correo por «${antes}»; entrada privada «${entrada}»`,
+  );
   if (antes === 'boveda') return;
+  // Las dos cosas que la bóveda nueva necesita para abrir, comprobadas ANTES de vaciar
+  // nada: el arreglo del puerto (v4.0.3) en el JS y la entrada privada montada en el
+  // servicio (v4.0.5). La segunda faltaba con la primera ya desplegada.
   if (!(await sirveArreglo()))
     throw new Error(
       'producción no sirve todavía el arreglo de v4.0.3 (no hay `capabilitiesHandlers` en el JS de ' +
         'Mail): el traspaso acabaría en la bóveda rota. No se ha tocado nada.',
+    );
+  if (entrada !== 'lista')
+    throw new Error(
+      `el servicio de Mail dice que la entrada privada está «${entrada}»: la bóveda nueva no ` +
+        'abriría (`…core.entrada_no_lista`). No se ha tocado nada.',
     );
   if (antes !== 'matrix')
     throw new Error(`la autoridad de Rooms contesta «${antes}»: no se pide un traspaso a ciegas`);
@@ -234,9 +246,11 @@ try {
   if (TRASPASO) await pedirTraspaso();
   const tal = await esperarPuerta();
   // Sin la bóveda, «abierta» no dice nada de ella: Matrix o la pantalla de «Pasar a la
-  // bóveda» tampoco llevan la marca de la puerta (ver `almacenCorreo`).
-  const almacen = await page.evaluate(almacenCorreo, BASE).catch(() => 'dudoso');
-  console.log(`\n   la cuenta abre su correo por «${almacen}»`);
+  // bóveda» tampoco llevan la marca de la puerta (ver `estadoDelCorreo`).
+  const { almacen, entrada } = await page
+    .evaluate(estadoDelCorreo, BASE)
+    .catch(() => ({ almacen: 'dudoso', entrada: 'dudoso' }));
+  console.log(`\n   la cuenta abre su correo por «${almacen}»; entrada privada «${entrada}»`);
   informar('Mail tal cual está desplegado', tal);
   if (tal.estado === 'abierta' && almacen !== 'boveda') {
     console.log(

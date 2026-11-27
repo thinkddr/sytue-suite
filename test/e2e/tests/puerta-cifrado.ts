@@ -28,26 +28,39 @@
 /** `pqVaultProfile` de `@sytue/offline/vault`. */
 export const PERFIL_CIFRADO = "age-MLKEM768-X25519-v1";
 
+/** Lo que dice `estadoDelCorreo`. */
+export interface EstadoDelCorreo {
+  /** Por dónde abre Mail el correo: `boveda` (`PqVaultGate`), `matrix`, `retirada` o `dudoso`. */
+  almacen: "boveda" | "matrix" | "retirada" | "dudoso";
+  /** Si el servicio tiene montada la entrada privada (`private_ingress_ready`), o `dudoso`. */
+  entrada: "lista" | "no_lista" | "dudoso";
+}
+
 /**
- * Por dónde abre Mail el correo de la cuenta: `boveda` (la puerta de `PqVaultGate` y
- * `vault/mail-private.ts`), `matrix`, `retirada` o `dudoso`. Es la misma pregunta que
- * hace `elegirAlmacenCorreo` (apps/mail/src/client/almacenCorreo.ts) a la autoridad de
- * Rooms, de solo lectura.
+ * Por dónde abre Mail el correo de la cuenta y si el servicio tiene lista su entrada
+ * privada. Son las dos preguntas que hace Mail antes de abrir: `elegirAlmacenCorreo`
+ * (apps/mail/src/client/almacenCorreo.ts) a la autoridad de Rooms y `mail.capabilities`
+ * al estado del almacén privado. De solo lectura.
  *
  * POR QUÉ IMPORTA. Si la cuenta va por Matrix, la puerta de la bóveda no se monta y
  * nada de lo que se mida dice si la bóveda abre: v4.0.2 dejó roto el correo sobre la
  * bóveda (`mail.capacidades…host.authority.revalidate`) y la cuenta de auditoría, que
- * iba por Matrix, lo abría sin problema. Va a `page.evaluate`: no toca nada de fuera.
+ * iba por Matrix, lo abría sin problema. Y con la entrada sin montar, ninguna cuenta
+ * abre (`…core.entrada_no_lista`, v4.0.4: el piloto no le daba a Mail la autoridad de
+ * Rooms). Va a `page.evaluate`: no puede llamar a nada de fuera.
  */
-export async function almacenCorreo(
-  base: string,
-): Promise<"boveda" | "matrix" | "retirada" | "dudoso"> {
+export async function estadoDelCorreo(base: string): Promise<EstadoDelCorreo> {
+  const dudoso: EstadoDelCorreo = { almacen: "dudoso", entrada: "dudoso" };
   try {
     const s = await fetch(`${base}/auth/session`, { credentials: "same-origin" });
-    const sesion = (await s.json()) as { user?: { id?: unknown }; tenant?: unknown };
+    const sesion = (await s.json()) as {
+      user?: { id?: unknown };
+      tenant?: unknown;
+      owner?: { generation?: unknown };
+    };
     const subject = sesion.user?.id;
     const tenant = sesion.tenant;
-    if (typeof subject !== "string" || typeof tenant !== "string") return "dudoso";
+    if (typeof subject !== "string" || typeof tenant !== "string") return dudoso;
     const raw = new TextEncoder().encode(JSON.stringify({ tenant, subject, product: "mail" }));
     const ambito =
       "v1." +
@@ -55,27 +68,40 @@ export async function almacenCorreo(
         .replaceAll("+", "-")
         .replaceAll("/", "_")
         .replace(/=+$/u, "");
-    const res = await fetch(`${base}/api/matrix/storage/authority/`, {
-      credentials: "same-origin",
-      headers: { "X-Sytue-Storage-Scope": ambito },
-    });
-    const body = (await res.json().catch(() => null)) as {
-      user_id?: unknown;
-      code?: unknown;
-      error?: { code?: unknown };
-    } | null;
-    if (res.ok)
-      return typeof body?.user_id === "string" && body.user_id
-        ? body.user_id.endsWith(":sytue-vault")
-          ? "boveda"
-          : "matrix"
-        : "dudoso";
-    const code = body?.code ?? body?.error?.code;
-    if (res.status === 409 && code === "storage_root_enrollment_required") return "boveda";
-    if (res.status === 409 && code === "storage_matrix_retired") return "retirada";
-    return "dudoso";
+    const leer = async (ruta: string, cabeceras: Record<string, string> = {}) => {
+      const res = await fetch(`${base}/api/${ruta}`, {
+        credentials: "same-origin",
+        headers: { "X-Sytue-Storage-Scope": ambito, ...cabeceras },
+      });
+      const body = (await res.json().catch(() => null)) as Record<string, unknown> | null;
+      return { res, body };
+    };
+
+    let almacen: EstadoDelCorreo["almacen"] = "dudoso";
+    const autoridad = await leer("matrix/storage/authority/");
+    const usuario = autoridad.body?.user_id;
+    const error = autoridad.body?.error as { code?: unknown } | undefined;
+    const code = autoridad.body?.code ?? error?.code;
+    if (autoridad.res.ok && typeof usuario === "string" && usuario)
+      almacen = usuario.endsWith(":sytue-vault") ? "boveda" : "matrix";
+    else if (autoridad.res.status === 409 && code === "storage_root_enrollment_required")
+      almacen = "boveda";
+    else if (autoridad.res.status === 409 && code === "storage_matrix_retired")
+      almacen = "retirada";
+
+    // El estado del almacén privado pide la generación de la sesión, como `owner.fetch`.
+    let entrada: EstadoDelCorreo["entrada"] = "dudoso";
+    const generacion = sesion.owner?.generation;
+    if (typeof generacion === "string") {
+      const estado = await leer("private-storage/migration", {
+        "X-Sytue-Session-Generation": generacion,
+      });
+      if (estado.res.ok && estado.body)
+        entrada = estado.body.private_ingress_ready === true ? "lista" : "no_lista";
+    }
+    return { almacen, entrada };
   } catch {
-    return "dudoso";
+    return dudoso;
   }
 }
 

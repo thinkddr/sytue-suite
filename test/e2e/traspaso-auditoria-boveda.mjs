@@ -7,10 +7,10 @@
 // «Pasar a la bóveda» de Mail (vacía el correo privado de la cuenta en Matrix y abre una
 // bóveda nueva). Hace falta porque la cuenta abría su correo por Matrix y la puerta de la
 // bóveda no se medía: v4.0.2 salió con ella rota y nada lo vio (ver
-// `repro-mail-desbloqueo.mjs` y `almacenCorreo` en tests/puerta-cifrado.ts).
+// `repro-mail-desbloqueo.mjs` y `estadoDelCorreo` en tests/puerta-cifrado.ts).
 //
-// Solo traspasa si producción ya sirve el arreglo de v4.0.3; si no, se para sin tocar
-// nada. Con la cuenta ya en la bóveda, solo comprueba que abre. Fichero aparte porque el
+// Solo traspasa si producción ya sirve el arreglo de v4.0.3 y el servicio tiene lista la
+// entrada privada (v4.0.5); si no, se para sin tocar nada. Con la cuenta ya en la bóveda, solo comprueba que abre. Fichero aparte porque el
 // paso `reproductor` de `mobile.yml` solo acepta un nombre:
 //
 //   reproductor=traspaso-auditoria-boveda.mjs
